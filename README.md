@@ -1,3 +1,9 @@
+## FRGLIB
+
+![FRGLib](./logo.svg)
+
+Крутая библиотека для Python,Rust и C++
+
 ## Сборка и запуск
 
 В папке проекта выполните:
@@ -13,4 +19,9 @@ cmake --build build -j
 ```bash
 cmake --build build -j
 ./build/frglib
+```
+
+##Запуск тестов (Python)
+```bash
+python3 examples/python/window.py 
 ```
