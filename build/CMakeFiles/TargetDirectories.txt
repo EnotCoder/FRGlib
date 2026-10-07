@@ -1,3 +1,0 @@
-/home/enot0520/Vulkan/FRGLib/build/CMakeFiles/frglib.dir
-/home/enot0520/Vulkan/FRGLib/build/CMakeFiles/edit_cache.dir
-/home/enot0520/Vulkan/FRGLib/build/CMakeFiles/rebuild_cache.dir
