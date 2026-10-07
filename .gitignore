@@ -1,12 +1,15 @@
-# Папки сборки
-/build/
-/build-release/
-/cmake-build-*/
+# Rust
+/target/
+**/*.rs.bk
 
-# Локальные настройки и данные CMake
-CMakeUserPresets.json
-CMakeLists.txt.user
-compile_commands.json
+# Готовые wheel-и
+/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
 
 # Кэш редактора
 .cache/

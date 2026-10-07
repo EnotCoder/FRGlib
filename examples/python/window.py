@@ -1,12 +1,8 @@
-import ctypes
 import time
 
-lib = ctypes.CDLL("./build/libfrglib.so")
+import frglib
 
-
-lib.frg_create(b"game", 500, 500, True)
-
-while lib.frg_poll():
-    time.sleep(0.01)
-
-lib.frg_close()
+with frglib.Window("FRGLib", 800, 600) as window:
+    print(window)
+    while window.poll():
+        time.sleep(0.01)
