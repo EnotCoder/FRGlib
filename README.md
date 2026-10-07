@@ -23,7 +23,7 @@ cmake --build build -j
 ./build/frglib
 ```
 
-## Запуск тестов (Python)
+## Запуск примеров (Python)
 
 ```bash
 python3 examples/python/window.py 
