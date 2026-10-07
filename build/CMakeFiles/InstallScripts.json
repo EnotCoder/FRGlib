@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/enot0520/Vulkan/FRGLib/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
