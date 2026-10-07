@@ -14,7 +14,7 @@ namespace frglib{
             // запрет на присваение
             window& operator = (const window&) = delete;  
 
-            bool create(const char* title, int width, int height, bool resize);
+            bool create(const char* title, int width, int height, bool resize = true);
             void close();
 
         private:
