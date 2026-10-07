@@ -1,0 +1,17 @@
+# Папки сборки
+/build/
+/build-release/
+/cmake-build-*/
+
+# Локальные настройки и данные CMake
+CMakeUserPresets.json
+CMakeLists.txt.user
+compile_commands.json
+
+# Кэш редактора
+.cache/
+
+# Временные файлы
+*.swp
+*.swo
+*~
