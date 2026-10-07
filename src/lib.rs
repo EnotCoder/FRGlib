@@ -12,15 +12,8 @@ fn to_py_err(err: Error) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
 
-/// A window, as seen from Python.
-///
-/// `unsendable` because SDL restricts windows to the thread that initialised
-/// it, and the `sdl3` crate deliberately keeps its types `!Send`. PyO3 raises
-/// instead of letting a second thread reach in.
 #[pyclass(unsendable, module = "frglib", name = "Window")]
 struct PyWindow {
-    // `None` after `close()`, so closing is explicit and idempotent rather
-    // than waiting for the Python object to be collected.
     inner: Option<CoreWindow>,
 }
 
@@ -48,16 +41,6 @@ impl PyWindow {
             .map_err(to_py_err)
     }
 
-    /// Pump the event queue.
-    ///
-    /// Returns `False` once the window has been asked to close.
-    ///
-    /// The GIL is deliberately *not* released here. Doing so would require the
-    /// closure to be `Ungil` — i.e. `Send` — and SDL's types are `!Send` by
-    /// design, so the only way to get it would be to `unsafe impl Send` them
-    /// and hand that unsoundness to every caller. `SDL_PollEvent` does not
-    /// block: it drains the queue and returns, so the GIL is held for
-    /// microseconds. Callers that need to yield should sleep, as the example does.
     fn poll(&mut self) -> PyResult<bool> {
         self.inner_mut()?.poll().map_err(to_py_err)
     }
