@@ -7,11 +7,15 @@ pub use error::Error;
 use event::with_pump;
 
 use sdl3::event::{Event, WindowEvent};
-use sdl3::video::Window as SdlWindow;
+use sdl3::pixels::Color;
+use sdl3::render::{create_renderer, WindowCanvas};
 use sdl3::Sdl;
 
 pub struct Window {
-    window: SdlWindow,
+    // Declaration order is drop order: `WindowCanvas` owns both the renderer and
+    // the SDL window, so it has to be torn down while `_sdl` is still alive.
+    canvas: WindowCanvas,
+    background: Color,
     _sdl: Sdl,
 }
 
@@ -35,11 +39,27 @@ impl Window {
         }
         let window = builder.build()?;
 
-        Ok(Self { window, _sdl: sdl })
+        // `create_renderer` takes the window by value and hands back a Result,
+        // which is why we use it instead of `Window::into_canvas`: that one is
+        // infallible in its signature and `panic!`s internally on failure. SDL
+        // docs suggest `SDL_CreateWindowAndRenderer` to avoid startup flicker,
+        // but it takes no window flags, so `resizable`/`vulkan` would be lost.
+        let canvas = create_renderer(window, None)?;
+
+        Ok(Self {
+            canvas,
+            background: Color {
+                r: 0,
+                g: 200,
+                b: 0,
+                a: 255,
+            },
+            _sdl: sdl,
+        })
     }
 
     pub fn poll(&mut self) -> Result<bool, Error> {
-        let window_id = self.window.id();
+        let window_id = self.canvas.window().id();
         let sdl = &self._sdl;
 
         with_pump(sdl, |pump| {
@@ -63,7 +83,38 @@ impl Window {
 
     /// Current drawable size, as `(width, height)`.
     pub fn size(&self) -> (u32, u32) {
-        self.window.size()
+        self.canvas.window().size()
+    }
+
+    /// Sets the colour `frame` fills the window with.
+    pub fn set_background(&mut self, r: u8, g: u8, b: u8, a: u8) {
+        self.background = Color { r, g, b, a };
+    }
+
+    /// The colour `frame` currently fills the window with.
+    pub fn background(&self) -> (u8, u8, u8, u8) {
+        let c = self.background;
+        (c.r, c.g, c.b, c.a)
+    }
+
+    /// Draws one frame: fills with the background colour, then presents it.
+    ///
+    /// SDL has no API for the background of a window, so this has to run every
+    /// frame -- there is nothing to set once at startup.
+    ///
+    /// # Panics
+    ///
+    /// `set_draw_color` and `clear` `panic!` in `sdl3` instead of returning a
+    /// `Result`, so a broken renderer surfaces as a panic (PyO3 turns that into
+    /// `PanicException`) rather than as an `Error`. `present` does report
+    /// failure, and that case is handled.
+    pub fn frame(&mut self) -> Result<(), Error> {
+        self.canvas.set_draw_color(self.background);
+        self.canvas.clear();
+        if !self.canvas.present() {
+            return Err(sdl3::get_error().into());
+        }
+        Ok(())
     }
 
     /// The Vulkan instance extensions this window needs.
@@ -71,6 +122,6 @@ impl Window {
     /// Feed this straight into `ash::Instance::enumerate_instance_extensions`
     /// surface-extension checks.
     pub fn vulkan_instance_extensions(&self) -> Result<Vec<String>, Error> {
-        Ok(self.window.vulkan_instance_extensions()?)
+        Ok(self.canvas.window().vulkan_instance_extensions()?)
     }
 }

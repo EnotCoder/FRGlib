@@ -25,3 +25,10 @@ impl From<sdl3::video::WindowBuildError> for Error {
         Error(err.to_string())
     }
 }
+
+/// Same for `sdl3::render::create_renderer`.
+impl From<sdl3::IntegerOrSdlError> for Error {
+    fn from(err: sdl3::IntegerOrSdlError) -> Self {
+        Error(err.to_string())
+    }
+}

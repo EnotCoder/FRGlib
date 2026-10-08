@@ -50,6 +50,25 @@ impl PyWindow {
         Ok(self.inner()?.size())
     }
 
+    /// Set the colour `frame` fills the window with, as RGBA bytes.
+    fn set_background(&mut self, r: u8, g: u8, b: u8, a: u8) -> PyResult<()> {
+        self.inner_mut()?.set_background(r, g, b, a);
+        Ok(())
+    }
+
+    /// The colour `frame` currently fills the window with, as RGBA bytes.
+    #[getter]
+    fn background(&self) -> PyResult<(u8, u8, u8, u8)> {
+        Ok(self.inner()?.background())
+    }
+
+    /// Fill the window with the background colour and present the frame.
+    ///
+    /// SDL has no window background API, so this has to be called every frame.
+    fn frame(&mut self) -> PyResult<()> {
+        self.inner_mut()?.frame().map_err(to_py_err)
+    }
+
     /// Vulkan instance extensions required to present to this window.
     fn vulkan_instance_extensions(&self) -> PyResult<Vec<String>> {
         self.inner()?
