@@ -1,33 +1,45 @@
 //! Rust bindings to SDL3.
 //!
-//! Сейчас реализовано окно с рендерером и обработка событий; слой для Vulkan
-//! впереди.
+//! A window with a renderer, plus window and input events. A Vulkan layer is
+//! still to come.
 //!
-//! # Пример
+//! # Example
 //!
 //! ```no_run
-//! use frglib::window::Window;
+//! use frglib::{Color, Event, Window};
+//! use std::time::Duration;
 //!
-//! # fn main() -> Result<(), frglib::window::Error> {
+//! # fn main() -> Result<(), frglib::Error> {
 //! let mut window = Window::new("FRGLib", 800, 600, true, false)?;
+//! window.set_background(Color::GREEN);
 //!
-//! while window.poll()? {
+//! loop {
+//!     for event in window.poll()? {
+//!         match event {
+//!             Event::Quit | Event::CloseRequested => return Ok(()),
+//!             Event::Resized { width, height } => println!("now {width}x{height}"),
+//!             _ => {}
+//!         }
+//!     }
+//!
 //!     window.frame()?;
-//!     std::thread::sleep(std::time::Duration::from_millis(16));
+//!     std::thread::sleep(Duration::from_millis(16));
 //! }
-//! # Ok(())
 //! # }
 //! ```
 //!
-//! # Ограничения
+//! # Limitations
 //!
-//! [`Window`] намеренно не `Send` и не `Sync`: SDL требует, чтобы окно
-//! создавалось и использовалось в том же потоке, который первым инициализировал
-//! SDL, и крейт `sdl3` держит свои типы `!Send` по той же причине. Обычно это
-//! главный поток. Рендерер, как и окно, создаётся только на главном потоке, так
-//! что [`Window::frame`] вызывать нужно оттуда же.
-//!
-//! События ввода и клавиатуры пока не диспетчеризуются: [`Window::poll`]
-//! сообщает только о том, что окно закрывается, и выбрасывает остальное.
+//! [`Window`] is intentionally neither `Send` nor `Sync`: SDL requires a window
+//! to be created and used on the thread that initialised SDL first, and `sdl3`
+//! keeps its types `!Send` for the same reason. That is normally the main
+//! thread. The renderer, like the window, can only be created on the main
+//! thread, so [`Window::frame`] has to be called from there too.
 
+pub mod color;
+pub mod event;
 pub mod window;
+
+pub use color::Color;
+pub use event::Event;
+pub use window::{Error, Window};

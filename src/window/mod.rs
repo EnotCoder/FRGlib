@@ -1,13 +1,12 @@
 // Windowing and event handling on top of SDL3.
 mod error;
-mod event;
+mod pump;
 
 pub use error::Error;
 
-use event::with_pump;
+use pump::with_pump;
 
-use sdl3::event::{Event, WindowEvent};
-use sdl3::pixels::Color;
+use crate::color::Color;
 use sdl3::render::{create_renderer, WindowCanvas};
 use sdl3::Sdl;
 
@@ -61,36 +60,30 @@ impl Window {
 
         Ok(Self {
             canvas,
-            background: Color {
-                r: 0,
-                g: 200,
-                b: 0,
-                a: 255,
-            },
+            background: Color::GREEN,
             _sdl: sdl,
         })
     }
 
-    pub fn poll(&mut self) -> Result<bool, Error> {
+    /// Drains the event queue and returns everything that happened this frame.
+    ///
+    /// SDL keeps one queue for the whole process, so events are filtered by
+    /// window id and only this window's reach the caller. `Event::Quit` is the
+    /// exception, as it is not tied to any window.
+    ///
+    /// Use [`Event::should_close`] to decide whether to keep looping.
+    pub fn poll(&mut self) -> Result<Vec<crate::event::Event>, Error> {
         let window_id = self.canvas.window().id();
         let sdl = &self._sdl;
 
         with_pump(sdl, |pump| {
-            let mut running = true;
+            let mut events = Vec::new();
             while let Some(event) = pump.poll_event() {
-                match event {
-                    Event::Quit { .. } => running = false,
-                    // Matched on `window_id`: the C++ version closed on any
-                    // window's close request, including other windows'.
-                    Event::Window {
-                        window_id: id,
-                        win_event: WindowEvent::CloseRequested,
-                        ..
-                    } if id == window_id => running = false,
-                    _ => {}
+                if let Some(event) = crate::event::translate(event, window_id) {
+                    events.push(event);
                 }
             }
-            Ok(running)
+            Ok(events)
         })
     }
 
@@ -100,14 +93,13 @@ impl Window {
     }
 
     /// Sets the colour `frame` fills the window with.
-    pub fn set_background(&mut self, r: u8, g: u8, b: u8, a: u8) {
-        self.background = Color { r, g, b, a };
+    pub fn set_background(&mut self, color: crate::color::Color) {
+        self.background = color;
     }
 
     /// The colour `frame` currently fills the window with.
-    pub fn background(&self) -> (u8, u8, u8, u8) {
-        let c = self.background;
-        (c.r, c.g, c.b, c.a)
+    pub fn background(&self) -> crate::color::Color {
+        self.background
     }
 
     /// Draws one frame: fills with the background colour, then presents it.
@@ -118,9 +110,8 @@ impl Window {
     /// # Panics
     ///
     /// `set_draw_color` and `clear` `panic!` in `sdl3` instead of returning a
-    /// `Result`, so a broken renderer surfaces as a panic (PyO3 turns that into
-    /// `PanicException`) rather than as an `Error`. `present` does report
-    /// failure, and that case is handled.
+    /// `Result`, so a broken renderer surfaces as a panic rather than as an
+    /// `Error`. `present` does report failure, and that case is handled.
     pub fn frame(&mut self) -> Result<(), Error> {
         self.canvas.set_draw_color(self.background);
         self.canvas.clear();
