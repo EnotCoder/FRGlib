@@ -37,6 +37,11 @@ impl Window {
         if vulkan {
             builder.vulkan();
         }
+        // SDL picks the first available renderer driver, and on Linux that is
+        // `opengl`. SDL expects a window to carry SDL_WINDOW_OPENGL before a GL
+        // context is attached to it, so setting it here keeps the flag and the
+        // backend that `create_renderer` below is about to choose in agreement.
+        builder.opengl();
         let window = builder.build()?;
 
         // `create_renderer` takes the window by value and hands back a Result,
