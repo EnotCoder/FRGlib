@@ -1,7 +1,9 @@
 // Windowing and event handling on top of SDL3.
+mod builder;
 mod error;
 mod pump;
 
+pub use builder::WindowBuilder;
 pub use error::Error;
 
 use pump::with_pump;
@@ -19,12 +21,19 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(
-        title: &str,
+    /// Starts building a window. See [`WindowBuilder`].
+    pub fn builder(title: impl Into<String>) -> WindowBuilder {
+        WindowBuilder::new(title)
+    }
+
+    /// Opens the window. Called by [`WindowBuilder::build`].
+    fn create(
+        title: String,
         width: u32,
         height: u32,
         resizable: bool,
         vulkan: bool,
+        background: Color,
     ) -> Result<Self, Error> {
         // SDL3 asks the X11 compositor to bypass our window by default, which
         // sets _NET_WM_BYPASS_COMPOSITOR=1 and makes the window get drawn
@@ -37,7 +46,7 @@ impl Window {
         let sdl = sdl3::init()?;
         let video = sdl.video()?;
 
-        let mut builder = video.window(title, width, height);
+        let mut builder = video.window(&title, width, height);
         if resizable {
             builder.resizable();
         }
@@ -60,7 +69,7 @@ impl Window {
 
         Ok(Self {
             canvas,
-            background: Color::GREEN,
+            background,
             _sdl: sdl,
         })
     }

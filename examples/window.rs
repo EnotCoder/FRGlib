@@ -7,9 +7,12 @@ use std::time::Duration;
 use frglib::{Color, Event, Window};
 
 fn main() -> Result<(), frglib::Error> {
-    // title, width, height, resizable, vulkan
-    let mut window = Window::new("FRGLib", 800, 600, true, false)?;
-    window.set_background(Color::WHITE);
+    let mut window = Window::builder("FRGLib")
+        .size(800, 600)
+        .resizable(true)
+        .vulkan(false)
+        .background(Color::WHITE)
+        .build()?;
 
     println!(
         "size {:?}, background {:?}",

@@ -19,18 +19,29 @@ cargo run --example window
 ## Использование
 
 ```rust
-use frglib::window::Window;
+use frglib::{Color, Event, Window};
 use std::time::Duration;
 
-fn main() -> Result<(), frglib::window::Error> {
-    let mut window = Window::new("FRGLib", 800, 600, true, false)?;
+fn main() -> Result<(), frglib::Error> {
+    let mut window = Window::builder("FRGLib")
+        .size(800, 600)
+        .resizable(true)
+        .vulkan(false)
+        .background(Color::GREEN)
+        .build()?;
 
-    window.set_background(0, 200, 0, 255);
-    while window.poll()? {
+    loop {
+        for event in window.poll()? {
+            match event {
+                Event::Quit | Event::CloseRequested => return Ok(()),
+                Event::Resized { width, height } => println!("{width}x{height}"),
+                _ => {}
+            }
+        }
+
         window.frame()?;
         std::thread::sleep(Duration::from_millis(16));
     }
-    Ok(())
 }
 ```
 
@@ -38,15 +49,31 @@ fn main() -> Result<(), frglib::window::Error> {
 
 | Вызов | Описание |
 |---|---|
-| `Window::new(title, width, height, resizable, vulkan)` | Открывает окно с рендерером |
-| `poll() -> Result<bool, Error>` | Разбирает очередь событий. `false` — пора закрываться |
-| `frame() -> Result<(), Error>` | Заливает окно текущим цветом фона и показывает кадр |
-| `set_background(r, g, b, a)` | Задаёт цвет фона |
-| `background() -> (u8, u8, u8, u8)` | Возвращает текущий цвет фона |
+| `Window::builder(title)` | Начинает сборку окна. Заголовок обязателен, остальное необязательно |
+| `.size(w, h)` | Размер в пикселях. По умолчанию 800x600 |
+| `.resizable(bool)` | Разрешить ресайз. По умолчанию `true` |
+| `.vulkan(bool)` | Флаг `SDL_WINDOW_VULKAN`. По умолчанию `false` |
+| `.background(Color)` | Цвет фона. По умолчанию `Color::GREEN` |
+| `.build()` | Открывает окно, возвращает `Result<Window, Error>` |
+| `poll() -> Result<Vec<Event>, Error>` | Разбирает очередь событий за кадр |
+| `frame() -> Result<(), Error>` | Заливает окно текущим цветом и показывает кадр |
+| `set_background(Color)` | Меняет цвет фона на лету |
+| `background() -> Color` | Текущий цвет фона |
 | `size() -> (u32, u32)` | Текущий размер окна |
 | `vulkan_instance_extensions() -> Result<Vec<String>, Error>` | Расширения Vulkan, нужные этому окну |
 
-Дефолтный цвет фона — зелёный, `(0, 200, 0, 255)`.
+`Event::should_close()` отвечает на вопрос, стоит ли продолжать цикл.
+
+### События
+
+`poll()` возвращает `Vec<Event>`: `Quit`, `CloseRequested`, `Resized`, `Moved`,
+`FocusGained`/`FocusLost`, `Minimized`/`Maximized`/`Restored`, `KeyDown`,
+`KeyUp`, `TextInput`, `MouseMotion`, `MouseButtonDown`, `MouseButtonUp`,
+`MouseWheel`.
+
+У SDL одна очередь событий на весь процесс, поэтому события фильтруются по
+идентификатору окна: чужое окно не получит твои события мыши и клавиатуры.
+Исключение — `Event::Quit`, он не привязан к окну.
 
 ## SDL3 без зависимости от системы
 

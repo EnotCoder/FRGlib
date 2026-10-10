@@ -10,8 +10,10 @@
 //! use std::time::Duration;
 //!
 //! # fn main() -> Result<(), frglib::Error> {
-//! let mut window = Window::new("FRGLib", 800, 600, true, false)?;
-//! window.set_background(Color::GREEN);
+//! let mut window = Window::builder("FRGLib")
+//!     .size(800, 600)
+//!     .background(Color::GREEN)
+//!     .build()?;
 //!
 //! loop {
 //!     for event in window.poll()? {
@@ -42,4 +44,4 @@ pub mod window;
 
 pub use color::Color;
 pub use event::Event;
-pub use window::{Error, Window};
+pub use window::{Error, Window, WindowBuilder};
