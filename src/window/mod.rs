@@ -27,6 +27,14 @@ impl Window {
         resizable: bool,
         vulkan: bool,
     ) -> Result<Self, Error> {
+        // SDL3 asks the X11 compositor to bypass our window by default, which
+        // sets _NET_WM_BYPASS_COMPOSITOR=1 and makes the window get drawn
+        // straight to the framebuffer. A bypassed window never receives
+        // compositor effects, so under picom it loses the blur, the rounded
+        // corners, the shadow and the open/close animations. SDL says to set
+        // this before creating a window.
+        sdl3::hint::set("SDL_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR", "0");
+
         let sdl = sdl3::init()?;
         let video = sdl.video()?;
 
