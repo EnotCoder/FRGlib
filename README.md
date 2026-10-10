@@ -1,40 +1,74 @@
 ## FRGLib
 
-библиотека для создания игр на Python, Rust и C++.
+Rust-обвязка над SDL3: окно, рендерер и обработка событий. Слой для Vulkan
+впереди.
 
-## Подготовка окружения
+## Требования
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install "maturin[patchelf]"
-```
+- Rust 1.82+
+- SDL3 (для сборки по умолчанию берётся системная библиотека)
+- `cmake` и C-компилятор — только если включаешь фичу `bundled`
 
 ## Сборка и запуск
 
 ```bash
-maturin develop
-python examples/python/window.py
+cargo build
+cargo run --example window
 ```
 
-`maturin develop` пересобирает расширение и ставит его в активный venv. После
-изменения в `src/` достаточно запустить его же — отдельная пересборка не нужна.
+## Использование
 
-## Wheel без зависимости от системного SDL3
+```rust
+use frglib::window::Window;
+use std::time::Duration;
 
-По умолчанию линкуется системная SDL3, и maturin кладёт её копию в wheel. Если
-нужна полностью самодостаточная сборка, включите фичу `bundled`: SDL3
-собирается из исходников и линкуется статически, и wheel получается примерно
-1.9 МБ без всяких внешних библиотек.
+fn main() -> Result<(), frglib::window::Error> {
+    let mut window = Window::new("FRGLib", 800, 600, true, false)?;
+
+    window.set_background(0, 200, 0, 255);
+    while window.poll()? {
+        window.frame()?;
+        std::thread::sleep(Duration::from_millis(16));
+    }
+    Ok(())
+}
+```
+
+## API
+
+| Вызов | Описание |
+|---|---|
+| `Window::new(title, width, height, resizable, vulkan)` | Открывает окно с рендерером |
+| `poll() -> Result<bool, Error>` | Разбирает очередь событий. `false` — пора закрываться |
+| `frame() -> Result<(), Error>` | Заливает окно текущим цветом фона и показывает кадр |
+| `set_background(r, g, b, a)` | Задаёт цвет фона |
+| `background() -> (u8, u8, u8, u8)` | Возвращает текущий цвет фона |
+| `size() -> (u32, u32)` | Текущий размер окна |
+| `vulkan_instance_extensions() -> Result<Vec<String>, Error>` | Расширения Vulkan, нужные этому окну |
+
+Дефолтный цвет фона — зелёный, `(0, 200, 0, 255)`.
+
+## SDL3 без зависимости от системы
+
+По умолчанию линкуется системная SDL3. Фича `bundled` собирает её из исходников
+и линкует статически — полезно, если итоговый бинарник должен таскать SDL3 с
+собой:
 
 ```bash
-pip install maturin cmake
-maturin build --release --features bundled --out dist
+cargo build --release --features bundled
 ```
 
-Нужны `cmake` и C-компилятор. Проверено: `ldd` на установленном `.so` не
-показывает `libSDL3` вообще.
+Оговорка про `bundled`: в `sdl3-sys` флаг `build-from-source` сам по себе не
+переключает линковку на статическую — за это отвечает отдельный `link-static`.
+Нужен именно `build-from-source-static`, как и прописано в фиче.
 
-Оговорка: раз SDL3 влинкована статически, maturin не может определить
-manylinux-тег и ставит общий `linux_x86_64`. Для загрузки на PyPI такой wheel
-не подойдёт — потребуется `auditwheel repair`.
+## Ограничения
+
+- SDL требует, чтобы окно создавалось и использовалось в том же потоке, который
+  первым инициализировал SDL. `Window` не `Send` и не `Sync`, и рендерер
+  создаётся только на главном потоке — так что `frame()` тоже оттуда.
+- События ввода и клавиатуры не диспетчеризуются: `poll()` сообщает только о
+  том, что окно закрывается, остальное выбрасывает. Это следующий шаг.
+- `set_draw_color` и `clear` в крейте `sdl3` `panic!` вместо `Result`, так что
+  битый рендерер вылезет паникой, а не `Error`. `present` ошибку возвращает
+  честно, этот случай обработан.

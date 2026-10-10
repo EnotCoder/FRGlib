@@ -2,14 +2,8 @@
 /target/
 **/*.rs.bk
 
-# Готовые wheel-и
-/dist/
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
+# Библиотека, а не приложение: версии зависят от того, кто её подтягивает
+/Cargo.lock
 
 # Кэш редактора
 .cache/

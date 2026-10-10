@@ -3,23 +3,20 @@ name = "frglib"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
-description = "Bindings to SDL3 for Python"
+description = "Rust bindings to SDL3: windows, events and a Vulkan-capable surface"
 license = "MIT"
-
-[lib]
-name = "frglib"
-crate-type = ["cdylib", "rlib"]
+repository = "https://github.com/EnotCoder/FRGlib.git"
+readme = "README.md"
+keywords = ["sdl", "sdl3", "window", "graphics", "vulkan"]
+categories = ["graphics", "rendering", "game-development", "api-bindings"]
 
 [features]
 default = []
-# Build SDL3 from source and link it statically, so the built extension has no
+# Build SDL3 from source and link it statically, so the built binary has no
 # system SDL3 dependency. Needs cmake and a C compiler. Note that
 # `build-from-source` alone is not enough: it still links dynamically, because
 # `sdl3-sys` only switches to `LinkKind::Static` under `link-static`.
 bundled = ["sdl3/build-from-source-static"]
-
-[dependencies]
-pyo3 = { version = "0.29", features = ["extension-module"] }
 
 [dependencies.sdl3]
 version = "0.20"
