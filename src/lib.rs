@@ -8,6 +8,7 @@ mod window;
 
 use window::{Error, Window as CoreWindow};
 
+// Преобразование ошибки Rust в исключение Python
 fn to_py_err(err: Error) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
