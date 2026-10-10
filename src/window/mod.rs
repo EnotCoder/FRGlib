@@ -125,7 +125,7 @@ impl Window {
         self.canvas.set_draw_color(self.background);
         self.canvas.clear();
         if !self.canvas.present() {
-            return Err(sdl3::get_error().into());
+            return Err(Error::Present(sdl3::get_error()));
         }
         Ok(())
     }
