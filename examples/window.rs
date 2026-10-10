@@ -10,7 +10,7 @@ fn main() -> Result<(), frglib::window::Error> {
     // title, width, height, resizable, vulkan
     let mut window = Window::new("FRGLib", 800, 600, true, false)?;
 
-    window.set_background(0, 200, 0, 255);
+    window.set_background(0, 255, 255, 255);
     println!(
         "size {:?}, background {:?}",
         window.size(),
