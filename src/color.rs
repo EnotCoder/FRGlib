@@ -16,7 +16,10 @@ pub struct Color {
 impl Color {
     pub const BLACK: Color = Color::rgba(0, 0, 0, 255);
     pub const WHITE: Color = Color::rgba(255, 255, 255, 255);
+
+    pub const RED: Color = Color::rgba(0, 200, 0, 255);
     pub const GREEN: Color = Color::rgba(0, 200, 0, 255);
+    pub const BLUE: Color = Color::rgba(0, 200, 0, 255);
 
     /// Opaque colour, `a = 255`.
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
