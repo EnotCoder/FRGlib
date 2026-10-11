@@ -6,6 +6,13 @@ use crate::window::Error;
 
 use sdl3::render::{BlendMode, WindowCanvas};
 
+/// `Option<FRect>: From<Rect>` does not exist, so the conversion goes through an
+/// explicit local at every call site that needs one.
+fn to_f_rect(rect: impl Into<Rect>) -> sdl3::render::FRect {
+    let rect: Rect = rect.into();
+    rect.into()
+}
+
 /// Draws shapes onto a window for one frame.
 ///
 /// Obtained from [`Window::frame_with`](crate::Window::frame_with). Holds a
@@ -38,8 +45,7 @@ impl<'a> Draw<'a> {
             self.canvas.set_blend_mode(want);
         }
 
-        let rect: Rect = rect.into();
-        let f_rect: sdl3::render::FRect = rect.into();
+        let f_rect = to_f_rect(rect);
         self.canvas.set_draw_color(color);
         self.canvas.fill_rect(Some(f_rect))?;
         Ok(())
@@ -59,6 +65,39 @@ impl<'a> Draw<'a> {
         color: Color,
     ) -> Result<(), Error> {
         self.fill_rect(Rect::square_centered(cx, cy, side), color)
+    }
+
+    /// Fills a rectangle with `image`, stretched to fit.
+    ///
+    /// The image is uploaded to the GPU on every call and dropped again straight
+    /// after, so this costs a texture upload per frame. That is fine for the odd
+    /// sprite, but a large image redrawn every frame will want a persistent
+    /// texture instead.
+    pub fn fill_texture(
+        &mut self,
+        rect: impl Into<Rect>,
+        image: &crate::image::Image,
+    ) -> Result<(), Error> {
+        // `texture_creator` hands over ownership, so nothing here borrows
+        // `self.canvas` -- the texture borrows the local creator instead, which
+        // is what lets `copy` take `&mut self.canvas` below.
+        let creator = self.canvas.texture_creator();
+        let texture = creator.create_texture_from_surface(&image.surface)?;
+
+        self.canvas.set_blend_mode(sdl3::render::BlendMode::Blend);
+        self.canvas.copy(&texture, None, Some(to_f_rect(rect)))?;
+        Ok(())
+    }
+
+    /// Draws `image` as a square with its top-left corner at `(x, y)`.
+    pub fn fill_textured_square(
+        &mut self,
+        x: f32,
+        y: f32,
+        side: f32,
+        image: &crate::image::Image,
+    ) -> Result<(), Error> {
+        self.fill_texture(Rect::square(x, y, side), image)
     }
 
     /// Drawable size of the window, as `(width, height)`.

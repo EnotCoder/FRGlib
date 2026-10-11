@@ -16,6 +16,8 @@ pub enum Error {
     WindowBuild(sdl3::video::WindowBuildError),
     /// A renderer would not attach to the window.
     Renderer(sdl3::IntegerOrSdlError),
+    /// A texture could not be created from an image.
+    Texture(sdl3::render::TextureValueError),
     /// Presenting the frame failed. SDL reports this as a plain flag rather
     /// than a dedicated error type, so it borrows [`Error::Sdl`]'s payload.
     Present(sdl3::Error),
@@ -27,6 +29,7 @@ impl fmt::Display for Error {
             Error::Sdl(err) => write!(f, "SDL error: {err}"),
             Error::WindowBuild(err) => write!(f, "could not create the window: {err}"),
             Error::Renderer(err) => write!(f, "could not create the renderer: {err}"),
+            Error::Texture(err) => write!(f, "could not create the texture: {err}"),
             Error::Present(err) => write!(f, "could not present the frame: {err}"),
         }
     }
@@ -38,6 +41,7 @@ impl StdError for Error {
             Error::Sdl(err) | Error::Present(err) => Some(err),
             Error::WindowBuild(err) => Some(err),
             Error::Renderer(err) => Some(err),
+            Error::Texture(err) => Some(err),
         }
     }
 }
@@ -60,5 +64,12 @@ impl From<sdl3::video::WindowBuildError> for Error {
 impl From<sdl3::IntegerOrSdlError> for Error {
     fn from(err: sdl3::IntegerOrSdlError) -> Self {
         Error::Renderer(err)
+    }
+}
+
+/// Same for `TextureCreator::create_texture_from_surface`.
+impl From<sdl3::render::TextureValueError> for Error {
+    fn from(err: sdl3::render::TextureValueError) -> Self {
+        Error::Texture(err)
     }
 }
