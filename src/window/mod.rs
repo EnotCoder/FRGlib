@@ -1,9 +1,11 @@
 // Windowing and event handling on top of SDL3.
 mod builder;
+mod draw;
 mod error;
 mod pump;
 
 pub use builder::WindowBuilder;
+pub use draw::Draw;
 pub use error::Error;
 
 use pump::with_pump;
@@ -111,10 +113,26 @@ impl Window {
         self.background
     }
 
+    /// Fills the window with the background colour without presenting it.
+    fn clear(&mut self) {
+        self.canvas.set_draw_color(self.background);
+        self.canvas.clear();
+    }
+
+    /// Presents whatever has been drawn.
+    fn present(&mut self) -> Result<(), Error> {
+        if !self.canvas.present() {
+            return Err(Error::Present(sdl3::get_error()));
+        }
+        Ok(())
+    }
+
     /// Draws one frame: fills with the background colour, then presents it.
     ///
     /// SDL has no API for the background of a window, so this has to run every
     /// frame -- there is nothing to set once at startup.
+    ///
+    /// Use [`Window::frame_with`] to put shapes on top of the background.
     ///
     /// # Panics
     ///
@@ -122,12 +140,40 @@ impl Window {
     /// `Result`, so a broken renderer surfaces as a panic rather than as an
     /// `Error`. `present` does report failure, and that case is handled.
     pub fn frame(&mut self) -> Result<(), Error> {
-        self.canvas.set_draw_color(self.background);
-        self.canvas.clear();
-        if !self.canvas.present() {
-            return Err(Error::Present(sdl3::get_error()));
+        self.clear();
+        self.present()
+    }
+
+    /// Draws one frame with shapes on top of the background.
+    ///
+    /// The background is cleared first, then `draw` runs, then the frame is
+    /// presented. `draw` may return an error to abort the frame.
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), frglib::Error> {
+    /// # let mut window = frglib::Window::builder("demo").build()?;
+    /// window.frame_with(|d| {
+    ///     d.fill_square(100.0, 100.0, 200.0, frglib::Color::rgb(220, 60, 60))?;
+    ///     Ok(())
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Same caveat as [`Window::frame`]: `clear` and `set_draw_color` panic
+    /// inside `sdl3` rather than returning an error.
+    pub fn frame_with(
+        &mut self,
+        draw: impl FnOnce(&mut Draw<'_>) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        self.clear();
+        {
+            let mut handle = Draw::new(&mut self.canvas);
+            draw(&mut handle)?;
         }
-        Ok(())
+        self.present()
     }
 
     /// The Vulkan instance extensions this window needs.
