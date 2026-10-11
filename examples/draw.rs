@@ -12,7 +12,8 @@ fn main() -> Result<(), frglib::Error> {
         .background(Color::rgb(20, 25, 30))
         .build()?;
 
-    let mut angle = 0.0f32;
+
+    let margin = 60.0;
 
     loop {
         for event in window.poll()? {
@@ -23,37 +24,25 @@ fn main() -> Result<(), frglib::Error> {
             }
         }
 
-        angle += 1.5;
         let (w, h) = window.size();
         let (w, h) = (w as f32, h as f32);
 
+        // Вписываем логотип в окно целиком, с отступами.
+        let avail_w = (w - margin * 2.0).max(1.0);
+        let avail_h = (h - margin * 2.0).max(1.0);
+        let (mut lw, mut lh) = (avail_w, avail_w);
+        if lh > avail_h {
+            lh = avail_h;
+            lw = avail_h;
+        }
+
+        let x = (w - lw) / 2.0;
+        let y = (h - lh) / 2.0;
+        
+
         window.frame_with(|d| {
             // Непрозрачный квадрат в левом верхнем углу.
-            d.fill_square(40.0, 40.0, 120.0, Color::rgb(220, 60, 60))?;
-
-            // Полупрозрачный: должен смешаться с фоном, а не закрыть его.
-            d.fill_rect(
-                Rect::new(40.0, 200.0, 220.0, 120.0),
-                Color::rgba(60, 160, 220, 128),
-            )?;
-
-            // Два непрозрачных, чтобы проверить переключение режима
-            // проходимости обратно в None.
-            d.fill_rect(
-                Rect::new(40.0, 360.0, 220.0, 60.0),
-                Color::rgb(90, 200, 120),
-            )?;
-            d.fill_rect(
-                Rect::new(40.0, 430.0, 220.0, 60.0),
-                Color::rgba(220, 180, 60, 90),
-            )?;
-
-            // Вращающийся по кругу квадрат в центре окна.
-            let r = w.min(h) * 0.25;
-            let cx = w / 2.0 + angle.to_radians().cos() * r;
-            let cy = h / 2.0 + angle.to_radians().sin() * r;
-            d.fill_square_centered(cx, cy, 60.0, Color::WHITE)?;
-
+            d.fill_rect(Rect::new(x, y, lw, lh), Color::rgb(220, 60, 60))?;
             Ok(())
         })?;
 
