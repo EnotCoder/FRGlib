@@ -121,6 +121,7 @@ window.frame_with(|d| {
 | `cargo run --example draw` | Прямоугольники, квадраты, альфа |
 | `cargo run --example texture` | Логотип библиотеки как текстура |
 | `cargo run --example polygon` | Многоугольники: заливка, контур, текстура |
+| `cargo run --example mouse` | Состояние кнопок мыши: `Down`/`Up`, потеря фокуса |
 
 ### События
 

@@ -45,7 +45,7 @@ pub mod rect;
 pub mod window;
 
 pub use color::Color;
-pub use event::Event;
+pub use event::{Event, MouseButton};
 pub use image::Image;
 pub use rect::Rect;
 pub use window::{Draw, Error, Window, WindowBuilder};
