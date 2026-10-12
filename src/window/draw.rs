@@ -106,6 +106,10 @@ impl<'a> Draw<'a> {
         points: &[(f32, f32)],
         color: Color,
     ) -> Result<(), Error> {
+        // Контуру нужно минимум две точки: один отрезок и замыкающий.
+        if points.len() < 2 {
+            return Ok(());
+        }
 
         let want = if color.a < 255 {
             BlendMode::Blend
@@ -178,25 +182,21 @@ impl<'a> Draw<'a> {
                 color: vertex_color,
                 tex_coord: FPoint::new(0.0, 0.0),
             });
-
-            let want = if color.a < 255 {
-                BlendMode::Blend
-            } else {
-                BlendMode::None
-            };
-
-            if self.canvas.blend_mode() != want {
-                self.canvas.set_blend_mode(want);
-            }
-
-            self.canvas.render_geometry(
-                &vertices,
-                None,
-                VertexIndices::Sequential,
-            )?;
-
-            Ok(())
         }
+
+        let want = if color.a < 255 {
+            BlendMode::Blend
+        } else {
+            BlendMode::None
+        };
+        if self.canvas.blend_mode() != want {
+            self.canvas.set_blend_mode(want);
+        }
+
+        self.canvas
+            .render_geometry(&vertices, None, VertexIndices::Sequential)?;
+
+        Ok(())
     }
 
     /// Drawable size of the window, as `(width, height)`.

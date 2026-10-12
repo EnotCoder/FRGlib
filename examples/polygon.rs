@@ -1,19 +1,16 @@
-//! Рисует квадраты поверх фона окна.
+//! Заполняет многоугольник по индексам и обводит его контур.
 //!
-//! Запуск: `cargo run --example draw`
+//! Запуск: `cargo run --example polygon`
 
 use std::time::Duration;
 
-use frglib::{Color, Event, Rect, Window};
+use frglib::{Color, Event, Window};
 
 fn main() -> Result<(), frglib::Error> {
     let mut window = Window::builder("FRGLib draw")
         .size(800, 600)
         .background(Color::rgb(20, 25, 30))
         .build()?;
-
-
-    let margin = 60.0;
 
     loop {
         for event in window.poll()? {
