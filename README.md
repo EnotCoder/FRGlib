@@ -2,6 +2,18 @@
 
 ![Логотип библиотеки](logo.svg)
 
+[![crates.io](https://img.shields.io/crates/v/frglib.svg)](https://crates.io/crates/frglib)
+[![docs.rs](https://img.shields.io/docsrs/frglib/latest.svg)](https://docs.rs/frglib/latest)
+[![license](https://img.shields.io/crates/l/frglib.svg)](https://github.com/EnotCoder/FRGlib/blob/main/LICENSE)
+![Rust](https://img.shields.io/badge/rust-1.82%2B-blue)
+
+Установка:
+
+```toml
+[dependencies]
+frglib = "0.1"
+```
+
 Rust-обвязка над SDL3: окно, рендерер и обработка событий. Слой для Vulkan
 впереди.
 
