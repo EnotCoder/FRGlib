@@ -13,7 +13,7 @@ Rust-обвязка над SDL3: окно, рендерер и обработк�
 
 ```bash
 cargo build
-cargo run --example window
+cargo run --example basic-window
 ```
 
 ## Использование
@@ -117,11 +117,11 @@ window.frame_with(|d| {
 
 | Пример | Что показывает |
 |---|---|
-| `cargo run --example window` | Окно, ввод, события |
-| `cargo run --example draw` | Прямоугольники, квадраты, альфа |
-| `cargo run --example texture` | Логотип библиотеки как текстура |
-| `cargo run --example polygon` | Многоугольники: заливка, контур, текстура |
-| `cargo run --example mouse` | Состояние кнопок мыши: `Down`/`Up`, потеря фокуса |
+| `cargo run --example basic-window` | Окно, ввод, события |
+| `cargo run --example basic-draw` | Прямоугольники, квадраты, альфа |
+| `cargo run --example basic-texture` | Логотип библиотеки как текстура |
+| `cargo run --example basic-polygon` | Многоугольники: заливка, контур, текстура |
+| `cargo run --example basic-mouse` | Состояние кнопок мыши: `Down`/`Up`, потеря фокуса |
 
 ### События
 

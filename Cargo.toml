@@ -22,6 +22,31 @@ bundled = ["sdl3/build-from-source-static"]
 version = "0.20"
 features = ["raw-window-handle"]
 
+# Cargo discovers examples only as `examples/*.rs` and `examples/*/main.rs` --
+# one level deep. The ones here sit a level deeper (`basic/*.rs`), next to their
+# own assets, so they have to be listed by hand. Note that a target name is also
+# the binary name, so it cannot contain a `/`; hence `basic-texture` rather than
+# `basic/texture`.
+[[example]]
+name = "basic-draw"
+path = "examples/basic/draw.rs"
+
+[[example]]
+name = "basic-mouse"
+path = "examples/basic/mouse.rs"
+
+[[example]]
+name = "basic-polygon"
+path = "examples/basic/polygon.rs"
+
+[[example]]
+name = "basic-texture"
+path = "examples/basic/texture.rs"
+
+[[example]]
+name = "basic-window"
+path = "examples/basic/window.rs"
+
 [profile.release]
 lto = true
 codegen-units = 1

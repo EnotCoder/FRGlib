@@ -1,7 +1,7 @@
 //! Заполняет многоугольник по индексам, обводит его контур и накладывает
 //! текстуру на второй многоугольник.
 //!
-//! Запуск: `cargo run --example polygon`
+//! Запуск: `cargo run --example basic-polygon`
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -12,7 +12,7 @@ use frglib::{Color, Event, Image, Window};
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/assets")
+        .join("examples/basic/assets")
         .join(name)
 }
 

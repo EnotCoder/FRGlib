@@ -1,6 +1,6 @@
 //! Рисует квадраты поверх фона окна.
 //!
-//! Запуск: `cargo run --example draw`
+//! Запуск: `cargo run --example basic-draw`
 
 use std::time::Duration;
 

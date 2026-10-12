@@ -1,6 +1,6 @@
 //! Рисует логотип библиотеки в окне.
 //!
-//! Запуск: `cargo run --example logo`
+//! Запуск: `cargo run --example basic-texture`
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -11,7 +11,7 @@ use frglib::{Color, Event, Image, Rect, Window};
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/assets")
+        .join("examples/basic/assets")
         .join(name)
 }
 

@@ -3,7 +3,7 @@
 //! Зажата левая — `fgoty_down_pose.png`, правая — `fgoty_up_pose.png`, обе
 //! сразу или ни одной — `fgoty.png`.
 //!
-//! Запуск: `cargo run --example mouse`
+//! Запуск: `cargo run --example basic-mouse`
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -14,7 +14,7 @@ use frglib::{Color, Event, Image, MouseButton, Rect, Window};
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/assets")
+        .join("examples/basic/assets")
         .join(name)
 }
 

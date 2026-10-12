@@ -1,6 +1,6 @@
 //! Opens a window, fills it with a colour, and prints what happens.
 //!
-//! Запуск: `cargo run --example window`
+//! Запуск: `cargo run --example basic-window`
 
 use std::time::Duration;
 
