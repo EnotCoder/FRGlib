@@ -1,5 +1,7 @@
 ## FRGLib
 
+![Логотип библиотеки](logo.svg)
+
 Rust-обвязка над SDL3: окно, рендерер и обработка событий. Слой для Vulkan
 впереди.
 
@@ -17,6 +19,8 @@ cargo run --example basic-window
 ```
 
 ## Использование
+
+![Логотип библиотеки](examples/basic/assets/fgoty_with_body.png)
 
 ```rust
 use frglib::{Color, Event, Window};
