@@ -11,17 +11,17 @@ use frglib::{Color, Event, Image, Rect, Window};
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("assets")
+        .join("examples/assets")
         .join(name)
 }
 
 fn main() -> Result<(), frglib::Error> {
-    let logo = Image::from_file(asset("logo.png"))?;
+    let logo = Image::from_file(asset("fgoty.png"))?;
     println!("логотип {:?}", logo.size());
 
     let mut window = Window::builder("FRGLib logo")
-        .size(900, 500)
-        .background(Color::rgb(16, 43, 38))
+        .size(800, 600)
+        .background(Color::rgb(255, 255, 255))
         .build()?;
 
     // Логотип 1760x640, держим его пропорции при любом размере окна.
