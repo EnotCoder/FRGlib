@@ -20,7 +20,7 @@ cargo run --example basic-window
 
 
 <h2>
-  <img src="assets/logo.png" alt="Лягушонок" width="40" align="absmiddle">
+  <img src="examples/basic/assets/fgoty_with_body.png" alt="Лягушонок" width="40">
   Использование
 </h2>
 
