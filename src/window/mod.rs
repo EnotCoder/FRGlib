@@ -82,7 +82,7 @@ impl Window {
     /// window id and only this window's reach the caller. `Event::Quit` is the
     /// exception, as it is not tied to any window.
     ///
-    /// Use [`Event::should_close`] to decide whether to keep looping.
+    /// Use [`crate::Event::should_close`] to decide whether to keep looping.
     pub fn poll(&mut self) -> Result<Vec<crate::event::Event>, Error> {
         let window_id = self.canvas.window().id();
         let sdl = &self._sdl;

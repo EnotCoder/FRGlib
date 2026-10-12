@@ -9,6 +9,11 @@ repository = "https://github.com/EnotCoder/FRGlib.git"
 readme = "README.md"
 keywords = ["sdl", "sdl3", "window", "graphics", "vulkan"]
 categories = ["graphics", "rendering", "game-development", "api-bindings"]
+# A library: whoever pulls this in needs the sources, the readme and the
+# licence, and nothing else. The examples stay in the repository but stay out of
+# the package -- Cargo drops the `[[example]]` sections whose files `include`
+# left behind, so no dangling paths survive in the published manifest.
+include = ["src/**", "Cargo.toml", "README.md", "LICENSE", "logo.svg"]
 
 [features]
 default = []
