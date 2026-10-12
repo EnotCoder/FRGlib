@@ -14,6 +14,77 @@ fn to_f_rect(rect: impl Into<Rect>) -> sdl3::render::FRect {
     rect.into()
 }
 
+/// Builds the vertex buffer for an indexed triangle list.
+///
+/// Shared by [`Draw::fill_polygon`] and [`Draw::fill_textured_polygon`], which
+/// differ only in what each vertex's `tex_coord` says. With `textured`, a
+/// position is mapped onto the bounding box of the referenced vertices, so the
+/// polygon covers the whole texture; without one, `tex_coord` stays `(0, 0)` and
+/// the field is ignored.
+fn polygon_vertices(
+    points: &[(f32, f32)],
+    indices: &[i32],
+    color: FColor,
+    textured: bool,
+) -> Vec<Vertex> {
+    assert!(
+        indices.len() % 3 == 0,
+        "Количество индексов должно быть кратно 3"
+    );
+
+    let positions: Vec<(f32, f32)> = indices
+        .iter()
+        .map(|&index| {
+            assert!(
+                index >= 0 && (index as usize) < points.len(),
+                "Индекс вершины {index} выходит за границы массива"
+            );
+            points[index as usize]
+        })
+        .collect();
+
+    if positions.is_empty() {
+        return Vec::new();
+    }
+
+    // Only the vertices the indices reference take part in the box: a point that
+    // nothing points at is not part of the polygon and must not stretch the
+    // texture over it.
+    let (min_x, min_y, w, h) = if textured {
+        let (mut min_x, mut min_y) = (f32::INFINITY, f32::INFINITY);
+        let (mut max_x, mut max_y) = (f32::NEG_INFINITY, f32::NEG_INFINITY);
+        for &(x, y) in &positions {
+            min_x = min_x.min(x);
+            min_y = min_y.min(y);
+            max_x = max_x.max(x);
+            max_y = max_y.max(y);
+        }
+        // A box with no width or height means every point sits on one line;
+        // dividing by it would poison the coordinates with a NaN.
+        (
+            min_x,
+            min_y,
+            (max_x - min_x).max(f32::EPSILON),
+            (max_y - min_y).max(f32::EPSILON),
+        )
+    } else {
+        (0.0, 0.0, 1.0, 1.0)
+    };
+
+    positions
+        .into_iter()
+        .map(|(x, y)| Vertex {
+            position: FPoint::new(x, y),
+            color,
+            tex_coord: if textured {
+                FPoint::new((x - min_x) / w, (y - min_y) / h)
+            } else {
+                FPoint::new(0.0, 0.0)
+            },
+        })
+        .collect()
+}
+
 /// Draws shapes onto a window for one frame.
 ///
 /// Obtained from [`Window::frame_with`](crate::Window::frame_with). Holds a
@@ -151,15 +222,6 @@ impl<'a> Draw<'a> {
         indices: &[i32],
         color: Color,
     ) -> Result<(), Error> {
-        assert!(
-            indices.len() % 3 == 0,
-            "Количество индексов должно быть кратно 3"
-        );
-
-        if indices.is_empty() {
-            return Ok(());
-        }
-
         let vertex_color = FColor {
             r: color.r as f32 / 255.0,
             g: color.g as f32 / 255.0,
@@ -167,21 +229,9 @@ impl<'a> Draw<'a> {
             a: color.a as f32 / 255.0,
         };
 
-        let mut vertices = Vec::with_capacity(indices.len());
-
-        for &index in indices {
-            assert!(
-                index >= 0 && (index as usize) < points.len(),
-                "Индекс вершины {index} выходит за границы массива"
-            );
-
-            let (x, y) = points[index as usize];
-
-            vertices.push(Vertex {
-                position: FPoint::new(x, y),
-                color: vertex_color,
-                tex_coord: FPoint::new(0.0, 0.0),
-            });
+        let vertices = polygon_vertices(points, indices, vertex_color, false);
+        if vertices.is_empty() {
+            return Ok(());
         }
 
         let want = if color.a < 255 {
@@ -195,6 +245,53 @@ impl<'a> Draw<'a> {
 
         self.canvas
             .render_geometry(&vertices, None, VertexIndices::Sequential)?;
+
+        Ok(())
+    }
+
+    /// Fills the triangles described by `indices` with `image`.
+    ///
+    /// The polygon's bounding box is stretched over the texture, so the polygon
+    /// covers all of it -- the image's aspect ratio is not preserved.
+    ///
+    /// As in [`fill_texture`](Self::fill_texture), the texture is uploaded to
+    /// the GPU on every call and dropped again straight after, so this costs a
+    /// texture upload per frame.
+    pub fn fill_textured_polygon(
+        &mut self,
+        points: &[(f32, f32)],
+        indices: &[i32],
+        image: &crate::image::Image,
+    ) -> Result<(), Error> {
+        // White modulates nothing, so the image comes through untouched.
+        let vertices = polygon_vertices(
+            points,
+            indices,
+            FColor {
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
+                a: 1.0,
+            },
+            true,
+        );
+        if vertices.is_empty() {
+            return Ok(());
+        }
+
+        // `texture_creator` hands over ownership, so the texture borrows the
+        // local creator instead of `self.canvas` -- which is what lets
+        // `render_geometry` take `&mut self.canvas` below.
+        let creator = self.canvas.texture_creator();
+        let texture = creator.create_texture_from_surface(&image.surface)?;
+
+        // Unconditional, like in `fill_texture`: unlike a solid colour, an image
+        // routinely carries alpha, and without blending it would show up as a
+        // hard-edged box.
+        self.canvas.set_blend_mode(BlendMode::Blend);
+
+        self.canvas
+            .render_geometry(&vertices, Some(&texture), VertexIndices::Sequential)?;
 
         Ok(())
     }
