@@ -19,9 +19,10 @@ cargo run --example basic-window
 ```
 
 
-<img src="examples/basic/assets/fgoty_with_body.png" alt="Маскот" width="200">
-
-## Использование
+<h2>
+  <img src="assets/logo.png" alt="Лягушонок" width="40" align="absmiddle">
+  Использование
+</h2>
 
 ```rust
 use frglib::{Color, Event, Window};
