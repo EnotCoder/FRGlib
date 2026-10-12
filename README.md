@@ -20,7 +20,7 @@ cargo run --example basic-window
 
 ## Использование
 
-![Логотип библиотеки](examples/basic/assets/fgoty_with_body.png)
+<img src="examples/basic/assets/fgoty_with_body.png" alt="Маскот" width="50">
 
 ```rust
 use frglib::{Color, Event, Window};
