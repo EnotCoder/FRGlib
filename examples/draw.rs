@@ -27,7 +27,6 @@ fn main() -> Result<(), frglib::Error> {
         let (w, h) = window.size();
         let (w, h) = (w as f32, h as f32);
 
-        // Вписываем логотип в окно целиком, с отступами.
         let avail_w = (w - margin * 2.0).max(1.0);
         let avail_h = (h - margin * 2.0).max(1.0);
         let (mut lw, mut lh) = (avail_w, avail_w);

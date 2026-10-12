@@ -4,7 +4,8 @@ use crate::color::Color;
 use crate::rect::Rect;
 use crate::window::Error;
 
-use sdl3::render::{BlendMode, WindowCanvas};
+use sdl3::pixels::FColor;
+use sdl3::render::{FPoint, Vertex, VertexIndices, BlendMode, WindowCanvas};
 
 /// `Option<FRect>: From<Rect>` does not exist, so the conversion goes through an
 /// explicit local at every call site that needs one.
@@ -98,6 +99,104 @@ impl<'a> Draw<'a> {
         image: &crate::image::Image,
     ) -> Result<(), Error> {
         self.fill_texture(Rect::square(x, y, side), image)
+    }
+
+    pub fn draw_polygon(
+        &mut self,
+        points: &[(f32, f32)],
+        color: Color,
+    ) -> Result<(), Error> {
+
+        let want = if color.a < 255 {
+            BlendMode::Blend
+        } else {
+            BlendMode::None
+        };
+        if self.canvas.blend_mode() != want {
+            self.canvas.set_blend_mode(want);
+        }
+
+        self.canvas.set_draw_color(color);
+
+        // Соединяем соседние точки.
+        for pair in points.windows(2) {
+            let (x1, y1) = pair[0];
+            let (x2, y2) = pair[1];
+
+            self.canvas.draw_line(
+                FPoint::new(x1, y1),
+                FPoint::new(x2, y2),
+            )?;
+        }
+
+        // Замыкаем контур: последняя точка → первая.
+        let (last_x, last_y) = points[points.len() - 1];
+        let (first_x, first_y) = points[0];
+
+        self.canvas.draw_line(
+            FPoint::new(last_x, last_y),
+            FPoint::new(first_x, first_y),
+        )?;
+
+        Ok(())
+    }
+
+    pub fn fill_polygon(
+        &mut self,
+        points: &[(f32, f32)],
+        indices: &[i32],
+        color: Color,
+    ) -> Result<(), Error> {
+        assert!(
+            indices.len() % 3 == 0,
+            "Количество индексов должно быть кратно 3"
+        );
+
+        if indices.is_empty() {
+            return Ok(());
+        }
+
+        let vertex_color = FColor {
+            r: color.r as f32 / 255.0,
+            g: color.g as f32 / 255.0,
+            b: color.b as f32 / 255.0,
+            a: color.a as f32 / 255.0,
+        };
+
+        let mut vertices = Vec::with_capacity(indices.len());
+
+        for &index in indices {
+            assert!(
+                index >= 0 && (index as usize) < points.len(),
+                "Индекс вершины {index} выходит за границы массива"
+            );
+
+            let (x, y) = points[index as usize];
+
+            vertices.push(Vertex {
+                position: FPoint::new(x, y),
+                color: vertex_color,
+                tex_coord: FPoint::new(0.0, 0.0),
+            });
+
+            let want = if color.a < 255 {
+                BlendMode::Blend
+            } else {
+                BlendMode::None
+            };
+
+            if self.canvas.blend_mode() != want {
+                self.canvas.set_blend_mode(want);
+            }
+
+            self.canvas.render_geometry(
+                &vertices,
+                None,
+                VertexIndices::Sequential,
+            )?;
+
+            Ok(())
+        }
     }
 
     /// Drawable size of the window, as `(width, height)`.
