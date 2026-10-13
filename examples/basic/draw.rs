@@ -1,17 +1,16 @@
-//! Рисует квадраты поверх фона окна.
+//! Рисует объекты поверх фона окна.
 //!
 //! Запуск: `cargo run --example basic-draw`
 
 use std::time::Duration;
 
-use frglib::{Color, Event, Rect, Window};
+use frglib::{Color, Event, Object, Window};
 
 fn main() -> Result<(), frglib::Error> {
     let mut window = Window::builder("FRGLib draw")
         .size(800, 600)
         .background(Color::rgb(20, 25, 30))
         .build()?;
-
 
     let margin = 60.0;
 
@@ -29,19 +28,19 @@ fn main() -> Result<(), frglib::Error> {
 
         let avail_w = (w - margin * 2.0).max(1.0);
         let avail_h = (h - margin * 2.0).max(1.0);
-        let (mut lw, mut lh) = (avail_w, avail_w);
-        if lh > avail_h {
-            lh = avail_h;
-            lw = avail_h;
+        let (mut side, mut other) = (avail_w, avail_w);
+        if other > avail_h {
+            other = avail_h;
+            side = avail_h;
         }
 
-        let x = (w - lw) / 2.0;
-        let y = (h - lh) / 2.0;
-        
+        // Объект задаёт центр, поэтому вписываем квадрат по центру окна, а не по
+        // левому верхнему углу -- иначе при ресайзе он уезжал бы за край.
+        let square = Object::from_xywh(w / 2.0, h / 2.0, side, other);
 
         window.frame_with(|d| {
-            // Непрозрачный квадрат в левом верхнем углу.
-            d.fill_rect(Rect::new(x, y, lw, lh), Color::rgb(220, 60, 60))?;
+            // Непрозрачный квадрат по центру окна.
+            d.fill_object(&square, Color::rgb(220, 60, 60))?;
             Ok(())
         })?;
 

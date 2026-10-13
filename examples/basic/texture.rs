@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use frglib::{Color, Event, Image, Rect, Window};
+use frglib::{Color, Event, Image, Object, Window};
 
 /// Логотип лежит в репозитории; путь строим от корня крейта, а не от
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
@@ -53,8 +53,11 @@ fn main() -> Result<(), frglib::Error> {
         let x = (w - lw) / 2.0;
         let y = (h - lh) / 2.0;
 
+        // Объект описывает логотип по центру, поэтому и рисуем его по центру.
+        let sprite = Object::from_xywh(x + lw / 2.0, y + lh / 2.0, lw, lh);
+
         window.frame_with(|d| {
-            d.fill_texture(Rect::new(x, y, lw, lh), &logo)?;
+            d.fill_textured_object(&sprite, &logo)?;
             Ok(())
         })?;
 

@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use frglib::{Color, Event, Image, Window};
+use frglib::{Color, Event, Image, Object, Window};
 
 /// Логотип лежит в репозитории; путь строим от корня крейта, а не от
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
@@ -59,16 +59,17 @@ fn main() -> Result<(), frglib::Error> {
             0, 2, 3, // Треугольник A → C → D.
         ];
 
+        // Объекты нужны ради центра поворота: обе фигуры здесь неподвижны, поэтому у
+        // объектов нулевой угол, и рисование идёт по быстрому пути.
+        let solid_obj = Object::from_xywh(225.0, 190.0, 250.0, 220.0);
+        let text_obj = Object::from_xywh(580.0, 410.0, 220.0, 220.0);
+
         window.frame_with(|d| {
             // Сначала заливка.
-            d.fill_polygon(
-                &points,
-                &indices,
-                Color::rgb(220, 60, 60),
-            )?;
+            d.fill_object_polygon(&solid_obj, &points, &indices, Color::rgb(220, 60, 60))?;
 
             // А здесь — тот же многоугольник, но залитый текстурой.
-            d.fill_textured_polygon(&text_points, &text_indices, &logo)?;
+            d.fill_textured_object_polygon(&text_obj, &text_points, &text_indices, &logo)?;
 
             Ok(())
         })?;

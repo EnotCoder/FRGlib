@@ -8,7 +8,7 @@ use crate::window::Error;
 ///
 /// Holds the decoded pixels on the CPU, not anything on the GPU, so it owns no
 /// borrow of a window and can outlive one. Actually putting it on the GPU happens
-/// per call to [`Draw::fill_texture`](crate::Draw::fill_texture).
+/// per call to [`Draw::fill_textured_object`](crate::Draw::fill_textured_object).
 pub struct Image {
     pub(crate) surface: sdl3::surface::Surface<'static>,
 }

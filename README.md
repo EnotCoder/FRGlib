@@ -85,29 +85,30 @@ fn main() -> Result<(), frglib::Error> {
 
 ```rust
 window.frame_with(|d| {
-    d.fill_square(100.0, 100.0, 200.0, Color::rgb(220, 60, 60))?;
+    let square = Object::from_xywh(200.0, 200.0, 200.0, 200.0);
+    d.fill_object(&square, Color::rgb(220, 60, 60))?;
     Ok(())
 })?;
 ```
 
 | Вызов | Описание |
 |---|---|
-| `fill_rect(rect, Color)` | Заливает прямоугольник сплошным цветом |
-| `fill_square(x, y, side, Color)` | Квадрат с левым верхним углом в `(x, y)` |
-| `fill_square_centered(cx, cy, side, Color)` | Квадрат с центром в `(cx, cy)` |
-| `fill_texture(rect, &Image)` | Заливает прямоугольник текстурой |
-| `fill_textured_square(x, y, side, &Image)` | Квадрат с текстурой |
-| `fill_polygon(points, indices, Color)` | Заливает многоугольник по списку треугольников |
-| `draw_polygon(points, Color)` | Обводит многоугольник отрезками |
-| `fill_textured_polygon(points, indices, &Image)` | Заливает многоугольник текстурой |
 | `fill_object(&Object, Color)` | Заливает прямоугольник объекта, с поворотом |
+| `draw_object(&Object, Color)` | Обводит тот же прямоугольник |
 | `fill_textured_object(&Object, &Image)` | Рисует объект текстурой, с поворотом и отражением |
 | `fill_object_polygon(&Object, points, indices, Color)` | Заливает многоугольник, повёрнутый вокруг центра объекта |
 | `draw_object_polygon(&Object, points, Color)` | Обводит тот же повёрнутый многоугольник |
+| `fill_textured_object_polygon(&Object, points, indices, &Image)` | Заливает повёрнутый многоугольник текстурой |
+| `size()` | Размер окна, полезно для центрирования |
+
+Всё рисование идёт через `Object` — метода без него в API нет. У методов
+объекта:
+
+| Вызов | Описание |
+|---|---|
 | `corners()` | Четыре повёрнутых угла объекта |
 | `turn(point)` | Поворачивает точку вокруг центра объекта |
 | `update(dt)` | Двигает объект вдоль `velocity`, `dt` в секундах |
-| `size()` | Размер окна, полезно для центрирования |
 
 Альфа работает сама: цвет с `a < 255` смешивается с тем, что под ним, с `a == 255`
 затирает. Режим проходимости переключается сам, только когда он реально меняется.
@@ -116,9 +117,10 @@ window.frame_with(|d| {
 
 ```rust
 let logo = Image::from_file("assets/logo.png")?;
+let sprite = Object::from_xywh(200.0, 200.0, 200.0, 200.0);
 
 window.frame_with(|d| {
-    d.fill_textured_square(100.0, 100.0, 200.0, &logo)?;
+    d.fill_textured_object(&sprite, &logo)?;
     Ok(())
 })?;
 ```
@@ -131,8 +133,9 @@ window.frame_with(|d| {
 стоимость — одна загрузка на кадр. Для спрайтов это нормально, для крупной
 картинки в цикле будет заметно — тогда понадобится постоянная текстура.
 
-`fill_textured_polygon` растягивает текстуру по bounding box многоугольника, так
-что полигон закрывает её целиком, а пропорции картинки не сохраняются.
+`fill_textured_object_polygon` растягивает текстуру по bounding box многоугольника
+**до поворота**, так что полигон закрывает её целиком, пропорции картинки не
+сохраняются, а сама картинка поворачивается вместе с фигурой.
 
 ### Объекты
 

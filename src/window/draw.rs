@@ -30,18 +30,28 @@ fn rotate_points(points: &[(f32, f32)], obj: &Object) -> Vec<(f32, f32)> {
         .collect()
 }
 
+/// Modulates nothing, so a textured draw passes the image through untouched.
+const WHITE: FColor = FColor {
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+    a: 1.0,
+};
+
 /// Builds the vertex buffer for an indexed triangle list.
 ///
-/// Shared by [`Draw::fill_polygon`] and [`Draw::fill_textured_polygon`], which
-/// differ only in what each vertex's `tex_coord` says. With `textured`, a
+/// Shared by every `*_object` fill, which differ in what each vertex's
+/// `tex_coord` says and whether the positions get turned. With `textured`, a
 /// position is mapped onto the bounding box of the referenced vertices, so the
 /// polygon covers the whole texture; without one, `tex_coord` stays `(0, 0)` and
-/// the field is ignored.
+/// the field is ignored. `turn_about` turns the positions only -- texture
+/// coordinates are always taken from the polygon as given.
 fn polygon_vertices(
     points: &[(f32, f32)],
     indices: &[i32],
     color: FColor,
     textured: bool,
+    turn_about: Option<&Object>,
 ) -> Vec<Vertex> {
     assert!(
         indices.len() % 3 == 0,
@@ -89,14 +99,24 @@ fn polygon_vertices(
 
     positions
         .into_iter()
-        .map(|(x, y)| Vertex {
-            position: FPoint::new(x, y),
-            color,
-            tex_coord: if textured {
-                FPoint::new((x - min_x) / w, (y - min_y) / h)
-            } else {
-                FPoint::new(0.0, 0.0)
-            },
+        .map(|(x, y)| {
+            // The turn happens here rather than on `positions` above, so the
+            // bounding box above stays the polygon's own and the texture lands
+            // where it would have without rotation.
+            let turned = match turn_about {
+                Some(obj) => obj.turn(Vec2::new(x, y)),
+                None => Vec2::new(x, y),
+            };
+
+            Vertex {
+                position: FPoint::new(turned.x, turned.y),
+                color,
+                tex_coord: if textured {
+                    FPoint::new((x - min_x) / w, (y - min_y) / h)
+                } else {
+                    FPoint::new(0.0, 0.0)
+                },
+            }
         })
         .collect()
 }
@@ -121,7 +141,10 @@ impl<'a> Draw<'a> {
     /// already there, one with `a == 255` replaces it. SDL defaults to
     /// `BlendMode::None`, which would ignore alpha entirely, so the mode is
     /// switched per call.
-    pub fn fill_rect(&mut self, rect: impl Into<Rect>, color: Color) -> Result<(), Error> {
+    ///
+    /// Private because an axis-aligned box is just an [`Object`] with no
+    /// rotation, and that is how callers reach this path.
+    fn fill_rect(&mut self, rect: impl Into<Rect>, color: Color) -> Result<(), Error> {
         // Only touch the blend mode when it actually has to change; every call
         // is a GL state change otherwise.
         let want = if color.a < 255 {
@@ -139,60 +162,8 @@ impl<'a> Draw<'a> {
         Ok(())
     }
 
-    /// Fills a square with `color`, its top-left corner at `(x, y)`.
-    pub fn fill_square(&mut self, x: f32, y: f32, side: f32, color: Color) -> Result<(), Error> {
-        self.fill_rect(Rect::square(x, y, side), color)
-    }
-
-    /// Fills a square with `color`, centred on `(cx, cy)`.
-    pub fn fill_square_centered(
-        &mut self,
-        cx: f32,
-        cy: f32,
-        side: f32,
-        color: Color,
-    ) -> Result<(), Error> {
-        self.fill_rect(Rect::square_centered(cx, cy, side), color)
-    }
-
-    /// Fills a rectangle with `image`, stretched to fit.
-    ///
-    /// The image is uploaded to the GPU on every call and dropped again straight
-    /// after, so this costs a texture upload per frame. That is fine for the odd
-    /// sprite, but a large image redrawn every frame will want a persistent
-    /// texture instead.
-    pub fn fill_texture(
-        &mut self,
-        rect: impl Into<Rect>,
-        image: &crate::image::Image,
-    ) -> Result<(), Error> {
-        // `texture_creator` hands over ownership, so nothing here borrows
-        // `self.canvas` -- the texture borrows the local creator instead, which
-        // is what lets `copy` take `&mut self.canvas` below.
-        let creator = self.canvas.texture_creator();
-        let texture = creator.create_texture_from_surface(&image.surface)?;
-
-        self.canvas.set_blend_mode(sdl3::render::BlendMode::Blend);
-        self.canvas.copy(&texture, None, Some(to_f_rect(rect)))?;
-        Ok(())
-    }
-
-    /// Draws `image` as a square with its top-left corner at `(x, y)`.
-    pub fn fill_textured_square(
-        &mut self,
-        x: f32,
-        y: f32,
-        side: f32,
-        image: &crate::image::Image,
-    ) -> Result<(), Error> {
-        self.fill_texture(Rect::square(x, y, side), image)
-    }
-
-    pub fn draw_polygon(
-        &mut self,
-        points: &[(f32, f32)],
-        color: Color,
-    ) -> Result<(), Error> {
+    /// Turns `points` about `obj`'s centre, in place of them as given.
+    fn draw_polygon(&mut self, points: &[(f32, f32)], color: Color) -> Result<(), Error> {
         // Контуру нужно минимум две точки: один отрезок и замыкающий.
         if points.len() < 2 {
             return Ok(());
@@ -214,25 +185,23 @@ impl<'a> Draw<'a> {
             let (x1, y1) = pair[0];
             let (x2, y2) = pair[1];
 
-            self.canvas.draw_line(
-                FPoint::new(x1, y1),
-                FPoint::new(x2, y2),
-            )?;
+            self.canvas
+                .draw_line(FPoint::new(x1, y1), FPoint::new(x2, y2))?;
         }
 
         // Замыкаем контур: последняя точка → первая.
         let (last_x, last_y) = points[points.len() - 1];
         let (first_x, first_y) = points[0];
 
-        self.canvas.draw_line(
-            FPoint::new(last_x, last_y),
-            FPoint::new(first_x, first_y),
-        )?;
+        self.canvas
+            .draw_line(FPoint::new(last_x, last_y), FPoint::new(first_x, first_y))?;
 
         Ok(())
     }
 
-    pub fn fill_polygon(
+    /// Private because an indexed triangle list is what every `*_object` fill
+    /// reduces to once rotation is in play.
+    fn fill_polygon(
         &mut self,
         points: &[(f32, f32)],
         indices: &[i32],
@@ -245,7 +214,7 @@ impl<'a> Draw<'a> {
             a: color.a as f32 / 255.0,
         };
 
-        let vertices = polygon_vertices(points, indices, vertex_color, false);
+        let vertices = polygon_vertices(points, indices, vertex_color, false, None);
         if vertices.is_empty() {
             return Ok(());
         }
@@ -265,32 +234,27 @@ impl<'a> Draw<'a> {
         Ok(())
     }
 
-    /// Fills the triangles described by `indices` with `image`.
+    /// Fills the triangles described by `indices` in `points` with `image`,
+    /// turning them about `obj`'s centre.
     ///
-    /// The polygon's bounding box is stretched over the texture, so the polygon
-    /// covers all of it -- the image's aspect ratio is not preserved.
+    /// The texture is stretched over the polygon's bounding box as it was
+    /// *before* the turn, so the image covers the same shape it would cover
+    /// unrotated and simply goes round with it.
     ///
-    /// As in [`fill_texture`](Self::fill_texture), the texture is uploaded to
-    /// the GPU on every call and dropped again straight after, so this costs a
-    /// texture upload per frame.
-    pub fn fill_textured_polygon(
+    /// The texture is uploaded to the GPU on every call and dropped again
+    /// straight after, so this costs a texture upload per frame.
+    pub fn fill_textured_object_polygon(
         &mut self,
+        obj: &Object,
         points: &[(f32, f32)],
         indices: &[i32],
         image: &crate::image::Image,
     ) -> Result<(), Error> {
-        // White modulates nothing, so the image comes through untouched.
-        let vertices = polygon_vertices(
-            points,
-            indices,
-            FColor {
-                r: 1.0,
-                g: 1.0,
-                b: 1.0,
-                a: 1.0,
-            },
-            true,
-        );
+        // Texture coordinates come from the polygon as given, while the
+        // positions get turned -- hence the turn inside the builder rather than
+        // on `points` beforehand, which would stretch the texture along with
+        // the shape.
+        let vertices = polygon_vertices(points, indices, WHITE, true, Some(obj));
         if vertices.is_empty() {
             return Ok(());
         }
@@ -301,9 +265,8 @@ impl<'a> Draw<'a> {
         let creator = self.canvas.texture_creator();
         let texture = creator.create_texture_from_surface(&image.surface)?;
 
-        // Unconditional, like in `fill_texture`: unlike a solid colour, an image
-        // routinely carries alpha, and without blending it would show up as a
-        // hard-edged box.
+        // Unconditional: unlike a solid colour, an image routinely carries
+        // alpha, and without blending it would come out as a hard-edged box.
         self.canvas.set_blend_mode(BlendMode::Blend);
 
         self.canvas
@@ -330,8 +293,8 @@ impl<'a> Draw<'a> {
     /// Rotation happens inside SDL, which turns about the centre of the
     /// destination box -- the same point as [`Object::position`].
     ///
-    /// As in [`fill_textured_polygon`](Self::fill_textured_polygon), the texture
-    /// is uploaded to the GPU on every call and dropped again straight after.
+    /// The texture is uploaded to the GPU on every call and dropped again
+    /// straight after, so this costs a texture upload per frame.
     pub fn fill_textured_object(
         &mut self,
         obj: &Object,
@@ -343,7 +306,8 @@ impl<'a> Draw<'a> {
         let creator = self.canvas.texture_creator();
         let texture = creator.create_texture_from_surface(&image.surface)?;
 
-        // Unconditional, like in `fill_texture`: images routinely carry alpha.
+        // Unconditional: images routinely carry alpha, and without blending they
+        // would come out as hard-edged boxes.
         self.canvas.set_blend_mode(BlendMode::Blend);
 
         let dst = to_f_rect(obj.rect());
@@ -383,6 +347,15 @@ impl<'a> Draw<'a> {
 
         let rotated = rotate_points(points, obj);
         self.fill_polygon(&rotated, indices, color)
+    }
+
+    /// Draws the contour of the box `obj` covers, turned by its `rotation`.
+    ///
+    /// The counterpart of [`fill_object`](Self::fill_object): same box, same
+    /// centre, outline instead of fill.
+    pub fn draw_object(&mut self, obj: &Object, color: Color) -> Result<(), Error> {
+        let points = obj.corners().map(|p| (p.x, p.y));
+        self.draw_polygon(&points, color)
     }
 
     /// Draws the contour through `points`, turning it about `obj`'s centre.

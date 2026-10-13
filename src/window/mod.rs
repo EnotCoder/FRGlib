@@ -153,7 +153,8 @@ impl Window {
     /// # fn main() -> Result<(), frglib::Error> {
     /// # let mut window = frglib::Window::builder("demo").build()?;
     /// window.frame_with(|d| {
-    ///     d.fill_square(100.0, 100.0, 200.0, frglib::Color::rgb(220, 60, 60))?;
+    ///     let square = frglib::Object::from_xywh(200.0, 200.0, 200.0, 200.0);
+    ///     d.fill_object(&square, frglib::Color::rgb(220, 60, 60))?;
     ///     Ok(())
     /// })?;
     /// # Ok(())

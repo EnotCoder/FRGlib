@@ -62,11 +62,9 @@ fn main() -> Result<(), frglib::Error> {
             // 3. Тот же многоугольник, залитый и обведённый, уже повёрнутый.
             d.fill_object_polygon(&shaped, &triangle, &[0, 1, 2], Color::rgb(90, 150, 220))?;
 
-            // 4. Углы объекта можно и достать, и обвести самому -- они уже
-            //    повёрнутые, так что контур ложится на саму фигуру.
+            // 4. Углы объекта можно и обвести -- повёрнутый контур ложится на саму фигуру.
             for obj in [&solid, &textured, &shaped] {
-                let points = obj.corners().map(|p| (p.x, p.y));
-                d.draw_polygon(&points, Color::rgba(255, 255, 255, 90))?;
+                d.draw_object(obj, Color::rgba(255, 255, 255, 90))?;
             }
 
             Ok(())
