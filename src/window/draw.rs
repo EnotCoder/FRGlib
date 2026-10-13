@@ -1,17 +1,33 @@
 //! Drawing on top of a window.
 
 use crate::color::Color;
+use crate::math::Vec2;
+use crate::object::Object;
 use crate::rect::Rect;
 use crate::window::Error;
 
 use sdl3::pixels::FColor;
-use sdl3::render::{FPoint, Vertex, VertexIndices, BlendMode, WindowCanvas};
+use sdl3::render::{BlendMode, FPoint, Vertex, VertexIndices, WindowCanvas};
 
 /// `Option<FRect>: From<Rect>` does not exist, so the conversion goes through an
 /// explicit local at every call site that needs one.
 fn to_f_rect(rect: impl Into<Rect>) -> sdl3::render::FRect {
     let rect: Rect = rect.into();
     rect.into()
+}
+
+/// Two triangles over four corners, in the winding `polygon_vertices` expects.
+const QUAD_INDICES: [i32; 6] = [0, 1, 2, 0, 2, 3];
+
+/// Turns `points` about `obj`'s centre, as `to_screen_points` needs them.
+fn rotate_points(points: &[(f32, f32)], obj: &Object) -> Vec<(f32, f32)> {
+    points
+        .iter()
+        .map(|&(x, y)| {
+            let turned = obj.turn(Vec2::new(x, y));
+            (turned.x, turned.y)
+        })
+        .collect()
 }
 
 /// Builds the vertex buffer for an indexed triangle list.
@@ -294,6 +310,97 @@ impl<'a> Draw<'a> {
             .render_geometry(&vertices, Some(&texture), VertexIndices::Sequential)?;
 
         Ok(())
+    }
+
+    /// Fills the box `obj` covers with `color`, turned by its `rotation`.
+    ///
+    /// The two flip flags are ignored: a solid colour has nothing to mirror.
+    pub fn fill_object(&mut self, obj: &Object, color: Color) -> Result<(), Error> {
+        if obj.rotation == 0.0 {
+            return self.fill_rect(obj.rect(), color);
+        }
+
+        let points = obj.corners().map(|p| (p.x, p.y));
+        self.fill_polygon(&points, &QUAD_INDICES, color)
+    }
+
+    /// Draws `image` as the box `obj` covers, turned by its `rotation` and
+    /// mirrored by its flip flags.
+    ///
+    /// Rotation happens inside SDL, which turns about the centre of the
+    /// destination box -- the same point as [`Object::position`].
+    ///
+    /// As in [`fill_textured_polygon`](Self::fill_textured_polygon), the texture
+    /// is uploaded to the GPU on every call and dropped again straight after.
+    pub fn fill_textured_object(
+        &mut self,
+        obj: &Object,
+        image: &crate::image::Image,
+    ) -> Result<(), Error> {
+        // `texture_creator` hands over ownership, so the texture borrows the
+        // local creator instead of `self.canvas`, which is what lets the copy
+        // below take `&mut self.canvas`.
+        let creator = self.canvas.texture_creator();
+        let texture = creator.create_texture_from_surface(&image.surface)?;
+
+        // Unconditional, like in `fill_texture`: images routinely carry alpha.
+        self.canvas.set_blend_mode(BlendMode::Blend);
+
+        let dst = to_f_rect(obj.rect());
+        if obj.rotation == 0.0 && !obj.flip_horizontal && !obj.flip_vertical {
+            self.canvas.copy(&texture, None, Some(dst))?;
+            return Ok(());
+        }
+
+        self.canvas.copy_ex(
+            &texture,
+            None,
+            Some(dst),
+            f64::from(obj.rotation),
+            None,
+            obj.flip_horizontal,
+            obj.flip_vertical,
+        )?;
+
+        Ok(())
+    }
+
+    /// Fills the triangles described by `indices` in `points` with `color`,
+    /// turning them about `obj`'s centre.
+    ///
+    /// `obj` only supplies the centre to turn about: the points stay where they
+    /// are otherwise, and `obj.size` is not used.
+    pub fn fill_object_polygon(
+        &mut self,
+        obj: &Object,
+        points: &[(f32, f32)],
+        indices: &[i32],
+        color: Color,
+    ) -> Result<(), Error> {
+        if obj.rotation == 0.0 {
+            return self.fill_polygon(points, indices, color);
+        }
+
+        let rotated = rotate_points(points, obj);
+        self.fill_polygon(&rotated, indices, color)
+    }
+
+    /// Draws the contour through `points`, turning it about `obj`'s centre.
+    ///
+    /// As in [`fill_object_polygon`](Self::fill_object_polygon), `obj.size` is
+    /// not used.
+    pub fn draw_object_polygon(
+        &mut self,
+        obj: &Object,
+        points: &[(f32, f32)],
+        color: Color,
+    ) -> Result<(), Error> {
+        if obj.rotation == 0.0 {
+            return self.draw_polygon(points, color);
+        }
+
+        let rotated = rotate_points(points, obj);
+        self.draw_polygon(&rotated, color)
     }
 
     /// Drawable size of the window, as `(width, height)`.

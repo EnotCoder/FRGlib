@@ -37,6 +37,10 @@ name = "basic-draw"
 path = "examples/basic/draw.rs"
 
 [[example]]
+name = "basic-object"
+path = "examples/basic/object.rs"
+
+[[example]]
 name = "basic-mouse"
 path = "examples/basic/mouse.rs"
 
@@ -51,6 +55,10 @@ path = "examples/basic/texture.rs"
 [[example]]
 name = "basic-window"
 path = "examples/basic/window.rs"
+
+[[example]]
+name = "2d_games-frogy"
+path = "examples/2d_games/frogy.rs"
 
 [profile.release]
 lto = true
