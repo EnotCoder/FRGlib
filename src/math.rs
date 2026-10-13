@@ -18,21 +18,22 @@ impl Vec2 {
         Vec2 { x, y }
     }
 
-    /// Squared length, for when only the magnitude matters and not its root.
+    /// Length squared, without the sqrt. Use it when comparing distances.
     pub fn length_squared(self) -> f32 {
         self.x * self.x + self.y * self.y
     }
 
+    /// Length with the sqrt. Use it when you need the real number.
     pub fn length(self) -> f32 {
         self.length_squared().sqrt()
     }
 
+    /// Two vectors multiplied into one number: how much they point the same way.
     pub fn dot(self, other: Vec2) -> f32 {
         self.x * other.x + self.y * other.y
     }
 
-    /// Scaled to unit length, or [`ZERO`](Self::ZERO) when it has no length to
-    /// scale by.
+    /// Length made 1, direction unchanged. A zero vector stays zero.
     pub fn normalized(self) -> Vec2 {
         let len = self.length();
         if len == 0.0 {
@@ -42,11 +43,7 @@ impl Vec2 {
         }
     }
 
-    /// Rotated by `radians`, counter-clockwise in a y-up plane.
-    ///
-    /// Window coordinates put y down, so on screen a positive angle reads as a
-    /// clockwise turn -- the same direction SDL itself uses. Angles in this
-    /// crate's public API are in degrees; convert with `to_radians()`.
+    /// Turns the vector by an angle in radians, not degrees
     pub fn rotated(self, radians: f32) -> Vec2 {
         let (sin, cos) = radians.sin_cos();
         Vec2::new(self.x * cos - self.y * sin, self.x * sin + self.y * cos)
