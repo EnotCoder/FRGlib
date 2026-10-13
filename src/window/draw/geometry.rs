@@ -4,6 +4,7 @@
 //! either an SDL type or a `Vec`, so the drawing methods in the parent module
 //! stay a thin layer over these.
 
+use crate::camera::Camera;
 use crate::math::Vec2;
 use crate::object::Object;
 use crate::rect::Rect;
@@ -36,6 +37,33 @@ pub(super) fn rotate_points(points: &[(f32, f32)], obj: &Object) -> Vec<(f32, f3
         .map(|&(x, y)| {
             let turned = obj.turn(Vec2::new(x, y));
             (turned.x, turned.y)
+        })
+        .collect()
+}
+
+/// Moves `points` out of world space and onto the screen through `camera`.
+///
+/// This runs after any turning, never before: a turn is a rotation about a
+/// point, and doing it in world space keeps the angle the caller asked for,
+/// while doing it here would scale the radius without the shape.
+///
+/// `camera` of `None` means the frame has no camera, and then the points are
+/// screen coordinates already -- they come back copied, unchanged.
+pub(super) fn project(
+    points: &[(f32, f32)],
+    camera: Option<Camera>,
+    size: (u32, u32),
+) -> Vec<(f32, f32)> {
+    let camera = match camera {
+        Some(camera) => camera,
+        None => return points.to_vec(),
+    };
+
+    points
+        .iter()
+        .map(|&(x, y)| {
+            let projected = camera.to_screen(Vec2::new(x, y), size);
+            (projected.x, projected.y)
         })
         .collect()
 }
@@ -121,4 +149,40 @@ pub(super) fn polygon_vertices(
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Guards the bug of making a camera the default: a camera at the origin
+    /// with no zoom is *not* the identity, it centres the world on the window,
+    /// so every drawing example ended up shifted by half a window.
+    #[test]
+    fn without_a_camera_points_stay_where_they_were() {
+        let points = [(10.0, 20.0), (30.0, 40.0)];
+        assert_eq!(project(&points, None, (800, 600)), points);
+    }
+
+    #[test]
+    fn with_a_camera_the_looked_at_point_lands_in_the_middle() {
+        let camera = Camera::new(Vec2::ZERO);
+        let placed = project(&[(0.0, 0.0)], Some(camera), (800, 600));
+
+        assert!((placed[0].0 - 400.0).abs() < 1e-4);
+        assert!((placed[0].1 - 300.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn the_zoom_scales_the_distance_already_turned() {
+        // Turning first and projecting second keeps the radius the caller
+        // asked for; the other order would scale it twice over.
+        let camera = Camera::new(Vec2::ZERO).with_zoom(3.0);
+        let turned = Vec2::new(100.0, 0.0).rotated(std::f32::consts::FRAC_PI_2);
+        let placed = camera.to_screen(turned, (800, 600));
+
+        // Turned to (0, 100) in world space, then tripled.
+        assert!((placed.x - 400.0).abs() < 1e-3);
+        assert!((placed.y - 600.0).abs() < 1e-3);
+    }
 }

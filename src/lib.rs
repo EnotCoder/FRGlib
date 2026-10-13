@@ -38,6 +38,7 @@
 //! thread. The renderer, like the window, can only be created on the main
 //! thread, so [`Window::frame`] has to be called from there too.
 
+pub mod camera;
 pub mod color;
 pub mod event;
 pub mod image;
@@ -46,6 +47,7 @@ pub mod object;
 pub mod rect;
 pub mod window;
 
+pub use camera::Camera;
 pub use color::Color;
 pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
 pub use image::Image;

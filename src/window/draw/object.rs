@@ -8,10 +8,11 @@ use super::geometry::{polygon_vertices, rotate_points, to_f_rect, QUAD_INDICES, 
 use super::Draw;
 
 use crate::color::Color;
+use crate::math::Vec2;
 use crate::object::Object;
 use crate::window::Error;
 
-use sdl3::render::{BlendMode, VertexIndices};
+use sdl3::render::{BlendMode, FPoint, VertexIndices};
 
 impl<'a> Draw<'a> {
     /// Fills the triangles described by `indices` in `points` with `image`,
@@ -34,9 +35,20 @@ impl<'a> Draw<'a> {
         // positions get turned -- hence the turn inside the builder rather than
         // on `points` beforehand, which would stretch the texture along with
         // the shape.
-        let vertices = polygon_vertices(points, indices, WHITE, true, Some(obj));
+        let mut vertices = polygon_vertices(points, indices, WHITE, true, Some(obj));
         if vertices.is_empty() {
             return Ok(());
+        }
+
+        // Placed through the camera after that, so a vertex is turned once and
+        // projected once. Texture coordinates are left alone throughout: they
+        // address the image, not the world.
+        if let Some(camera) = self.camera {
+            let size = self.size_px();
+            for vertex in &mut vertices {
+                let p = camera.to_screen(Vec2::new(vertex.position.x, vertex.position.y), size);
+                vertex.position = FPoint::new(p.x, p.y);
+            }
         }
 
         // `texture_creator` hands over ownership, so the texture borrows the
@@ -73,6 +85,10 @@ impl<'a> Draw<'a> {
     /// Rotation happens inside SDL, which turns about the centre of the
     /// destination box -- the same point as [`Object::position`].
     ///
+    /// The box is projected through the camera first, so the angle is left
+    /// alone: the zoom is the same on both axes, so it scales the box without
+    /// turning it.
+    ///
     /// The texture is uploaded to the GPU on every call and dropped again
     /// straight after, so this costs a texture upload per frame.
     pub fn fill_textured_object(
@@ -90,7 +106,7 @@ impl<'a> Draw<'a> {
         // would come out as hard-edged boxes.
         self.canvas.set_blend_mode(BlendMode::Blend);
 
-        let dst = to_f_rect(obj.rect());
+        let dst = to_f_rect(self.place_rect(obj.rect()));
         if obj.rotation == 0.0 && !obj.flip_horizontal && !obj.flip_vertical {
             self.canvas.copy(&texture, None, Some(dst))?;
             return Ok(());
