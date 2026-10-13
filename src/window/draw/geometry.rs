@@ -1,0 +1,124 @@
+//! Vertex buffers and the arithmetic behind them.
+//!
+//! Nothing here touches a canvas: everything takes plain numbers and gives back
+//! either an SDL type or a `Vec`, so the drawing methods in the parent module
+//! stay a thin layer over these.
+
+use crate::math::Vec2;
+use crate::object::Object;
+use crate::rect::Rect;
+
+use sdl3::pixels::FColor;
+use sdl3::render::{FPoint, Vertex};
+
+/// `Option<FRect>: From<Rect>` does not exist, so the conversion goes through an
+/// explicit local at every call site that needs one.
+pub(super) fn to_f_rect(rect: impl Into<Rect>) -> sdl3::render::FRect {
+    let rect: Rect = rect.into();
+    rect.into()
+}
+
+/// Two triangles over four corners, in the winding `polygon_vertices` expects.
+pub(super) const QUAD_INDICES: [i32; 6] = [0, 1, 2, 0, 2, 3];
+
+/// Modulates nothing, so a textured draw passes the image through untouched.
+pub(super) const WHITE: FColor = FColor {
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+    a: 1.0,
+};
+
+/// Turns `points` about `obj`'s centre, for the polygon methods to hand on.
+pub(super) fn rotate_points(points: &[(f32, f32)], obj: &Object) -> Vec<(f32, f32)> {
+    points
+        .iter()
+        .map(|&(x, y)| {
+            let turned = obj.turn(Vec2::new(x, y));
+            (turned.x, turned.y)
+        })
+        .collect()
+}
+
+/// Builds the vertex buffer for an indexed triangle list.
+///
+/// Shared by every `*_object` fill, which differ in what each vertex's
+/// `tex_coord` says and whether the positions get turned. With `textured`, a
+/// position is mapped onto the bounding box of the referenced vertices, so the
+/// polygon covers the whole texture; without one, `tex_coord` stays `(0, 0)` and
+/// the field is ignored. `turn_about` turns the positions only -- texture
+/// coordinates are always taken from the polygon as given.
+pub(super) fn polygon_vertices(
+    points: &[(f32, f32)],
+    indices: &[i32],
+    color: FColor,
+    textured: bool,
+    turn_about: Option<&Object>,
+) -> Vec<Vertex> {
+    assert!(
+        indices.len() % 3 == 0,
+        "Количество индексов должно быть кратно 3"
+    );
+
+    let positions: Vec<(f32, f32)> = indices
+        .iter()
+        .map(|&index| {
+            assert!(
+                index >= 0 && (index as usize) < points.len(),
+                "Индекс вершины {index} выходит за границы массива"
+            );
+            points[index as usize]
+        })
+        .collect();
+
+    if positions.is_empty() {
+        return Vec::new();
+    }
+
+    // Only the vertices the indices reference take part in the box: a point that
+    // nothing points at is not part of the polygon and must not stretch the
+    // texture over it.
+    let (min_x, min_y, w, h) = if textured {
+        let (mut min_x, mut min_y) = (f32::INFINITY, f32::INFINITY);
+        let (mut max_x, mut max_y) = (f32::NEG_INFINITY, f32::NEG_INFINITY);
+        for &(x, y) in &positions {
+            min_x = min_x.min(x);
+            min_y = min_y.min(y);
+            max_x = max_x.max(x);
+            max_y = max_y.max(y);
+        }
+        // A box with no width or height means every point sits on one line;
+        // dividing by it would poison the coordinates with a NaN.
+        (
+            min_x,
+            min_y,
+            (max_x - min_x).max(f32::EPSILON),
+            (max_y - min_y).max(f32::EPSILON),
+        )
+    } else {
+        (0.0, 0.0, 1.0, 1.0)
+    };
+
+    positions
+        .into_iter()
+        .map(|(x, y)| {
+            // The turn happens here rather than on `positions` above, so the
+            // bounding box above stays the polygon's own and the texture lands
+            // where it would have without rotation.
+            let turned = match turn_about {
+                Some(obj) => obj.turn(Vec2::new(x, y)),
+                None => Vec2::new(x, y),
+            };
+
+            Vertex {
+                position: FPoint::new(turned.x, turned.y),
+                color,
+                tex_coord: if textured {
+                    FPoint::new((x - min_x) / w, (y - min_y) / h)
+                } else {
+                    FPoint::new(0.0, 0.0)
+                },
+            }
+        })
+        .collect()
+}
