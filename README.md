@@ -207,8 +207,8 @@ Event::MouseMotion { x, y } => {
 | `cargo run --example basic-polygon` | Многоугольники: заливка, контур, текстура |
 | `cargo run --example basic-mouse` | Состояние кнопок мыши: `Down`/`Up`, потеря фокуса |
 | `cargo run --example basic-object` | Объекты: поворот заливки, текстуры и многоугольника |
+| `cargo run --example basic-camera` | Камера: движение, зум, картинка на сцене |
 | `cargo run --example 2d_games-frogy` | Объект: движение, поворот, отражение |
-| `cargo run --example 2d_games-camera` | Камера: движение, зум, мышь в мире |
 
 ### События
 

@@ -1,23 +1,28 @@
-//! Камера: ездит по сетке, зумит, и мышь знает, где она в мире.
+//! Камера: ездит по сцене и зумит.
 //!
-//! WASD или стрелки — движение камеры, колесо мыши — зум.
+//! Стрелки или WASD — движение камеры, колесо мыши — зум к курсору.
 //!
-//! Запуск: `cargo run --example 2d_games-camera`
+//! Запуск: `cargo run --example basic-camera`
 
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use frglib::{Camera, Color, Event, Keycode, Object, Vec2, Window};
+use frglib::{Camera, Color, Event, Image, Keycode, Object, Vec2, Window};
 
-/// Шаг сетки в единицах мира.
-const CELL: f32 = 100.0;
-
-/// Сколько клеток в сторону от центра мира.
-const RADIUS: i32 = 12;
+/// Картинка лежит рядом с примерами; путь строим от корня крейта, а не от
+/// текущего каталога, чтобы `cargo run --example` работал из любого места.
+fn asset(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("examples/basic/assets")
+        .join(name)
+}
 
 /// Скорость камеры в единицах мира в секунду.
 const SPEED: f32 = 600.0;
 
 fn main() -> Result<(), frglib::Error> {
+    let frog = Image::from_file(asset("fgoty_with_body.png"))?;
+
     let mut window = Window::builder("FRGLib camera")
         .size(800, 600)
         .background(Color::rgb(18, 20, 26))
@@ -25,15 +30,11 @@ fn main() -> Result<(), frglib::Error> {
 
     let mut camera = Camera::new(Vec2::ZERO);
 
-    // Сетка -- это просто объекты в координатах мира. Она нужна лишь чтобы было
-    // видно, куда едет камера; никакого тайлового мира в библиотеке нет.
-    let cell = CELL - 12.0;
-    let grid: Vec<Object> = (-RADIUS..=RADIUS)
-        .flat_map(|gy| {
-            (-RADIUS..=RADIUS)
-                .map(move |gx| Object::from_xywh(gx as f32 * CELL, gy as f32 * CELL, cell, cell))
-        })
-        .collect();
+    // Картинка 800x600, а на экране ей полагается быть вдвое меньше: в мире
+    // размер считается в единицах мира, и при зуме 1 это ровно пиксели. Стоит
+    // она в начале координат, то есть ровно там, где стоит камера.
+    let (iw, ih) = frog.size();
+    let hero = Object::from_xywh(0.0, 0.0, iw as f32 / 2.0, ih as f32 / 2.0);
 
     let mut pressed: Vec<Keycode> = Vec::new();
     let mut cursor: Option<Vec2> = None;
@@ -85,35 +86,16 @@ fn main() -> Result<(), frglib::Error> {
             }
         }
 
-        // Границ нет: камера свободно уезжает за сетку, и это видно -- пустое
-        // поле вокруг. Ограничение добавить несложно, но в этой версии его нет.
+        // Границ нет: камера свободно уезжает за сцену, и это видно -- пустое поле
+        // вокруг. Ограничение добавить несложно, но в этой версии его нет.
         camera.position += direction.normalized() * SPEED * dt;
-
-        let size = window.size();
-        let cursor_world = cursor.map(|c| camera.to_world(c, size));
-
-        let marker = cursor_world.map(|p| Object::from_xywh(p.x, p.y, 24.0, 24.0));
 
         window.frame_with(|d| {
             // Камера -- первой строкой: всё, что нарисовано дальше, попадает на
             // экран через неё.
             d.set_camera(camera);
 
-            for object in &grid {
-                // Раскраска по клеткам, чтобы движение было видно глазом.
-                let odd = ((object.position.x + object.position.y) / CELL) as i32 % 2 == 0;
-                let colour = if odd {
-                    Color::rgb(58, 72, 92)
-                } else {
-                    Color::rgb(44, 54, 70)
-                };
-                d.fill_object(object, colour)?;
-            }
-
-            // Метка под курсором: та же точка мира, но нарисованная объектом.
-            if let Some(marker) = &marker {
-                d.draw_object(marker, Color::rgb(240, 120, 60))?;
-            }
+            d.fill_textured_object(&hero, &frog)?;
 
             Ok(())
         })?;
