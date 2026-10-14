@@ -24,13 +24,23 @@ use sdl3::render::{BlendMode, FPoint, VertexIndices, WindowCanvas};
 pub struct Draw<'a> {
     canvas: &'a mut WindowCanvas,
     camera: Option<Camera>,
+    /// Gated with the feature: without `cached-textures` there is nothing to
+    /// resolve handles against, and an always-present field would be a dead
+    /// branch in every default build.
+    #[cfg(feature = "cached-textures")]
+    textures: &'a crate::texture::Store,
 }
 
 impl<'a> Draw<'a> {
-    pub(crate) fn new(canvas: &'a mut WindowCanvas) -> Self {
+    pub(crate) fn new(
+        canvas: &'a mut WindowCanvas,
+        #[cfg(feature = "cached-textures")] textures: &'a crate::texture::Store,
+    ) -> Self {
         Draw {
             canvas,
             camera: None,
+            #[cfg(feature = "cached-textures")]
+            textures,
         }
     }
 

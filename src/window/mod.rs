@@ -15,9 +15,13 @@ use sdl3::render::{create_renderer, WindowCanvas};
 use sdl3::Sdl;
 
 pub struct Window {
-    // Declaration order is drop order: `WindowCanvas` owns both the renderer and
-    // the SDL window, so it has to be torn down while `_sdl` is still alive.
-    canvas: WindowCanvas,
+    // Declaration order is drop order. The textures are declared first, so they
+    // are destroyed before the canvas that owns the renderer -- destroying them
+    // afterwards would call `SDL_DestroyTexture` on a dead renderer. The canvas
+    // itself comes next, and has to go while `_sdl` is still alive.
+    #[cfg(feature = "cached-textures")]
+    pub(crate) textures: crate::texture::Store,
+    pub(crate) canvas: WindowCanvas,
     background: Color,
     _sdl: Sdl,
 }
@@ -70,6 +74,8 @@ impl Window {
         let canvas = create_renderer(window, None)?;
 
         Ok(Self {
+            #[cfg(feature = "cached-textures")]
+            textures: crate::texture::Store::new(),
             canvas,
             background,
             _sdl: sdl,
@@ -171,7 +177,21 @@ impl Window {
     ) -> Result<(), Error> {
         self.clear();
         {
-            let mut handle = Draw::new(&mut self.canvas);
+            // Destructured rather than read as two separate fields: the drawing code
+            // needs `&mut canvas` and `&textures` at once, which only works if
+            // the borrows are split up front. The `textures` binding is gated so
+            // the default build, which has no store, still compiles.
+            let Self {
+                canvas,
+                #[cfg(feature = "cached-textures")]
+                textures,
+                ..
+            } = self;
+            let mut handle = Draw::new(
+                canvas,
+                #[cfg(feature = "cached-textures")]
+                textures,
+            );
             draw(&mut handle)?;
         }
         self.present()

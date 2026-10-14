@@ -22,6 +22,16 @@ default = []
 # `build-from-source` alone is not enough: it still links dynamically, because
 # `sdl3-sys` only switches to `LinkKind::Static` under `link-static`.
 bundled = ["sdl3/build-from-source-static"]
+# Turns on `sdl3/unsafe_textures`, which drops the lifetime from `Texture` so
+# that a texture can outlive the frame it was uploaded in -- without it, holding
+# one means a self-referential struct, which safe Rust cannot express.
+#
+# The sdl3 feature admits that a texture may be used with a canvas other than
+# the one it came from, which is undefined behaviour. We never do that: a
+# `Texture` cannot outlive the window that uploaded it. That guarantee is the
+# reason this is opt-in rather than always on, so the crate stays sound for
+# everyone who does not ask for it.
+cached-textures = ["sdl3/unsafe_textures"]
 
 [dependencies.sdl3]
 version = "0.20"
@@ -59,6 +69,11 @@ path = "examples/basic/window.rs"
 [[example]]
 name = "basic-camera"
 path = "examples/basic/camera.rs"
+
+[[example]]
+name = "basic-cached"
+path = "examples/basic/cached.rs"
+required-features = ["cached-textures"]
 
 [profile.release]
 lto = true

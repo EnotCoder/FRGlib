@@ -45,6 +45,8 @@ pub mod image;
 pub mod math;
 pub mod object;
 pub mod rect;
+#[cfg(feature = "cached-textures")]
+pub mod texture;
 pub mod window;
 
 pub use camera::Camera;
@@ -54,4 +56,6 @@ pub use image::Image;
 pub use math::Vec2;
 pub use object::Object;
 pub use rect::Rect;
+#[cfg(feature = "cached-textures")]
+pub use texture::Texture;
 pub use window::{Draw, Error, Window, WindowBuilder};

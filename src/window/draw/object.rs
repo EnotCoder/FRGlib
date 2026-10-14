@@ -15,6 +15,61 @@ use crate::window::Error;
 use sdl3::render::{BlendMode, FPoint, VertexIndices};
 
 impl<'a> Draw<'a> {
+    /// Everything `fill_textured_object` and `fill_object_texture` share, given
+    /// a texture already in hand.
+    ///
+    /// Split out so the upload stays on the `Image` path and only the box maths
+    /// is shared -- otherwise the two would drift apart.
+    fn copy_object(&mut self, obj: &Object, texture: &sdl3::render::Texture) -> Result<(), Error> {
+        // Unconditional: unlike a solid colour, an image routinely carries
+        // alpha, and without blending it would come out as a hard-edged box.
+        self.canvas.set_blend_mode(BlendMode::Blend);
+
+        let dst = to_f_rect(self.place_rect(obj.rect()));
+        if obj.rotation == 0.0 && !obj.flip_horizontal && !obj.flip_vertical {
+            self.canvas.copy(texture, None, Some(dst))?;
+            return Ok(());
+        }
+
+        self.canvas.copy_ex(
+            texture,
+            None,
+            Some(dst),
+            f64::from(obj.rotation),
+            None,
+            obj.flip_horizontal,
+            obj.flip_vertical,
+        )?;
+
+        Ok(())
+    }
+
+    /// What the two `*_object_polygon` textured methods share, given vertices
+    /// and a texture already in hand.
+    fn render_object_polygon(
+        &mut self,
+        vertices: &mut [sdl3::render::Vertex],
+        texture: &sdl3::render::Texture,
+    ) -> Result<(), Error> {
+        // Placed through the camera after the turn, so a vertex is turned once
+        // and projected once. Texture coordinates are left alone throughout: they
+        // address the image, not the world.
+        if let Some(camera) = self.camera {
+            let size = self.size_px();
+            for vertex in vertices.iter_mut() {
+                let p = camera.to_screen(Vec2::new(vertex.position.x, vertex.position.y), size);
+                vertex.position = FPoint::new(p.x, p.y);
+            }
+        }
+
+        self.canvas.set_blend_mode(BlendMode::Blend);
+
+        self.canvas
+            .render_geometry(vertices, Some(texture), VertexIndices::Sequential)?;
+
+        Ok(())
+    }
+
     /// Fills the triangles described by `indices` in `points` with `image`,
     /// turning them about `obj`'s centre.
     ///
@@ -40,31 +95,34 @@ impl<'a> Draw<'a> {
             return Ok(());
         }
 
-        // Placed through the camera after that, so a vertex is turned once and
-        // projected once. Texture coordinates are left alone throughout: they
-        // address the image, not the world.
-        if let Some(camera) = self.camera {
-            let size = self.size_px();
-            for vertex in &mut vertices {
-                let p = camera.to_screen(Vec2::new(vertex.position.x, vertex.position.y), size);
-                vertex.position = FPoint::new(p.x, p.y);
-            }
-        }
-
         // `texture_creator` hands over ownership, so the texture borrows the
         // local creator instead of `self.canvas` -- which is what lets
         // `render_geometry` take `&mut self.canvas` below.
         let creator = self.canvas.texture_creator();
         let texture = creator.create_texture_from_surface(&image.surface)?;
 
-        // Unconditional: unlike a solid colour, an image routinely carries
-        // alpha, and without blending it would come out as a hard-edged box.
-        self.canvas.set_blend_mode(BlendMode::Blend);
+        self.render_object_polygon(&mut vertices, &texture)
+    }
 
-        self.canvas
-            .render_geometry(&vertices, Some(&texture), VertexIndices::Sequential)?;
+    /// [`fill_textured_object_polygon`](Self::fill_textured_object_polygon)
+    /// with a texture uploaded once by [`Window::upload`](crate::Window::upload).
+    ///
+    /// Same picture, without the per-frame upload. Needs the `cached-textures`
+    /// feature.
+    #[cfg(feature = "cached-textures")]
+    pub fn fill_object_texture_polygon(
+        &mut self,
+        obj: &Object,
+        points: &[(f32, f32)],
+        indices: &[i32],
+        texture: crate::texture::Texture,
+    ) -> Result<(), Error> {
+        let mut vertices = polygon_vertices(points, indices, WHITE, true, Some(obj))?;
+        if vertices.is_empty() {
+            return Ok(());
+        }
 
-        Ok(())
+        self.render_object_polygon(&mut vertices, self.textures.get(texture))
     }
 
     /// Fills the box `obj` covers with `color`, turned by its `rotation`.
@@ -102,27 +160,21 @@ impl<'a> Draw<'a> {
         let creator = self.canvas.texture_creator();
         let texture = creator.create_texture_from_surface(&image.surface)?;
 
-        // Unconditional: images routinely carry alpha, and without blending they
-        // would come out as hard-edged boxes.
-        self.canvas.set_blend_mode(BlendMode::Blend);
+        self.copy_object(obj, &texture)
+    }
 
-        let dst = to_f_rect(self.place_rect(obj.rect()));
-        if obj.rotation == 0.0 && !obj.flip_horizontal && !obj.flip_vertical {
-            self.canvas.copy(&texture, None, Some(dst))?;
-            return Ok(());
-        }
-
-        self.canvas.copy_ex(
-            &texture,
-            None,
-            Some(dst),
-            f64::from(obj.rotation),
-            None,
-            obj.flip_horizontal,
-            obj.flip_vertical,
-        )?;
-
-        Ok(())
+    /// [`fill_textured_object`](Self::fill_textured_object) with a texture
+    /// uploaded once by [`Window::upload`](crate::Window::upload).
+    ///
+    /// Same picture, without the per-frame upload. Needs the `cached-textures`
+    /// feature.
+    #[cfg(feature = "cached-textures")]
+    pub fn fill_object_texture(
+        &mut self,
+        obj: &Object,
+        texture: crate::texture::Texture,
+    ) -> Result<(), Error> {
+        self.copy_object(obj, self.textures.get(texture))
     }
 
     /// Fills the triangles described by `indices` in `points` with `color`,
