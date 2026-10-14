@@ -54,14 +54,18 @@ impl Vec2 {
     }
 }
 
+// operator plus.
 impl std::ops::Add for Vec2 {
+    /// result type is Vec2.
     type Output = Vec2;
 
+    /// self is num right of the plus, other is num left of the plus.
     fn add(self, other: Vec2) -> Vec2 {
         Vec2::new(self.x + other.x, self.y + other.y)
     }
 }
 
+// operator minus.
 impl std::ops::Sub for Vec2 {
     type Output = Vec2;
 
@@ -70,6 +74,7 @@ impl std::ops::Sub for Vec2 {
     }
 }
 
+/// Multiplies both coordinates by a number.
 impl std::ops::Mul<f32> for Vec2 {
     type Output = Vec2;
 
@@ -78,6 +83,7 @@ impl std::ops::Mul<f32> for Vec2 {
     }
 }
 
+/// Divides both coordinates by the number.
 impl std::ops::Div<f32> for Vec2 {
     type Output = Vec2;
 
@@ -86,6 +92,7 @@ impl std::ops::Div<f32> for Vec2 {
     }
 }
 
+// Changes the signs of both coordinates.
 impl std::ops::Neg for Vec2 {
     type Output = Vec2;
 
@@ -94,6 +101,7 @@ impl std::ops::Neg for Vec2 {
     }
 }
 
+/// Writes the sum back to a
 impl std::ops::AddAssign for Vec2 {
     fn add_assign(&mut self, other: Vec2) {
         *self = *self + other;
@@ -116,11 +124,11 @@ impl From<[f32; 2]> for Vec2 {
 mod tests {
     use super::*;
 
-    /// Nothing below lands exactly on a float boundary, so every comparison
-    /// goes through a delta rather than `==`.
+    /// permissible error.
     const EPS: f32 = 1e-4;
 
     fn assert_close(got: f32, expected: f32) {
+        /// ads() -> removes the sign.
         assert!(
             (got - expected).abs() < EPS,
             "expected {expected}, got {got}"
