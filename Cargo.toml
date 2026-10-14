@@ -1,6 +1,6 @@
 [package]
 name = "frglib"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Rust bindings to SDL3: windows, events and a Vulkan-capable surface"
@@ -59,10 +59,6 @@ path = "examples/basic/window.rs"
 [[example]]
 name = "basic-camera"
 path = "examples/basic/camera.rs"
-
-[[example]]
-name = "2d_games-frogy"
-path = "examples/2d_games/frogy.rs"
 
 [profile.release]
 lto = true
