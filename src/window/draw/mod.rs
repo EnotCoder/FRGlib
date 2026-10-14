@@ -21,16 +21,6 @@ use geometry::{polygon_vertices, project, to_f_rect};
 use sdl3::pixels::FColor;
 use sdl3::render::{BlendMode, FPoint, VertexIndices, WindowCanvas};
 
-/// Draws shapes onto a window for one frame.
-///
-/// Obtained from [`Window::frame_with`](crate::Window::frame_with). Holds a
-/// mutable borrow of the window, so it cannot outlive the frame it was handed
-/// to.
-///
-/// Without a camera, coordinates are screen coordinates and go straight to the
-/// renderer. [`set_camera`](Self::set_camera) switches the frame over to world
-/// coordinates. A fresh `Draw` is made per frame, so one frame's camera can
-/// never leak into the next.
 pub struct Draw<'a> {
     canvas: &'a mut WindowCanvas,
     camera: Option<Camera>,
