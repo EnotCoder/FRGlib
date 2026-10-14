@@ -142,7 +142,7 @@ impl<'a> Draw<'a> {
             a: color.a as f32 / 255.0,
         };
 
-        let mut vertices = polygon_vertices(points, indices, vertex_color, false, None);
+        let mut vertices = polygon_vertices(points, indices, vertex_color, false, None)?;
         if vertices.is_empty() {
             return Ok(());
         }

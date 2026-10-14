@@ -17,9 +17,9 @@ impl Color {
     pub const BLACK: Color = Color::rgba(0, 0, 0, 255);
     pub const WHITE: Color = Color::rgba(255, 255, 255, 255);
 
-    pub const RED: Color = Color::rgba(0, 200, 0, 255);
+    pub const RED: Color = Color::rgba(200, 0, 0, 255);
     pub const GREEN: Color = Color::rgba(0, 200, 0, 255);
-    pub const BLUE: Color = Color::rgba(0, 200, 0, 255);
+    pub const BLUE: Color = Color::rgba(0, 0, 200, 255);
 
     /// Opaque colour, `a = 255`.
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
@@ -61,5 +61,84 @@ impl From<Color> for sdl3::pixels::Color {
             b: color.b,
             a: color.a,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The three named colours are the one thing in this file a reader reaches
+    /// for by reflex, and they were all the same green at one point -- shipping
+    /// `Color::RED` that renders green. Worth pinning down.
+    #[test]
+    fn named_colours_point_where_they_say() {
+        assert_eq!(Color::RED, Color::rgb(200, 0, 0));
+        assert_eq!(Color::GREEN, Color::rgb(0, 200, 0));
+        assert_eq!(Color::BLUE, Color::rgb(0, 0, 200));
+    }
+
+    #[test]
+    fn black_and_white_are_the_extremes() {
+        assert_eq!(Color::BLACK, Color::rgb(0, 0, 0));
+        assert_eq!(Color::WHITE, Color::rgb(255, 255, 255));
+    }
+
+    #[test]
+    fn the_named_colours_are_all_opaque() {
+        for colour in [
+            Color::RED,
+            Color::GREEN,
+            Color::BLUE,
+            Color::BLACK,
+            Color::WHITE,
+        ] {
+            assert_eq!(colour.a, 255, "{colour:?} should be opaque");
+        }
+    }
+
+    #[test]
+    fn the_named_colours_are_all_different() {
+        let all = [
+            Color::RED,
+            Color::GREEN,
+            Color::BLUE,
+            Color::BLACK,
+            Color::WHITE,
+        ];
+
+        for (i, one) in all.iter().enumerate() {
+            for other in &all[i + 1..] {
+                assert_ne!(one, other, "{one:?} and {other:?} are the same");
+            }
+        }
+    }
+
+    #[test]
+    fn rgb_is_opaque_and_rgba_is_not() {
+        assert_eq!(Color::rgb(1, 2, 3).a, 255);
+        assert_eq!(Color::rgba(1, 2, 3, 4).a, 4);
+    }
+
+    #[test]
+    fn channels_survive_a_round_trip_through_an_array() {
+        let colour = Color::rgba(10, 20, 30, 40);
+        assert_eq!(colour.to_array(), [10, 20, 30, 40]);
+        assert_eq!(Color::from(colour.to_array()), colour);
+    }
+
+    #[test]
+    fn tuples_and_triples_convert() {
+        assert_eq!(Color::from((1, 2, 3)), Color::rgb(1, 2, 3));
+        assert_eq!(Color::from((1, 2, 3, 4)), Color::rgba(1, 2, 3, 4));
+        // The three-channel form cannot carry alpha, so it comes out opaque.
+        assert_eq!(Color::from((1, 2, 3)).a, 255);
+    }
+
+    #[test]
+    fn converting_to_the_sdl_type_keeps_every_channel() {
+        let sdl: sdl3::pixels::Color = Color::rgba(10, 20, 30, 40).into();
+        let (r, g, b, a) = sdl.rgba();
+        assert_eq!((r, g, b, a), (10, 20, 30, 40));
     }
 }

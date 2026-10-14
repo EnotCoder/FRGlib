@@ -35,7 +35,7 @@ impl<'a> Draw<'a> {
         // positions get turned -- hence the turn inside the builder rather than
         // on `points` beforehand, which would stretch the texture along with
         // the shape.
-        let mut vertices = polygon_vertices(points, indices, WHITE, true, Some(obj));
+        let mut vertices = polygon_vertices(points, indices, WHITE, true, Some(obj))?;
         if vertices.is_empty() {
             return Ok(());
         }

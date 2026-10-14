@@ -18,6 +18,13 @@ pub enum Error {
     Renderer(sdl3::IntegerOrSdlError),
     /// A texture could not be created from an image.
     Texture(sdl3::render::TextureValueError),
+    /// The index list did not describe a whole number of triangles.
+    ///
+    /// Every three consecutive indices make one triangle, so the count has to
+    /// divide by three.
+    IndicesNotTriples { count: usize },
+    /// An index pointed outside the points it was used with.
+    IndexOutOfBounds { index: i32, len: usize },
     /// Presenting the frame failed. SDL reports this as a plain flag rather
     /// than a dedicated error type, so it borrows [`Error::Sdl`]'s payload.
     Present(sdl3::Error),
@@ -30,6 +37,13 @@ impl fmt::Display for Error {
             Error::WindowBuild(err) => write!(f, "could not create the window: {err}"),
             Error::Renderer(err) => write!(f, "could not create the renderer: {err}"),
             Error::Texture(err) => write!(f, "could not create the texture: {err}"),
+            Error::IndicesNotTriples { count } => write!(
+                f,
+                "{count} indices do not make a whole number of triangles, expected a multiple of 3"
+            ),
+            Error::IndexOutOfBounds { index, len } => {
+                write!(f, "vertex index {index} is outside the {len} given points")
+            }
             Error::Present(err) => write!(f, "could not present the frame: {err}"),
         }
     }
@@ -42,6 +56,9 @@ impl StdError for Error {
             Error::WindowBuild(err) => Some(err),
             Error::Renderer(err) => Some(err),
             Error::Texture(err) => Some(err),
+            // The two polygon failures are our own checks, with no error from
+            // underneath to point at.
+            Error::IndicesNotTriples { .. } | Error::IndexOutOfBounds { .. } => None,
         }
     }
 }

@@ -8,6 +8,7 @@ use crate::camera::Camera;
 use crate::math::Vec2;
 use crate::object::Object;
 use crate::rect::Rect;
+use crate::window::Error;
 
 use sdl3::pixels::FColor;
 use sdl3::render::{FPoint, Vertex};
@@ -82,25 +83,28 @@ pub(super) fn polygon_vertices(
     color: FColor,
     textured: bool,
     turn_about: Option<&Object>,
-) -> Vec<Vertex> {
-    assert!(
-        indices.len() % 3 == 0,
-        "Количество индексов должно быть кратно 3"
-    );
+) -> Result<Vec<Vertex>, Error> {
+    // Both of these used to be `assert!`, which meant an index list the caller
+    // got wrong killed the process. A library reports; it does not judge.
+    if indices.len() % 3 != 0 {
+        return Err(Error::IndicesNotTriples {
+            count: indices.len(),
+        });
+    }
 
-    let positions: Vec<(f32, f32)> = indices
-        .iter()
-        .map(|&index| {
-            assert!(
-                index >= 0 && (index as usize) < points.len(),
-                "Индекс вершины {index} выходит за границы массива"
-            );
-            points[index as usize]
-        })
-        .collect();
+    let mut positions: Vec<(f32, f32)> = Vec::with_capacity(indices.len());
+    for &index in indices {
+        if index < 0 || index as usize >= points.len() {
+            return Err(Error::IndexOutOfBounds {
+                index,
+                len: points.len(),
+            });
+        }
+        positions.push(points[index as usize]);
+    }
 
     if positions.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
 
     // Only the vertices the indices reference take part in the box: a point that
@@ -127,7 +131,7 @@ pub(super) fn polygon_vertices(
         (0.0, 0.0, 1.0, 1.0)
     };
 
-    positions
+    let vertices = positions
         .into_iter()
         .map(|(x, y)| {
             // The turn happens here rather than on `positions` above, so the
@@ -148,7 +152,8 @@ pub(super) fn polygon_vertices(
                 },
             }
         })
-        .collect()
+        .collect::<Vec<Vertex>>();
+    Ok(vertices)
 }
 
 #[cfg(test)]
