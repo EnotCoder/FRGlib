@@ -4,10 +4,10 @@
 //! either an SDL type or a `Vec`, so the drawing methods in the parent module
 //! stay a thin layer over these.
 
-use crate::camera::Camera;
+use crate::graphics::Camera;
+use crate::graphics::Object;
+use crate::math::Rect;
 use crate::math::Vec2;
-use crate::object::Object;
-use crate::rect::Rect;
 use crate::window::Error;
 
 use sdl3::pixels::FColor;

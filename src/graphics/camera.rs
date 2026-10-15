@@ -1,7 +1,7 @@
 //! The camera: which part of the world the window shows.
 
+use crate::math::Rect;
 use crate::math::Vec2;
-use crate::rect::Rect;
 
 /// What the window looks at.
 ///

@@ -38,24 +38,14 @@
 //! thread. The renderer, like the window, can only be created on the main
 //! thread, so [`Window::frame`] has to be called from there too.
 
-pub mod camera;
-pub mod color;
 pub mod event;
-pub mod image;
+pub mod graphics;
 pub mod math;
-pub mod object;
-pub mod rect;
-#[cfg(feature = "cached-textures")]
-pub mod texture;
 pub mod window;
 
-pub use camera::Camera;
-pub use color::Color;
 pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
-pub use image::Image;
-pub use math::Vec2;
-pub use object::Object;
-pub use rect::Rect;
 #[cfg(feature = "cached-textures")]
-pub use texture::Texture;
+pub use graphics::Texture;
+pub use graphics::{Camera, Color, Image, Object};
+pub use math::{Rect, Vec2};
 pub use window::{Draw, Error, Window, WindowBuilder};

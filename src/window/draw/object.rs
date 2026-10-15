@@ -7,9 +7,9 @@
 use super::geometry::{polygon_vertices, rotate_points, to_f_rect, QUAD_INDICES, WHITE};
 use super::Draw;
 
-use crate::color::Color;
+use crate::graphics::Color;
+use crate::graphics::Object;
 use crate::math::Vec2;
-use crate::object::Object;
 use crate::window::Error;
 
 use sdl3::render::{BlendMode, FPoint, VertexIndices};
@@ -84,7 +84,7 @@ impl<'a> Draw<'a> {
         obj: &Object,
         points: &[(f32, f32)],
         indices: &[i32],
-        image: &crate::image::Image,
+        image: &crate::graphics::Image,
     ) -> Result<(), Error> {
         // Texture coordinates come from the polygon as given, while the
         // positions get turned -- hence the turn inside the builder rather than
@@ -115,7 +115,7 @@ impl<'a> Draw<'a> {
         obj: &Object,
         points: &[(f32, f32)],
         indices: &[i32],
-        texture: crate::texture::Texture,
+        texture: crate::graphics::texture::Texture,
     ) -> Result<(), Error> {
         let mut vertices = polygon_vertices(points, indices, WHITE, true, Some(obj))?;
         if vertices.is_empty() {
@@ -152,7 +152,7 @@ impl<'a> Draw<'a> {
     pub fn fill_textured_object(
         &mut self,
         obj: &Object,
-        image: &crate::image::Image,
+        image: &crate::graphics::Image,
     ) -> Result<(), Error> {
         // `texture_creator` hands over ownership, so the texture borrows the
         // local creator instead of `self.canvas`, which is what lets the copy
@@ -172,7 +172,7 @@ impl<'a> Draw<'a> {
     pub fn fill_object_texture(
         &mut self,
         obj: &Object,
-        texture: crate::texture::Texture,
+        texture: crate::graphics::texture::Texture,
     ) -> Result<(), Error> {
         self.copy_object(obj, self.textures.get(texture))
     }

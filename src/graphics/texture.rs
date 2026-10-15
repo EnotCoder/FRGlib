@@ -3,7 +3,7 @@
 //! Only present with the `cached-textures` feature -- see [`Texture`] for why
 //! that is not the default.
 
-use crate::image::Image;
+use crate::graphics::Image;
 use crate::window::{Error, Window};
 
 /// A handle to an image already on the GPU.

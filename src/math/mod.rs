@@ -1,8 +1,15 @@
-//! Two-dimensional points and vectors.
+//! Two-dimensional points, vectors and boxes.
+//!
+//! [`Vec2`] lives here directly; [`Rect`] is a box in the same coordinate
+//! space, so its module sits alongside rather than at the crate root.
+
+pub mod rect;
+
+pub use rect::Rect;
 
 /// A point or vector in pixels.
 ///
-/// Floats rather than integers, for the same reason [`Rect`](crate::Rect) is:
+/// Floats rather than integers, for the same reason [`Rect`] is:
 /// SDL works in floating point, and keeping `f32` here means the public API does
 /// not shift when `sdl3` changes.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

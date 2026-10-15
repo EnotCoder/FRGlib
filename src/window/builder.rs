@@ -1,6 +1,6 @@
 //! Builder for [`Window`].
 
-use crate::color::Color;
+use crate::graphics::Color;
 use crate::window::{Error, Window};
 
 /// Configures and creates a [`Window`].

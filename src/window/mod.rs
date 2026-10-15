@@ -10,7 +10,7 @@ pub use error::Error;
 
 use pump::with_pump;
 
-use crate::color::Color;
+use crate::graphics::Color;
 use sdl3::render::{create_renderer, WindowCanvas};
 use sdl3::Sdl;
 
@@ -20,7 +20,7 @@ pub struct Window {
     // afterwards would call `SDL_DestroyTexture` on a dead renderer. The canvas
     // itself comes next, and has to go while `_sdl` is still alive.
     #[cfg(feature = "cached-textures")]
-    pub(crate) textures: crate::texture::Store,
+    pub(crate) textures: crate::graphics::texture::Store,
     pub(crate) canvas: WindowCanvas,
     background: Color,
     _sdl: Sdl,
@@ -75,7 +75,7 @@ impl Window {
 
         Ok(Self {
             #[cfg(feature = "cached-textures")]
-            textures: crate::texture::Store::new(),
+            textures: crate::graphics::texture::Store::new(),
             canvas,
             background,
             _sdl: sdl,
@@ -110,12 +110,12 @@ impl Window {
     }
 
     /// Sets the colour `frame` fills the window with.
-    pub fn set_background(&mut self, color: crate::color::Color) {
+    pub fn set_background(&mut self, color: crate::graphics::Color) {
         self.background = color;
     }
 
     /// The colour `frame` currently fills the window with.
-    pub fn background(&self) -> crate::color::Color {
+    pub fn background(&self) -> crate::graphics::Color {
         self.background
     }
 

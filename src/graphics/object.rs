@@ -1,7 +1,7 @@
 //! Objects: something with a position, a size and a rotation.
 
+use crate::math::Rect;
 use crate::math::Vec2;
-use crate::rect::Rect;
 
 /// Something to draw: where it is, how big, how turned, and how it moves.
 ///

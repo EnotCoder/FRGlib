@@ -11,10 +11,10 @@
 mod geometry;
 mod object;
 
-use crate::camera::Camera;
-use crate::color::Color;
+use crate::graphics::Camera;
+use crate::graphics::Color;
+use crate::math::Rect;
 use crate::math::Vec2;
-use crate::rect::Rect;
 use crate::window::Error;
 
 use geometry::{polygon_vertices, project, to_f_rect};
@@ -28,13 +28,13 @@ pub struct Draw<'a> {
     /// resolve handles against, and an always-present field would be a dead
     /// branch in every default build.
     #[cfg(feature = "cached-textures")]
-    textures: &'a crate::texture::Store,
+    textures: &'a crate::graphics::texture::Store,
 }
 
 impl<'a> Draw<'a> {
     pub(crate) fn new(
         canvas: &'a mut WindowCanvas,
-        #[cfg(feature = "cached-textures")] textures: &'a crate::texture::Store,
+        #[cfg(feature = "cached-textures")] textures: &'a crate::graphics::texture::Store,
     ) -> Self {
         Draw {
             canvas,
