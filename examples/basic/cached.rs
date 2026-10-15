@@ -22,7 +22,7 @@ fn main() -> Result<(), frglib::Error> {
 
     let mut window = Window::builder("FRGLib cached")
         .size(800, 600)
-        .background(Color::rgb(18, 20, 26))
+        .background(Color::FON)
         .build()?;
 
     // Вот и вся разница: одна загрузка сейчас, а не шестьдесят раз в секунду.

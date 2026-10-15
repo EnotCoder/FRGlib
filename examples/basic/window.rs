@@ -9,7 +9,7 @@ fn main() -> Result<(), frglib::Error> {
         .size(800, 600)
         .resizable(true)
         .vulkan(false)
-        .background(Color::WHITE)
+        .background(Color::FON)
         .build()?;
 
     println!(

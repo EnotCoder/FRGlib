@@ -19,7 +19,7 @@ fn main() -> Result<(), frglib::Error> {
 
     let mut window = Window::builder("FRGLib logo")
         .size(800, 600)
-        .background(Color::rgb(255, 255, 255))
+        .background(Color::FON)
         .build()?;
 
     // Логотип 1760x640, держим его пропорции при любом размере окна.

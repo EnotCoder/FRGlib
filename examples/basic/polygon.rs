@@ -19,7 +19,7 @@ fn main() -> Result<(), frglib::Error> {
 
     let mut window = Window::builder("FRGLib draw")
         .size(800, 600)
-        .background(Color::rgb(20, 25, 30))
+        .background(Color::FON)
         .build()?;
 
     let mut clock = FrameClock::new(60.0);

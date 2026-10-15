@@ -23,7 +23,7 @@ fn main() -> Result<(), frglib::Error> {
 
     let mut window = Window::builder("FRGLib camera")
         .size(800, 600)
-        .background(Color::rgb(18, 20, 26))
+        .background(Color::FON)
         .build()?;
 
     let mut camera = Camera::new(Vec2::ZERO);

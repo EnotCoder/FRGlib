@@ -16,6 +16,7 @@ pub struct Color {
 impl Color {
     pub const BLACK: Color = Color::rgba(0, 0, 0, 255);
     pub const WHITE: Color = Color::rgba(255, 255, 255, 255);
+    pub const FON: Color = Color::rgba(20, 25, 30, 255);
 
     pub const RED: Color = Color::rgba(200, 0, 0, 255);
     pub const GREEN: Color = Color::rgba(0, 200, 0, 255);
