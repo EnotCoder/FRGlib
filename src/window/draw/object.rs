@@ -160,7 +160,7 @@ impl<'a> Draw<'a> {
         let creator = self.canvas.texture_creator();
         let texture = creator.create_texture_from_surface(&image.surface)?;
 
-        self.copy_object(obj, &texture)
+        self.copy_object(obj, &texture)c
     }
 
     /// [`fill_textured_object`](Self::fill_textured_object) with a texture

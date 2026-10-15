@@ -89,11 +89,6 @@ impl Object {
         .map(|offset| self.position + offset.rotated(radians))
     }
 
-    /// Turns `point` about [`position`](Self::position) by
-    /// [`rotation`](Self::rotation).
-    ///
-    /// Both the point and the result are in window coordinates, the same ones
-    /// [`corners`](Self::corners) reports and `fill_object_polygon` takes.
     pub fn turn(&self, point: Vec2) -> Vec2 {
         self.position + (point - self.position).rotated(self.rotation.to_radians())
     }
