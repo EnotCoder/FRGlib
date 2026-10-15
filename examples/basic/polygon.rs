@@ -3,10 +3,8 @@
 //!
 //! Запуск: `cargo run --example basic-polygon`
 
+use frglib::{Color, Event, FrameClock, Image, Object, Window};
 use std::path::PathBuf;
-use std::time::Duration;
-
-use frglib::{Color, Event, Image, Object, Window};
 
 /// Логотип лежит в репозитории; путь строим от корня крейта, а не от
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
@@ -23,6 +21,8 @@ fn main() -> Result<(), frglib::Error> {
         .size(800, 600)
         .background(Color::rgb(20, 25, 30))
         .build()?;
+
+    let mut clock = FrameClock::new(60.0);
 
     loop {
         for event in window.poll()? {
@@ -74,6 +74,6 @@ fn main() -> Result<(), frglib::Error> {
             Ok(())
         })?;
 
-        std::thread::sleep(Duration::from_millis(16));
+        clock.tick();
     }
 }

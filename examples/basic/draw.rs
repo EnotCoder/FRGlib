@@ -2,9 +2,7 @@
 //!
 //! Запуск: `cargo run --example basic-draw`
 
-use std::time::Duration;
-
-use frglib::{Color, Event, Object, Window};
+use frglib::{Color, Event, FrameClock, Object, Window};
 
 fn main() -> Result<(), frglib::Error> {
     let mut window = Window::builder("FRGLib draw")
@@ -13,6 +11,8 @@ fn main() -> Result<(), frglib::Error> {
         .build()?;
 
     let margin = 60.0;
+
+    let mut clock = FrameClock::new(60.0);
 
     loop {
         for event in window.poll()? {
@@ -44,6 +44,6 @@ fn main() -> Result<(), frglib::Error> {
             Ok(())
         })?;
 
-        std::thread::sleep(Duration::from_millis(16));
+        clock.tick();
     }
 }

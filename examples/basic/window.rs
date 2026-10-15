@@ -2,9 +2,7 @@
 //!
 //! Запуск: `cargo run --example basic-window`
 
-use std::time::Duration;
-
-use frglib::{Color, Event, Window};
+use frglib::{Color, Event, FrameClock, Window};
 
 fn main() -> Result<(), frglib::Error> {
     let mut window = Window::builder("FRGLib")
@@ -19,6 +17,8 @@ fn main() -> Result<(), frglib::Error> {
         window.size(),
         window.background()
     );
+
+    let mut clock = FrameClock::new(60.0);
 
     loop {
         for event in window.poll()? {
@@ -37,6 +37,6 @@ fn main() -> Result<(), frglib::Error> {
         }
 
         window.frame()?;
-        std::thread::sleep(Duration::from_millis(16));
+        clock.tick();
     }
 }

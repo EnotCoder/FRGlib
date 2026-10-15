@@ -4,10 +4,8 @@
 //!
 //! Запуск: `cargo run --example 2d_games-frogy`
 
+use frglib::{Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window};
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
-
-use frglib::{Color, Event, Image, Keycode, Object, Vec2, Window};
 
 /// Спрайты лежат рядом с примером; путь строим от корня крейта, а не от
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
@@ -37,9 +35,13 @@ fn main() -> Result<(), frglib::Error> {
     // Какие клавиши сейчас зажаты. Само событие -- это «щёлкнули», поэтому
     // состояние приходится копить и отдельно снимать по отпусканию.
     let mut pressed: Vec<Keycode> = Vec::new();
-    let mut last = Instant::now();
+    let mut clock = FrameClock::new(60.0);
 
     loop {
+        // Сколько секунд длился прошлый кадр -- ровно то, чем
+        // двигать скорость.
+        let dt = clock.dt();
+
         for event in window.poll()? {
             match event {
                 Event::Quit | Event::CloseRequested => return Ok(()),
@@ -52,11 +54,6 @@ fn main() -> Result<(), frglib::Error> {
                 _ => {}
             }
         }
-
-        // Настоящее время между кадрами: `update` умножает скорость на секунды.
-        let now = Instant::now();
-        let dt = (now - last).as_secs_f32();
-        last = now;
 
         let held = |key| pressed.contains(&key);
 
@@ -109,6 +106,6 @@ fn main() -> Result<(), frglib::Error> {
             Ok(())
         })?;
 
-        std::thread::sleep(Duration::from_millis(16));
+        clock.tick();
     }
 }

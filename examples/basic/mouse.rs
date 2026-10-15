@@ -5,10 +5,8 @@
 //!
 //! Запуск: `cargo run --example basic-mouse`
 
+use frglib::{Color, Event, FrameClock, Image, MouseButton, Object, Window};
 use std::path::PathBuf;
-use std::time::Duration;
-
-use frglib::{Color, Event, Image, MouseButton, Object, Window};
 
 /// Картинки лежат в репозитории; путь строим от корня крейта, а не от
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
@@ -32,6 +30,8 @@ fn main() -> Result<(), frglib::Error> {
     // читает. Само по себе событие -- это «щёлкнули», а не «зажата сейчас».
     let mut left = false;
     let mut right = false;
+
+    let mut clock = FrameClock::new(60.0);
 
     loop {
         for event in window.poll()? {
@@ -91,6 +91,6 @@ fn main() -> Result<(), frglib::Error> {
             Ok(())
         })?;
 
-        std::thread::sleep(Duration::from_millis(16));
+        clock.tick();
     }
 }

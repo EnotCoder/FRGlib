@@ -3,9 +3,9 @@
 //! Запуск: `cargo run --example basic-object`
 
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use frglib::{Color, Event, Image, Object, Window};
+use frglib::{Color, Event, FrameClock, Image, Object, Window};
 
 /// Картинка лежит рядом с примерами; путь строим от корня крейта, а не от
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
@@ -36,6 +36,7 @@ fn main() -> Result<(), frglib::Error> {
     let triangle = [(640.0, 220.0), (720.0, 380.0), (560.0, 380.0)];
 
     let start = Instant::now();
+    let mut clock = FrameClock::new(60.0);
 
     loop {
         for event in window.poll()? {
@@ -47,6 +48,9 @@ fn main() -> Result<(), frglib::Error> {
 
         // Угол растёт от времени, а не от числа кадров: иначе скорость вращения
         // зависела бы от того, как быстро машина тянет кадры.
+        // Угол растёт от времени, а не от числа кадров: иначе скорость вращения
+        // зависела бы от того, как быстро машина тянет кадры. Это абсолютный
+        // отсчёт от старта, а не шаг кадра, поэтому FrameClock тут не помогает.
         let elapsed = start.elapsed().as_secs_f32();
         let solid = solid.with_rotation(elapsed * 40.0);
         let textured = textured.with_rotation(-elapsed * 55.0);
@@ -70,6 +74,6 @@ fn main() -> Result<(), frglib::Error> {
             Ok(())
         })?;
 
-        std::thread::sleep(Duration::from_millis(16));
+        clock.tick();
     }
 }

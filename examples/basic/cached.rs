@@ -5,10 +5,8 @@
 //!
 //! Запуск: `cargo run --features cached-textures --example basic-cached`
 
+use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window};
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
-
-use frglib::{Camera, Color, Event, Image, Keycode, Object, Vec2, Window};
 
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -41,7 +39,7 @@ fn main() -> Result<(), frglib::Error> {
     let fast = Object::from_xywh(260.0, 0.0, w, h);
 
     let mut pressed: Vec<Keycode> = Vec::new();
-    let mut last = Instant::now();
+    let mut clock = FrameClock::new(60.0);
 
     loop {
         for event in window.poll()? {
@@ -57,9 +55,7 @@ fn main() -> Result<(), frglib::Error> {
             }
         }
 
-        let now = Instant::now();
-        let dt = (now - last).as_secs_f32();
-        last = now;
+        let dt = clock.dt();
 
         let held = |key| pressed.contains(&key);
         let mut direction = Vec2::ZERO;
@@ -87,6 +83,6 @@ fn main() -> Result<(), frglib::Error> {
             Ok(())
         })?;
 
-        std::thread::sleep(Duration::from_millis(16));
+        clock.tick();
     }
 }
