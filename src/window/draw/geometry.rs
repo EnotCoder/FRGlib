@@ -13,13 +13,6 @@ use crate::window::Error;
 use sdl3::pixels::FColor;
 use sdl3::render::{FPoint, Vertex};
 
-/// `Option<FRect>: From<Rect>` does not exist, so the conversion goes through an
-/// explicit local at every call site that needs one.
-pub(super) fn to_f_rect(rect: impl Into<Rect>) -> sdl3::render::FRect {
-    let rect: Rect = rect.into();
-    rect.into()
-}
-
 /// Two triangles over four corners, in the winding `polygon_vertices` expects.
 pub(super) const QUAD_INDICES: [i32; 6] = [0, 1, 2, 0, 2, 3];
 
@@ -31,7 +24,13 @@ pub(super) const WHITE: FColor = FColor {
     a: 1.0,
 };
 
-/// Turns `points` about `obj`'s centre, for the polygon methods to hand on.
+/// Convert my rectangle into an SDL rectangle.
+pub(super) fn to_f_rect(rect: impl Into<Rect>) -> sdl3::render::FRect {
+    let rect: Rect = rect.into();
+    rect.into()
+}
+
+/// Rotate a set of points around the object's center.
 pub(super) fn rotate_points(points: &[(f32, f32)], obj: &Object) -> Vec<(f32, f32)> {
     points
         .iter()
@@ -42,14 +41,7 @@ pub(super) fn rotate_points(points: &[(f32, f32)], obj: &Object) -> Vec<(f32, f3
         .collect()
 }
 
-/// Moves `points` out of world space and onto the screen through `camera`.
-///
-/// This runs after any turning, never before: a turn is a rotation about a
-/// point, and doing it in world space keeps the angle the caller asked for,
-/// while doing it here would scale the radius without the shape.
-///
-/// `camera` of `None` means the frame has no camera, and then the points are
-/// screen coordinates already -- they come back copied, unchanged.
+/// Translate points via the camera.
 pub(super) fn project(
     points: &[(f32, f32)],
     camera: Option<Camera>,
@@ -69,14 +61,7 @@ pub(super) fn project(
         .collect()
 }
 
-/// Builds the vertex buffer for an indexed triangle list.
-///
-/// Shared by every `*_object` fill, which differ in what each vertex's
-/// `tex_coord` says and whether the positions get turned. With `textured`, a
-/// position is mapped onto the bounding box of the referenced vertices, so the
-/// polygon covers the whole texture; without one, `tex_coord` stays `(0, 0)` and
-/// the field is ignored. `turn_about` turns the positions only -- texture
-/// coordinates are always taken from the polygon as given.
+/// Collect the completed triangle vertices.
 pub(super) fn polygon_vertices(
     points: &[(f32, f32)],
     indices: &[i32],
