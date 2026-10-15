@@ -94,12 +94,22 @@ impl FrameClock {
         self.period
     }
 
-    /// Seconds since the last [`tick`](Self::tick), capped by `max_dt`.
+    /// Seconds since the last call to `dt`, capped by `max_dt`.
     ///
-    /// Measure this at the top of the loop and it covers the previous frame's
-    /// work but not the wait that followed it.
-    pub fn dt(&self) -> f32 {
-        self.last.elapsed().min(self.max_dt).as_secs_f32()
+    /// Read this once at the top of every frame: it is the whole length of the
+    /// frame that just ended, the work *and* the wait. Reading it moves the
+    /// clock on, so a second read in the same frame comes out near zero --
+    /// which is the answer you want if you were about to ask twice by
+    /// accident.
+    ///
+    /// The wait has to be part of this. A frame at 60 fps spends about sixteen
+    /// of its seventeen milliseconds asleep, so a `dt` that measured only the
+    /// working time would make everything scaled by it move roughly a thousand
+    /// times too slowly.
+    pub fn dt(&mut self) -> f32 {
+        let elapsed = self.last.elapsed().min(self.max_dt);
+        self.last = Instant::now();
+        elapsed.as_secs_f32()
     }
 
     /// Waits out whatever is left of the frame, then starts the next one.
@@ -108,17 +118,11 @@ impl FrameClock {
     /// behind does not queue up a burst of catch-up frames: the next deadline
     /// moves to now, not further into the future.
     pub fn tick(&mut self) {
-        let now = Instant::now();
-        if let Some(left) = remaining(now, self.next) {
+        if let Some(left) = remaining(Instant::now(), self.next) {
             std::thread::sleep(left);
         }
 
-        // Stamped after the sleep on purpose. Before it, the next `dt` would
-        // measure the wait along with the work and come out as a full period
-        // every time.
-        self.last = Instant::now();
-
-        self.next = (self.next + self.period).max(self.last);
+        self.next = (self.next + self.period).max(Instant::now());
     }
 }
 
@@ -196,10 +200,51 @@ mod tests {
         assert!(remaining(now, now).is_none());
     }
 
-    /// dt starts near zero, since the clock was just made.
+    /// dt is near zero on the very first read, since the clock was just made.
     #[test]
-    fn dt_is_near_zero_right_after_construction() {
-        assert!(FrameClock::new(60.0).dt() < 0.05);
+    fn dt_is_zero_on_the_first_read() {
+        let mut clock = FrameClock::new(60.0);
+        assert!(clock.dt() < 0.001, "dt should start at nothing");
+    }
+
+    /// dt must cover the whole frame, sleep included.
+    ///
+    /// This is the regression that mattered: when `dt` measured only the
+    /// working time, a frame that mostly slept reported microseconds, and
+    /// anything scaled by it crawled. An idle frame must now report roughly
+    /// one period.
+    #[test]
+    fn dt_covers_the_wait_not_just_the_work() {
+        let mut clock = FrameClock::new(60.0);
+
+        // The first tick has no deadline ahead of it, so nothing to wait for.
+        clock.tick();
+        clock.tick();
+
+        let dt = clock.dt();
+        let period = clock.period_len().as_secs_f32();
+
+        assert!(
+            dt > period * 0.5,
+            "dt {dt} should be near the period {period}, not near zero"
+        );
+    }
+
+    /// Reading dt moves the clock on, so a frame cannot be measured twice.
+    #[test]
+    fn a_second_read_in_the_same_frame_is_near_zero() {
+        let mut clock = FrameClock::new(60.0);
+
+        clock.tick();
+        clock.tick();
+        let first = clock.dt();
+        let second = clock.dt();
+
+        assert!(first > 0.010, "the first read should see the frame");
+        assert!(
+            second < first / 10.0,
+            "second read {second} should not repeat the frame"
+        );
     }
 
     /// `tick` must not sleep when the frame already blew its budget, so a
@@ -235,8 +280,11 @@ mod tests {
     /// A cap keeps a stall from turning into one enormous step.
     #[test]
     fn dt_stops_at_max_dt() {
-        let clock = FrameClock::new(60.0).max_dt(Duration::from_millis(10));
+        let mut clock = FrameClock::new(60.0).max_dt(Duration::from_millis(10));
         std::thread::sleep(Duration::from_millis(40));
+
+        // One frame that ran forty times over budget.
+        clock.tick();
 
         let dt = clock.dt();
         assert!(dt <= 0.0101, "dt {dt} should be capped at 10ms");
@@ -246,10 +294,11 @@ mod tests {
     /// A generous cap must not get in the way.
     #[test]
     fn dt_passes_through_under_the_cap() {
-        let clock = FrameClock::new(60.0).max_dt(Duration::from_secs(10));
+        let mut clock = FrameClock::new(60.0).max_dt(Duration::from_secs(10));
         std::thread::sleep(Duration::from_millis(20));
+        clock.tick();
 
         let dt = clock.dt();
-        assert!(dt > 0.015, "dt {dt} should reflect the real wait");
+        assert!(dt > 0.015, "dt {dt} should reflect the real frame");
     }
 }
