@@ -45,9 +45,7 @@ const TILE_GRASS: usize = 0;
 const TILE_TUFT: usize = 1;
 const TILE_LOG: usize = 2;
 const TILE_PATH: usize = 3;
-
-/// Цвет пруда: в атласе такого тайла нет, поэтому вода просто заливается.
-const WATER: Color = Color::rgb(38, 78, 140);
+const TILE_WATER: usize = 4;
 
 /// Каким кадром смотрит фрогти.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -139,7 +137,7 @@ impl Tile {
             Tile::Tuft => Some(TILE_TUFT),
             Tile::Log => Some(TILE_LOG),
             Tile::Path => Some(TILE_PATH),
-            Tile::Water => None,
+            Tile::Water => Some(TILE_WATER),
         }
     }
 
@@ -158,14 +156,6 @@ fn build_map() -> Vec<Vec<Tile>> {
     // Дорога: вертикальная через центр и ответвление вбок.
     let road_x = w / 2;
     for row in &mut map {
-        row[road_x..=road_x + 1].fill(Tile::Path);
-    }
-    let junction = h / 3;
-    // Ответвление: две полосы дороги по обе стороны от перекрёстка.
-    let branch = w / 5..=w / 5 + 8;
-    map[junction][branch.clone()].fill(Tile::Path);
-    map[junction + 2][branch].fill(Tile::Path);
-    for row in map.iter_mut().take(junction + 3).skip(junction) {
         row[road_x..=road_x + 1].fill(Tile::Path);
     }
 
@@ -384,10 +374,8 @@ fn main() -> Result<(), frglib::Error> {
                     TILE,
                 );
 
-                match tile.texture() {
-                    Some(index) => d.fill_object_texture(&cell, tile_tex[index])?,
-                    None => d.fill_object(&cell, WATER)?,
-                }
+                let index: usize = tile.texture().expect("REASON");
+                d.fill_object_texture(&cell, tile_tex[index])?;
             }
 
             let hero = Object::from_xywh(
