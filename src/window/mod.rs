@@ -11,7 +11,7 @@ pub use error::Error;
 use pump::with_pump;
 
 use crate::graphics::Color;
-use sdl3::render::{create_renderer, WindowCanvas};
+use sdl3::render::{create_renderer, ScaleMode, WindowCanvas};
 use sdl3::Sdl;
 
 pub struct Window {
@@ -22,6 +22,10 @@ pub struct Window {
     #[cfg(feature = "cached-textures")]
     pub(crate) textures: crate::graphics::texture::Store,
     pub(crate) canvas: WindowCanvas,
+    // How every texture drawn on this window is sampled when it lands at a size
+    // other than its own. There is no renderer-wide default in SDL3, so this is
+    // applied to each texture as it is created rather than once at startup.
+    pub(crate) scale: ScaleMode,
     background: Color,
     _sdl: Sdl,
 }
@@ -40,6 +44,7 @@ impl Window {
         resizable: bool,
         vulkan: bool,
         background: Color,
+        scale: ScaleMode,
     ) -> Result<Self, Error> {
         // SDL3 asks the X11 compositor to bypass our window by default, which
         // sets _NET_WM_BYPASS_COMPOSITOR=1 and makes the window get drawn
@@ -77,6 +82,7 @@ impl Window {
             #[cfg(feature = "cached-textures")]
             textures: crate::graphics::texture::Store::new(),
             canvas,
+            scale,
             background,
             _sdl: sdl,
         })
@@ -107,6 +113,15 @@ impl Window {
     /// Current drawable size, as `(width, height)`.
     pub fn size(&self) -> (u32, u32) {
         self.canvas.window().size()
+    }
+
+    /// Whether textures on this window keep hard pixel edges when scaled.
+    ///
+    /// Reports what [`WindowBuilder::pixel_art`] asked for at startup. There is
+    /// no way to change it afterwards, since textures are filtered as they are
+    /// created and the ones already uploaded would have to be revisited.
+    pub fn pixel_art(&self) -> bool {
+        self.scale == ScaleMode::Nearest
     }
 
     /// Sets the colour `frame` fills the window with.
@@ -180,15 +195,19 @@ impl Window {
             // Destructured rather than read as two separate fields: the drawing code
             // needs `&mut canvas` and `&textures` at once, which only works if
             // the borrows are split up front. The `textures` binding is gated so
-            // the default build, which has no store, still compiles.
+            // the default build, which has no store, still compiles. `scale`
+            // binds by reference too, but it is `Copy`, so `*scale` hands over a
+            // plain value and the field keeps being borrowed at once.
             let Self {
                 canvas,
+                scale,
                 #[cfg(feature = "cached-textures")]
                 textures,
                 ..
             } = self;
             let mut handle = Draw::new(
                 canvas,
+                *scale,
                 #[cfg(feature = "cached-textures")]
                 textures,
             );

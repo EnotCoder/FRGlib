@@ -72,13 +72,17 @@ impl Window {
     ///
     /// The pixels live as long as the window does, so this cannot outlive the
     /// renderer they were uploaded to.
+    ///
+    /// The window's [`pixel_art`](crate::WindowBuilder::pixel_art) setting is
+    /// baked in at upload time, like it is for the textures drawn per frame.
     pub fn upload(&mut self, image: &Image) -> Result<Texture, Error> {
         // `texture_creator` borrows the canvas and the texture borrows the
         // creator. `unsafe_textures` is what lets the result be moved into the
         // store; the field order in `Window` is what keeps the destruction
         // safe.
         let creator = self.canvas.texture_creator();
-        let texture = creator.create_texture_from_surface(&image.surface)?;
+        let mut texture = creator.create_texture_from_surface(&image.surface)?;
+        texture.set_scale_mode(self.scale);
 
         Ok(self.textures.push(texture))
     }

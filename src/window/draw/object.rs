@@ -99,7 +99,8 @@ impl<'a> Draw<'a> {
         // local creator instead of `self.canvas` -- which is what lets
         // `render_geometry` take `&mut self.canvas` below.
         let creator = self.canvas.texture_creator();
-        let texture = creator.create_texture_from_surface(&image.surface)?;
+        let mut texture = creator.create_texture_from_surface(&image.surface)?;
+        texture.set_scale_mode(self.scale);
 
         self.render_object_polygon(&mut vertices, &texture)
     }
@@ -158,7 +159,8 @@ impl<'a> Draw<'a> {
         // local creator instead of `self.canvas`, which is what lets the copy
         // below take `&mut self.canvas`.
         let creator = self.canvas.texture_creator();
-        let texture = creator.create_texture_from_surface(&image.surface)?;
+        let mut texture = creator.create_texture_from_surface(&image.surface)?;
+        texture.set_scale_mode(self.scale);
 
         self.copy_object(obj, &texture)
     }

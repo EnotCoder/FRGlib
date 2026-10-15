@@ -2,6 +2,7 @@
 
 use crate::graphics::Color;
 use crate::window::{Error, Window};
+use sdl3::render::ScaleMode;
 
 /// Configures and creates a [`Window`].
 ///
@@ -28,6 +29,10 @@ pub struct WindowBuilder {
     resizable: bool,
     vulkan: bool,
     background: Color,
+    // Stored as the SDL scale mode rather than the boolean the caller gives us:
+    // applying it at the three places a texture is created is then a single
+    // unconditional call instead of a branch in each.
+    scale: ScaleMode,
 }
 
 impl WindowBuilder {
@@ -39,6 +44,7 @@ impl WindowBuilder {
             resizable: true,
             vulkan: false,
             background: Color::GREEN,
+            scale: ScaleMode::Linear,
         }
     }
 
@@ -68,6 +74,39 @@ impl WindowBuilder {
         self
     }
 
+    /// Whether textures keep hard pixel edges when scaled. Defaults to false.
+    ///
+    /// Off, SDL interpolates between texels: the right default for anything
+    /// drawn from photographs or vectors, and the reason small pixel art comes
+    /// out looking smeared. On, each texel is either kept or dropped whole, so
+    /// a sprite drawn at two or four times its own size stays crisp.
+    ///
+    /// This is a per-window switch, applied to every texture drawn on it. To mix
+    /// pixel art with a smooth image in one window, draw the smooth one into an
+    /// [`Image`] and scale it yourself first.
+    ///
+    /// Nearest sampling only looks right at a whole-number scale. At
+    /// `Camera::zoom` of 1.5 some texels land doubled and others not, which is
+    /// inherent to the mode rather than a fault in it -- pixel art is usually
+    /// zoomed by whole numbers for exactly that reason.
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), frglib::Error> {
+    /// let window = frglib::Window::builder("game")
+    ///     .pixel_art(true)
+    ///     .build()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn pixel_art(mut self, pixel_art: bool) -> Self {
+        self.scale = if pixel_art {
+            ScaleMode::Nearest
+        } else {
+            ScaleMode::Linear
+        };
+        self
+    }
+
     /// Opens the window.
     pub fn build(self) -> Result<Window, Error> {
         Window::create(
@@ -77,6 +116,45 @@ impl WindowBuilder {
             self.resizable,
             self.vulkan,
             self.background,
+            self.scale,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Smooth unless the caller asks otherwise, so nothing changes for anyone
+    /// who never mentions it.
+    #[test]
+    fn scaling_is_smooth_by_default() {
+        assert_eq!(WindowBuilder::new("demo").scale, ScaleMode::Linear);
+    }
+
+    #[test]
+    fn pixel_art_picks_the_nearest_texel() {
+        assert_eq!(
+            WindowBuilder::new("demo").pixel_art(true).scale,
+            ScaleMode::Nearest
+        );
+    }
+
+    /// The switch takes a boolean, so it has to be able to say no as well.
+    #[test]
+    fn pixel_art_can_be_turned_back_off() {
+        let builder = WindowBuilder::new("demo").pixel_art(true).pixel_art(false);
+
+        assert_eq!(builder.scale, ScaleMode::Linear);
+    }
+
+    #[test]
+    fn pixel_art_leaves_the_rest_of_the_builder_alone() {
+        let builder = WindowBuilder::new("demo").pixel_art(true);
+
+        assert_eq!(builder.width, 800);
+        assert_eq!(builder.height, 600);
+        assert!(builder.resizable);
+        assert!(!builder.vulkan);
     }
 }

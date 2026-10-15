@@ -19,11 +19,13 @@ use crate::window::Error;
 
 use geometry::{polygon_vertices, project, to_f_rect};
 use sdl3::pixels::FColor;
-use sdl3::render::{BlendMode, FPoint, VertexIndices, WindowCanvas};
+use sdl3::render::{BlendMode, FPoint, ScaleMode, VertexIndices, WindowCanvas};
 
 pub struct Draw<'a> {
     canvas: &'a mut WindowCanvas,
     camera: Option<Camera>,
+    /// The window's sampling mode, applied to every texture created here.
+    scale: ScaleMode,
     /// Gated with the feature: without `cached-textures` there is nothing to
     /// resolve handles against, and an always-present field would be a dead
     /// branch in every default build.
@@ -34,11 +36,13 @@ pub struct Draw<'a> {
 impl<'a> Draw<'a> {
     pub(crate) fn new(
         canvas: &'a mut WindowCanvas,
+        scale: ScaleMode,
         #[cfg(feature = "cached-textures")] textures: &'a crate::graphics::texture::Store,
     ) -> Self {
         Draw {
             canvas,
             camera: None,
+            scale,
             #[cfg(feature = "cached-textures")]
             textures,
         }
