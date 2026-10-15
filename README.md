@@ -255,6 +255,7 @@ Event::MouseMotion { x, y } => {
 | `cargo run --example basic-object` | Объекты: поворот заливки, текстуры и многоугольника |
 | `cargo run --example basic-camera` | Камера: движение, зум, картинка на сцене |
 | `cargo run --features cached-textures --example basic-cached` | Текстура, залитая один раз, против заливки на кадр |
+| `cargo run --example 2d_games-frogy` | Спрайты по направлениям: движение, поворот, отражение |
 
 ### Что изменилось в 0.2.0
 
