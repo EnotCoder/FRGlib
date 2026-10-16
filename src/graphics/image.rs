@@ -32,13 +32,6 @@ impl Image {
     }
 
     /// Cuts a rectangle out of the image into a new one.
-    ///
-    /// This is how a sheet gets taken apart. A tile map keeps many tiles side by
-    /// side in one file, and a sprite sheet keeps every direction and every walk
-    /// frame; either way each piece has to be drawable on its own.
-    ///
-    /// The region is copied, not referenced: the result shares nothing with the
-    /// original, so the big sheet can be dropped straight after.
     pub fn crop(&self, x: u32, y: u32, width: u32, height: u32) -> Result<Self, Error> {
         // sdl3's `Rect` takes the corner as i32 and the size as u32, which is a
         // reasonable way round and an awkward one to remember.
