@@ -59,6 +59,7 @@ fn mix(a: Color, b: Color, t: f32) -> Color {
 
 fn main() -> Result<(), frglib::Error> {
     let cube = Image::from_file(asset("frogy_cube.png"))?;
+    let cube_dead = Image::from_file(asset("frogy_cube_dead.png"))?;
     let spike = Image::from_file(asset("kill_block.png"))?;
     let floor = Image::from_file(asset("floor.png"))?;
 
@@ -77,6 +78,7 @@ fn main() -> Result<(), frglib::Error> {
         .build()?;
 
     let cube_tex = window.upload(&cube)?;
+    let cube_dead_tex = window.upload(&cube_dead)?;
     let spike_tex = window.upload(&spike)?;
     let top_tex = window.upload(&floor_top)?;
     let body_tex = window.upload(&floor_body)?;
@@ -305,7 +307,7 @@ fn main() -> Result<(), frglib::Error> {
             body.rotation = player.spin;
 
             if player.state == State::Dead {
-                d.fill_object(&body, Color::rgb(180, 40, 40))?;
+                d.fill_object_texture(&body, cube_dead_tex)?;
             } else {
                 d.fill_object_texture(&body, cube_tex)?;
             }
