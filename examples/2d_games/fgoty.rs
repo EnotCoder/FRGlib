@@ -45,6 +45,7 @@ const TILE_TUFT: usize = 1;
 const TILE_LOG: usize = 2;
 const TILE_PATH: usize = 3;
 const TILE_WATER: usize = 4;
+const TILE_RUST: usize = 5;
 
 /// Каким кадром смотрит фрогти.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -121,6 +122,7 @@ enum Tile {
     Log,
     Path,
     Water,
+    Rust,
 }
 
 impl Tile {
@@ -131,12 +133,13 @@ impl Tile {
             Tile::Log => Some(TILE_LOG),
             Tile::Path => Some(TILE_PATH),
             Tile::Water => Some(TILE_WATER),
+            Tile::Rust => Some(TILE_RUST),
         }
     }
 
     /// Ветка лежит на земле, а пруд глубокий -- по пруду не ходим.
     fn walkable(self) -> bool {
-        !matches!(self, Tile::Water)
+        !matches!(self, Tile::Water) && !matches!(self, Tile::Rust)
     }
 }
 
@@ -170,6 +173,8 @@ fn build_map() -> Vec<Vec<Tile>> {
         map[y][x] = Tile::Tuft;
     }
 
+    map[8][15] = Tile::Rust;
+    
     // Упавшие ветки: пара штук тут, пара там.
     for (y, x) in [(3, 14), (8, 27), (13, 6), (17, 37), (23, 18)] {
         map[y][x] = Tile::Log;
