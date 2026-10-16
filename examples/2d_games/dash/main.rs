@@ -9,9 +9,17 @@
 //!
 //! Запуск: `cargo run --features cached-textures --example 2d_games-frogy-dash`
 
+mod level;
+mod player;
+
 use std::path::PathBuf;
 
 use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window};
+
+use level::{hit, parse, top_of, Tile, BODY, COLS, GROUND, GROUND_SCREEN, LEVEL_TOP, ROWS, TILE};
+use player::{
+    Player, State, GRAVITY, JUMP, JUMP_CUT, LAND_TOLERANCE, SCREEN_X, SPEED, SPIKE_INSET,
+};
 
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -34,108 +42,10 @@ const CAP_H: f32 = 36.0;
 /// Высота одного куска грунта на экране.
 const DIRT_H: f32 = 60.0;
 
-/// Сторона тайла на экране. В файле 16, на экране 32 — ровно вдвое, так что
-/// с `pixel_art` тайлы остаются чёткими.
-const TILE: f32 = 32.0;
-
-/// Сторона куба и шипа.
-const BODY: f32 = TILE;
-
-/// Уровень: 8 строк по 96 столбцов. Строка 7 — земля, верхние висят в воздухе.
-///
-/// `.` пусто, `#` шип, `=` платформа, на которую можно приземлиться сверху.
-///
-/// Точки вместо пробелов — намеренно: хвостовые пробелы редактор срежет, и
-/// строки разъедутся.
-const LEVEL: [&str; 8] = [
-    "................................................................................................",
-    "................................................................................................",
-    "................................................................................................",
-    "................................................................................................",
-    "................................................................................................",
-    "................................................................................................",
-    "................................................................................................",
-    "..........................##...........#......##..................#......#..............##......",
-];
-
-/// Строк и столбцов в `LEVEL`.
-const ROWS: usize = LEVEL.len();
-const COLS: usize = LEVEL[0].len();
-
-/// Верх уровня в мире: строка 7 должна встать на землю.
-const LEVEL_TOP: f32 = GROUND - ROWS as f32 * TILE;
-
-/// Мировая Y верха земли.
-const GROUND: f32 = 400.0;
-
-/// На какой высоте от низа окна стоит земля.
-const GROUND_SCREEN: f32 = 0.75;
-
-/// Где куб стоит на экране. Мир едет влево, поэтому и камера едет вправо.
-const SCREEN_X: f32 = -200.0;
-
-/// С чего игрок начинает, в мире.
-const START_X: f32 = 3.0 * TILE;
-
-/// Скорость бега, пикселей в секунду.
-const SPEED: f32 = 320.0;
-
-/// Тяжесть вниз.
-const GRAVITY: f32 = 2400.0;
-
-/// Начальная скорость прыжка вверх.
-const JUMP: f32 = 780.0;
-
-/// Сколько от прыжка остаётся, если отпустить кнопку на подъёме.
-const JUMP_CUT: f32 = 0.42;
-
-/// Насколько можно промахнуться мимо верхушки платформы и всё равно
-/// приземлиться. Без этого на быстром падении пересечение верхней плоскости
-/// находится ровно в одной точке и легко проскакивает.
-const LAND_TOLERANCE: f32 = 1.5;
-
-/// Шип проверяем не всем тайлом, а чуть меньшим квадратом: треугольник в
-/// файле уже сужается кверху, и полный тайл убивал бы впритык.
-const SPIKE_INSET: f32 = 5.0;
-
 /// Небо.
 const SKY_TOP: Color = Color::rgb(58, 152, 233);
 const SKY_LOW: Color = Color::rgb(191, 233, 252);
 const SKY_BANDS: usize = 8;
-
-/// Что на клетке уровня.
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Tile {
-    Empty,
-    Spike,
-    Platform,
-}
-
-/// Разбирает `LEVEL` в сетку. Делается один раз, а не на кадр.
-fn parse() -> Vec<Vec<Tile>> {
-    LEVEL
-        .iter()
-        .map(|row| {
-            row.chars()
-                .map(|c| match c {
-                    '#' => Tile::Spike,
-                    '=' => Tile::Platform,
-                    _ => Tile::Empty,
-                })
-                .collect()
-        })
-        .collect()
-}
-
-/// Верх тайла в строке `row`.
-fn top_of(row: usize) -> f32 {
-    LEVEL_TOP + row as f32 * TILE
-}
-
-/// Прямоугольники по центру пересекаются?
-fn hit(a: Vec2, a_half: Vec2, b: Vec2, b_half: Vec2) -> bool {
-    (a.x - b.x).abs() < a_half.x + b_half.x && (a.y - b.y).abs() < a_half.y + b_half.y
-}
 
 /// Смешивает два цвета: `0` — `a`, `1` — `b`.
 fn mix(a: Color, b: Color, t: f32) -> Color {
@@ -145,53 +55,6 @@ fn mix(a: Color, b: Color, t: f32) -> Color {
             .clamp(0.0, 255.0) as u8
     };
     Color::rgba(ch(a.r, b.r), ch(a.g, b.g), ch(a.b, b.b), 255)
-}
-
-/// Что происходит с игроком.
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum State {
-    Run,
-    Dead,
-    Won,
-}
-
-/// Всё про одного игрока.
-struct Player {
-    x: f32,
-    y: f32,
-    vy: f32,
-    grounded: bool,
-    /// Прыжок уже урезан отпусканием — второй раз резать нельзя.
-    cut: bool,
-    state: State,
-    spin: f32,
-}
-
-impl Player {
-    fn new() -> Self {
-        Player {
-            x: START_X,
-            y: GROUND - BODY / 2.0,
-            vy: 0.0,
-            grounded: true,
-            cut: false,
-            state: State::Run,
-            spin: 0.0,
-        }
-    }
-
-    fn center(&self) -> Vec2 {
-        Vec2::new(self.x, self.y)
-    }
-
-    /// Тайлы, которых касается куб по горизонтали.
-    fn columns(&self) -> (isize, isize) {
-        let half = BODY / 2.0;
-        (
-            ((self.x - half) / TILE).floor() as isize,
-            ((self.x + half) / TILE).floor() as isize,
-        )
-    }
 }
 
 fn main() -> Result<(), frglib::Error> {
