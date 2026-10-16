@@ -1,7 +1,7 @@
 //! Frogy Dash: куб бежит вправо сам, игрок только прыгает.
 //!
-//! Пробел, стрелка вверх или W -- прыжок, чем дольше держишь, тем выше. Шип
-//! на пути -- смерть, пробел начинает уровень заново.
+//! Пробел, стрелка вверх или W -- прыжок. Сила всегда одна: нажал или зажал,
+//! одинаково. Шип на пути -- смерть, пробел начинает уровень заново.
 //!
 //! Как в настоящем Geometry Dash, мир едет влево, а куб держится на одном
 //! месте экрана: игрок по горизонтали не управляет совсем, вся задача --
@@ -17,9 +17,7 @@ use std::path::PathBuf;
 use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window};
 
 use level::{hit, parse, top_of, Tile, BODY, COLS, GROUND, GROUND_SCREEN, LEVEL_TOP, ROWS, TILE};
-use player::{
-    Player, State, GRAVITY, JUMP, JUMP_CUT, LAND_TOLERANCE, SCREEN_X, SPEED, SPIKE_INSET,
-};
+use player::{Player, State, GRAVITY, JUMP, LAND_TOLERANCE, SCREEN_X, SPEED, SPIKE_INSET};
 
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -55,6 +53,13 @@ fn mix(a: Color, b: Color, t: f32) -> Color {
             .clamp(0.0, 255.0) as u8
     };
     Color::rgba(ch(a.r, b.r), ch(a.g, b.g), ch(a.b, b.b), 255)
+}
+
+fn near(grid: &[Vec<Tile>], x: f32, from: isize, to: isize, want: Tile) -> bool {
+    let col = (x / TILE).floor() as isize;
+    (col + from..=col + to).any(|c| {
+        c >= 0 && c < COLS as isize && (0..ROWS).any(|r| grid[r][c as usize] == want)
+    })
 }
 
 fn main() -> Result<(), frglib::Error> {
@@ -114,17 +119,9 @@ fn main() -> Result<(), frglib::Error> {
 
         match player.state {
             State::Run => {
-                if jump && player.grounded {
+                if (jump || near(&grid, player.x, 5, 5, Tile::Spike) || near(&grid, player.x, 4, 6, Tile::Platform)) && player.grounded {
                     player.vy = -JUMP;
                     player.grounded = false;
-                    player.cut = false;
-                }
-
-                // Отпустили на подъёме — срезаем прыжок, чтобы он не был
-                // всегда одинаково высоким.
-                if !jump && player.vy < 0.0 && !player.cut {
-                    player.vy *= JUMP_CUT;
-                    player.cut = true;
                 }
 
                 player.vy += GRAVITY * dt;
@@ -316,5 +313,9 @@ fn main() -> Result<(), frglib::Error> {
         })?;
 
         clock.tick();
+        if player.state != State::Run {
+            println!("итог: {:?}, x = {:.0} из {}", player.state, player.x, COLS as f32 * TILE);
+            return Ok(());
+        }
     }
 }
