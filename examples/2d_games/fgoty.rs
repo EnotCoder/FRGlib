@@ -6,7 +6,7 @@
 //! своей текстурой. Дальше рисуются только те тайлы, что попали в кадр, так
 //! что карта может быть заметно больше окна.
 //!
-//! Запуск: `cargo run --features cached-textures --example 2d_games-frogy`
+//! Запуск: `cargo run --features cached-textures --example 2d_games-fgoty`
 
 use std::path::PathBuf;
 
@@ -225,7 +225,7 @@ fn main() -> Result<(), frglib::Error> {
         .map(|f| Image::from_file(asset("rpg_frogy", f.file())))
         .collect::<Result<_, _>>()?;
 
-    let mut window = Window::builder("frglib frogy")
+    let mut window = Window::builder("frglib fgoty")
         .size(800, 600)
         .background(Color::rgb(14, 17, 21))
         // Тайлы 16x16 рисуются в 32x32, ровно вдвое, и без этого флага SDL

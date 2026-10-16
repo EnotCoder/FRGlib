@@ -76,8 +76,8 @@ path = "examples/basic/cached.rs"
 required-features = ["cached-textures"]
 
 [[example]]
-name = "2d_games-frogy"
-path = "examples/2d_games/frogy.rs"
+name = "2d_games-fgoty"
+path = "examples/2d_games/fgoty.rs"
 required-features = ["cached-textures"]
 
 [profile.release]

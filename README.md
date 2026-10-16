@@ -334,7 +334,7 @@ loop {
 | `cargo run --example basic-object` | Объекты: поворот заливки, текстуры и многоугольника |
 | `cargo run --example basic-camera` | Камера: движение, зум, картинка на сцене |
 | `cargo run --features cached-textures --example basic-cached` | Текстура, залитая один раз, против заливки на кадр |
-| `cargo run --features cached-textures --example 2d_games-frogy` | RPG на тайловой карте: нарезка атласа, камера, коллизии |
+| `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: нарезка атласа, камера, коллизии |
 
 ### Что изменилось в 0.2.0
 
