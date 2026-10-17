@@ -37,6 +37,18 @@ cached-textures = ["sdl3/unsafe_textures"]
 version = "0.20"
 features = ["raw-window-handle"]
 
+# Только для примеров, и в публикуемый пакет не попадает: так библиотека не
+# тянет за собой SDL3_ttf, а пример с текстом всё равно может им
+# воспользоваться.
+#
+# `build-from-source-static` нужен потому, что SDL3_ttf в системе обычно не
+# установлен. Он же пересобирает и сам SDL3, так что первая сборка примера с
+# текстом занимает около минуты — плата за то, что у пользователя крейта этой
+# зависимости нет.
+[dev-dependencies.sdl3]
+version = "0.20"
+features = ["ttf", "build-from-source-static"]
+
 # Cargo discovers examples only as `examples/*.rs` and `examples/*/main.rs` --
 # one level deep. The ones here sit a level deeper (`basic/*.rs`), next to their
 # own assets, so they have to be listed by hand. Note that a target name is also
@@ -74,6 +86,10 @@ path = "examples/basic/camera.rs"
 name = "basic-cached"
 path = "examples/basic/cached.rs"
 required-features = ["cached-textures"]
+
+[[example]]
+name = "ui-text"
+path = "examples/ui/text.rs"
 
 [[example]]
 name = "2d_games-fgoty"

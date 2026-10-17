@@ -47,6 +47,27 @@ impl Image {
         Ok(Image { surface: out })
     }
 
+    /// Takes over a surface that was decoded somewhere else.
+    ///
+    /// This is the way in for pixels `frglib` never saw. Anything that
+    /// produces an SDL surface and an example wants to draw it -- SDL3_ttf
+    /// rendering a line of text, a procedural pattern, a gradient -- has
+    /// nowhere else to go: [`Draw`](crate::Draw) takes an `Image`, and until
+    /// now the only way to get one was a file on disk.
+    ///
+    /// It is also what keeps font code out of the library. Parsing an OTF is a
+    /// large, security-sensitive job, and a game library has no business doing
+    /// it on behalf of every user. So `frglib` leaves SDL3_ttf alone, and an
+    /// example that wants text pulls it in as a dev-dependency and hands the
+    /// result over here.
+    ///
+    /// The usual caveat of sdl3 types in a public signature applies here: the
+    /// surface is the same one sdl3 uses, so it is tied to the sdl3 version this
+    /// crate was built against.
+    pub fn from_surface(surface: sdl3::surface::Surface<'static>) -> Self {
+        Image { surface }
+    }
+
     /// Width and height in pixels.
     pub fn size(&self) -> (u32, u32) {
         self.surface.size()

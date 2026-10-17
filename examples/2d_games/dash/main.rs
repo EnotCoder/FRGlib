@@ -55,13 +55,6 @@ fn mix(a: Color, b: Color, t: f32) -> Color {
     Color::rgba(ch(a.r, b.r), ch(a.g, b.g), ch(a.b, b.b), 255)
 }
 
-fn near(grid: &[Vec<Tile>], x: f32, from: isize, to: isize, want: Tile) -> bool {
-    let col = (x / TILE).floor() as isize;
-    (col + from..=col + to).any(|c| {
-        c >= 0 && c < COLS as isize && (0..ROWS).any(|r| grid[r][c as usize] == want)
-    })
-}
-
 fn main() -> Result<(), frglib::Error> {
     let cube = Image::from_file(asset("frogy_cube.png"))?;
     let cube_dead = Image::from_file(asset("frogy_cube_dead.png"))?;
@@ -119,7 +112,7 @@ fn main() -> Result<(), frglib::Error> {
 
         match player.state {
             State::Run => {
-                if (jump || near(&grid, player.x, 5, 5, Tile::Spike) || near(&grid, player.x, 4, 6, Tile::Platform)) && player.grounded {
+                if jump && player.grounded {
                     player.vy = -JUMP;
                     player.grounded = false;
                 }
@@ -313,9 +306,5 @@ fn main() -> Result<(), frglib::Error> {
         })?;
 
         clock.tick();
-        if player.state != State::Run {
-            println!("итог: {:?}, x = {:.0} из {}", player.state, player.x, COLS as f32 * TILE);
-            return Ok(());
-        }
     }
 }
