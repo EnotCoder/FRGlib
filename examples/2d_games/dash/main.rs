@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window};
 
 use level::{hit, parse, top_of, Tile, BODY, COLS, GROUND, GROUND_SCREEN, LEVEL_TOP, ROWS, TILE};
-use player::{Player, State, GRAVITY, JUMP, LAND_TOLERANCE, SCREEN_X, SPEED, SPIKE_INSET};
+use player::{Player, State, GRAVITY, JUMP, LAND_TOLERANCE, SCREEN_X, SPEED, SPIKE_INSET, SPEED_SPIN};
 
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -125,7 +125,7 @@ fn main() -> Result<(), frglib::Error> {
 
                 // Крутим куб в полёте: у настоящего dash куб вертится.
                 if !player.grounded {
-                    player.spin += 540.0 * dt;
+                    player.spin += SPEED_SPIN * dt;
                 }
 
                 let (col0, col1) = player.columns();
