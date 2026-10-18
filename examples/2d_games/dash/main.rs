@@ -17,7 +17,9 @@ use std::path::PathBuf;
 use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window};
 
 use level::{hit, parse, top_of, Tile, BODY, COLS, GROUND, GROUND_SCREEN, LEVEL_TOP, ROWS, TILE};
-use player::{Player, State, GRAVITY, JUMP, LAND_TOLERANCE, SCREEN_X, SPEED, SPIKE_INSET, SPEED_SPIN};
+use player::{
+    Player, State, GRAVITY, JUMP, LAND_TOLERANCE, SCREEN_X, SPEED, SPEED_SPIN, SPIKE_INSET,
+};
 
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

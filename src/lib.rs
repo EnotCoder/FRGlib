@@ -42,6 +42,7 @@ pub mod event;
 pub mod graphics;
 pub mod math;
 pub mod timing;
+pub mod ui;
 pub mod window;
 
 pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
@@ -50,4 +51,5 @@ pub use graphics::Texture;
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{Rect, Vec2};
 pub use timing::FrameClock;
+pub use ui::{Button, ButtonState};
 pub use window::{Draw, Error, Window, WindowBuilder};

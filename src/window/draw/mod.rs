@@ -56,6 +56,26 @@ impl<'a> Draw<'a> {
         self.camera = Some(camera);
     }
 
+    /// Runs `draw` with the camera taken off, then puts it back.
+    ///
+    /// Everything drawn goes through the camera, so in a game that has one,
+    /// an interface drawn with it slides around the world: the menu walks off
+    /// with the map. Interface wants screen coordinates, this is how it gets
+    /// them.
+    ///
+    /// A closure rather than a pair of take/restore calls, because the
+    /// obvious mistake with the pair is to forget the second half -- and the
+    /// frame then quietly keeps drawing in screen space.
+    pub fn screen_space(
+        &mut self,
+        draw: impl FnOnce(&mut Draw<'_>) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        let saved = self.camera.take();
+        let out = draw(self);
+        self.camera = saved;
+        out
+    }
+
     /// Window size in pixels, as the camera needs it.
     fn size_px(&self) -> (u32, u32) {
         self.canvas.window().size()
