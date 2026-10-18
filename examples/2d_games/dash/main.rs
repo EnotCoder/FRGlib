@@ -10,6 +10,7 @@
 //! Запуск: `cargo run --features cached-textures --example 2d_games-frogy-dash`
 
 mod level;
+mod menu;
 mod player;
 
 use std::path::PathBuf;
@@ -24,6 +25,13 @@ use player::{
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("examples/2d_games/assets/dash")
+        .join(name)
+}
+
+/// Ассет, общий для примеров: шрифт лежит один на всех.
+fn shared_asset(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("examples/assets")
         .join(name)
 }
 
@@ -57,7 +65,19 @@ fn mix(a: Color, b: Color, t: f32) -> Color {
     Color::rgba(ch(a.r, b.r), ch(a.g, b.g), ch(a.b, b.b), 255)
 }
 
-fn main() -> Result<(), frglib::Error> {
+/// Что показывать: меню или саму игру.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Screen {
+    Menu,
+    Play,
+}
+
+/// Все три источника ошибок -- sdl3, шрифт и сам frglib -- реализуют
+/// `std::error::Error`, так что один ящик вместо собственного типа ошибки на
+/// тридцать строк.
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+fn main() -> Result<()> {
     let cube = Image::from_file(asset("frogy_cube.png"))?;
     let cube_dead = Image::from_file(asset("frogy_cube_dead.png"))?;
     let spike = Image::from_file(asset("kill_block.png"))?;
@@ -83,6 +103,12 @@ fn main() -> Result<(), frglib::Error> {
     let top_tex = window.upload(&floor_top)?;
     let body_tex = window.upload(&floor_body)?;
 
+    // Шрифт и меню живут за счёт dev-зависимости SDL3_ttf: в самом крейте её
+    // нет. Один шрифт на все примеры -- `examples/assets/font.otf`.
+    let ttf = sdl3::ttf::init()?;
+    let font = ttf.load_font(shared_asset("font.otf"), 32.0)?;
+    let mut menu = menu::Menu::new(&font, window.size())?;
+
     let grid = parse();
 
     let mut pressed: Vec<Keycode> = Vec::new();
@@ -90,18 +116,24 @@ fn main() -> Result<(), frglib::Error> {
     let mut player = Player::new();
     let mut camera = Camera::new(Vec2::ZERO);
 
+    // Игра начинается с меню, а не с бега: иначе первый кадр -- это уже
+    // проигрыш на первом шипе.
+    let mut screen = Screen::Menu;
+
     loop {
         let dt = clock.dt();
 
-        for event in window.poll()? {
+        let events = window.poll()?;
+
+        for event in &events {
             match event {
                 Event::Quit | Event::CloseRequested => return Ok(()),
                 Event::KeyDown { key, .. } => {
-                    if !pressed.contains(&key) {
-                        pressed.push(key);
+                    if !pressed.contains(key) {
+                        pressed.push(*key);
                     }
                 }
-                Event::KeyUp { key, .. } => pressed.retain(|&held| held != key),
+                Event::KeyUp { key, .. } => pressed.retain(|&held| held != *key),
                 _ => {}
             }
         }
@@ -110,7 +142,32 @@ fn main() -> Result<(), frglib::Error> {
         let jump = [Keycode::Space, Keycode::Up, Keycode::W, Keycode::Z]
             .iter()
             .any(|&key| held(key));
-        let restart = [Keycode::Space, Keycode::R].iter().any(|&key| held(key));
+
+        // Меню забирает мышь себе, пока открыто: игра под ним не должна
+        // реагировать на прыжки и не должна получать клики.
+        if screen == Screen::Menu {
+            menu.layout(window.size());
+            match menu.update(&events) {
+                menu::Choice::Exit => return Ok(()),
+                menu::Choice::Play => {
+                    player = Player::new();
+                    screen = Screen::Play;
+                }
+                menu::Choice::None => {}
+            }
+        } else if player.state != State::Run {
+            // Шип или финиш -- возвращаемся в меню, а не крутим рестарт.
+            screen = Screen::Menu;
+        }
+
+        if screen == Screen::Menu {
+            // Размер читаем до `frame_with`: замыкание берёт окно на
+            // изменение, а внутри осталось бы обращаться к нему.
+            let view = window.size();
+            clock.tick();
+            window.frame_with(|d| menu.draw(d, view))?;
+            continue;
+        }
 
         match player.state {
             State::Run => {
@@ -199,11 +256,8 @@ fn main() -> Result<(), frglib::Error> {
                     println!("уровень пройден: {COLS} столбцов.");
                 }
             }
-            State::Dead | State::Won => {
-                if restart {
-                    player = Player::new();
-                }
-            }
+            // Смерть и финиш обрабатываются выше: они возвращают в меню.
+            State::Dead | State::Won => {}
         }
 
         // Мир едет влево, потому что игрок едет вправо: камера держит его на
