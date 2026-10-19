@@ -34,7 +34,7 @@ fn asset(name: &str) -> PathBuf {
 /// Ассет, общий для примеров: шрифт лежит один на всех.
 fn shared_asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/assets")
+        .join("examples/2d_games/assets")
         .join(name)
 }
 

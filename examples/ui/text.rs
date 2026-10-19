@@ -22,7 +22,7 @@ use sdl3::ttf::{Font, FontError};
 
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/assets")
+        .join("examples/ui/assets")
         .join(name)
 }
 

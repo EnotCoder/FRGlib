@@ -19,7 +19,7 @@ use sdl3::pixels::Color as SdlColor;
 
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/assets")
+        .join("examples/ui/assets")
         .join(name)
 }
 
