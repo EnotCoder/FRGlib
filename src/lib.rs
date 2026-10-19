@@ -51,5 +51,5 @@ pub use graphics::Texture;
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{Rect, Vec2};
 pub use timing::FrameClock;
-pub use ui::{Button, ButtonState};
+pub use ui::{Button, ButtonState, Slider, SliderState};
 pub use window::{Draw, Error, Window, WindowBuilder};

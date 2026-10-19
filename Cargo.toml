@@ -92,6 +92,10 @@ name = "ui-button"
 path = "examples/ui/button.rs"
 
 [[example]]
+name = "ui-slider"
+path = "examples/ui/slider.rs"
+
+[[example]]
 name = "ui-text"
 path = "examples/ui/text.rs"
 

@@ -7,5 +7,7 @@
 //! for a font parser they never asked to use.
 
 mod button;
+mod slider;
 
 pub use button::{Button, ButtonState};
+pub use slider::{Slider, SliderState};
