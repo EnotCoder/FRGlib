@@ -341,7 +341,7 @@ loop {
 | `cargo run --example basic-camera` | Камера: движение, зум, картинка на сцене |
 | `cargo run --features cached-textures --example basic-cached` | Текстура, залитая один раз, против заливки на кадр |
 | `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: нарезка атласа, камера, коллизии |
-| `cargo run --features cached-textures --example 2d_games-frogy-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
+| `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
 | `cargo run --example ui-text` | Текст через SDL3_ttf, кириллица, кеш строк |
 | `cargo run --example ui-button` | Кнопки: три состояния, клик по отпусканию, интерфейс поверх камеры |
 

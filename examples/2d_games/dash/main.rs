@@ -1,4 +1,4 @@
-//! Frogy Dash: куб бежит вправо сам, игрок только прыгает.
+//! Fgoty Dash: куб бежит вправо сам, игрок только прыгает.
 //!
 //! Пробел, стрелка вверх или W -- прыжок. Сила всегда одна: нажал или зажал,
 //! одинаково. Шип на пути -- смерть, пробел начинает уровень заново.
@@ -7,7 +7,7 @@
 //! месте экрана: игрок по горизонтали не управляет совсем, вся задача --
 //! угадать момент прыжка.
 //!
-//! Запуск: `cargo run --features cached-textures --example 2d_games-frogy-dash`
+//! Запуск: `cargo run --features cached-textures --example 2d_games-fgoty-dash`
 
 mod level;
 mod menu;
@@ -183,8 +183,8 @@ enum Screen {
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
-    let cube = Image::from_file(asset("frogy_cube.png"))?;
-    let cube_dead = Image::from_file(asset("frogy_cube_dead.png"))?;
+    let cube = Image::from_file(asset("fgoty_cube.png"))?;
+    let cube_dead = Image::from_file(asset("fgoty_cube_dead.png"))?;
     let spike = Image::from_file(asset("kill_block.png"))?;
     let floor = Image::from_file(asset("floor.png"))?;
 
@@ -196,7 +196,7 @@ fn main() -> Result<()> {
     let floor_top = floor.crop(0, 0, SRC, CAP)?;
     let floor_body = floor.crop(0, CAP, SRC, FLOOR_H - CAP)?;
 
-    let mut window = Window::builder("frogy dash")
+    let mut window = Window::builder("fgoty dash")
         .size(960, 540)
         .background(SKY_TOP)
         .pixel_art(true)

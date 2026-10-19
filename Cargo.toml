@@ -105,7 +105,7 @@ path = "examples/2d_games/fgoty/main.rs"
 required-features = ["cached-textures"]
 
 [[example]]
-name = "2d_games-frogy-dash"
+name = "2d_games-fgoty-dash"
 path = "examples/2d_games/dash/main.rs"
 required-features = ["cached-textures"]
 

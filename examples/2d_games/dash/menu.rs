@@ -112,8 +112,8 @@ impl Menu {
 
         let play_label = caption(label_font, "Играть", white)?;
         let exit_label = caption(label_font, "Выход", white)?;
-        let title = caption(title_font, "FROGY DASH", white)?;
-        let title_shadow = caption(title_font, "FROGY DASH", shadow)?;
+        let title = caption(title_font, "FGOTY DASH", white)?;
+        let title_shadow = caption(title_font, "FGOTY DASH", shadow)?;
         let hint = caption(label_font, "пробел — прыжок", dim)?;
 
         Ok(Menu {

@@ -34,7 +34,7 @@ fn main() -> Result<(), frglib::Error> {
     let faces = [Facing::Down, Facing::Left, Facing::Right, Facing::Up];
     let frogs: Vec<Image> = faces
         .iter()
-        .map(|f| Image::from_file(asset("rpg_frogy", f.file())))
+        .map(|f| Image::from_file(asset("rpg_fgoty", f.file())))
         .collect::<Result<_, _>>()?;
 
     let mut window = Window::builder("frglib fgoty")

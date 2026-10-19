@@ -43,10 +43,10 @@ impl Facing {
 
     pub fn file(self) -> &'static str {
         match self {
-            Facing::Down => "frogy_down.png",
-            Facing::Left => "frogy_left.png",
-            Facing::Right => "frogy_right.png",
-            Facing::Up => "frogy_up.png",
+            Facing::Down => "fgoty_down.png",
+            Facing::Left => "fgoty_left.png",
+            Facing::Right => "fgoty_right.png",
+            Facing::Up => "fgoty_up.png",
         }
     }
 }
