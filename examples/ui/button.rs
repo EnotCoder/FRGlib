@@ -13,7 +13,8 @@
 use std::path::PathBuf;
 
 use frglib::{
-    Button, Camera, Color, Event, FrameClock, Image, Keycode, Object, Rect, Vec2, Window,
+    Button, Camera, Color, Event, FrameClock, Image, Keycode, Label, Object, Rect, TextCache, Vec2,
+    Window,
 };
 use sdl3::pixels::Color as SdlColor;
 
@@ -23,43 +24,7 @@ fn asset(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// Ошибка шрифта и ошибка окна — разные типы, а `main` обязан вернуть один.
-#[derive(Debug)]
-enum Error {
-    Sdl(sdl3::Error),
-    Font(sdl3::ttf::FontError),
-    Frglib(frglib::Error),
-}
-
-impl From<sdl3::Error> for Error {
-    fn from(e: sdl3::Error) -> Self {
-        Error::Sdl(e)
-    }
-}
-
-impl From<sdl3::ttf::FontError> for Error {
-    fn from(e: sdl3::ttf::FontError) -> Self {
-        Error::Font(e)
-    }
-}
-
-impl From<frglib::Error> for Error {
-    fn from(e: frglib::Error) -> Self {
-        Error::Frglib(e)
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Sdl(e) => write!(f, "SDL: {e}"),
-            Error::Font(e) => write!(f, "шрифт: {e}"),
-            Error::Frglib(e) => write!(f, "frglib: {e}"),
-        }
-    }
-}
-
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ttf = sdl3::ttf::init()?;
     let font = ttf.load_font(asset("font.otf"), 28.0)?;
     let white = SdlColor::RGBA(238, 242, 250, 255);
@@ -71,9 +36,15 @@ fn main() -> Result<(), Error> {
         .build()?;
 
     // Подпись -- это просто картинка. Кнопке всё равно, чем она нарисована.
-    let caption = |text: &str| -> Result<Image, Error> {
-        Ok(Image::from_surface(font.render(text).solid(white)?))
-    };
+    //
+    // Кеш хранит строки, которые меняются: состояния кнопок и переключатель
+    // звука. Без него тот же "звук: да" разбирался бы заново шестьдесят раз
+    // в секунду, хотя шрифт с той же формулой уже разобран.
+    let mut labels = TextCache::new(
+        |text: &str| -> Result<Image, Box<dyn std::error::Error>> {
+            Ok(Image::from_surface(font.render(text).solid(white)?))
+        },
+    );
 
     let mut play = Button::new(Rect::new(60.0, 150.0, 200.0, 56.0));
     let mut sound = Button::new(Rect::new(60.0, 226.0, 200.0, 56.0));
@@ -82,10 +53,6 @@ fn main() -> Result<(), Error> {
         Color::rgb(120, 48, 56),
         Color::rgb(180, 70, 78),
     );
-
-    let play_label = caption("Играть")?;
-    let sound_label = caption("Звук")?;
-    let quit_label = caption("Выход")?;
 
     let mut pressed: Vec<Keycode> = Vec::new();
     let mut clock = FrameClock::new(60.0);
@@ -148,23 +115,26 @@ fn main() -> Result<(), Error> {
         let view = window.size();
         let (vw, vh) = (view.0 as f32, view.1 as f32);
 
-        // Отладочная строка: в библиотеке шрифтов нет, поэтому её рисует тот
-        // же SDL3_ttf. Считаем до кадра — внутри замыкания это был бы второй
-        // изменяемый займ на тот же ресурс.
-        let say = |text: &str| -> Result<Image, Error> {
-            Ok(Image::from_surface(font.render(text).solid(white)?))
-        };
-        let note = say(if sound_on {
-            "звук: да"
-        } else {
-            "звук: нет"
-        })?;
-        let line = say(&format!(
+        // Строки кладём в кеш до кадра: внутри замыкания это был бы второй
+        // изменяемый займ на тот же ресурс. В кеше только то, что меняется:
+        // состояния кнопок и переключатель звука -- статичные подписи кнопок
+        // отрендерены один раз до цикла.
+        let note = if sound_on { "звук: да" } else { "звук: нет" };
+        let line = format!(
             "Играть: {}   Звук: {}   Выход: {}",
             name(play.state()),
             name(sound.state()),
             name(quit.state())
-        ))?;
+        );
+
+        labels.keep(note)?;
+        labels.keep(&line)?;
+        labels.keep("Играть")?;
+        labels.keep("Звук")?;
+        labels.keep("Выход")?;
+
+        let note_label = Label::new(labels.get(note)).at(vw / 2.0, 60.0);
+        let line_label = Label::new(labels.get(&line)).at(vw / 2.0, vh - 50.0);
 
         window.frame_with(|d| {
             d.set_camera(camera);
@@ -178,20 +148,13 @@ fn main() -> Result<(), Error> {
             };
             d.fill_object(&dot, dot_color)?;
 
-            play.draw(d, &play_label)?;
-            sound.draw(d, &sound_label)?;
-            quit.draw(d, &quit_label)?;
+            play.draw(d, labels.get("Играть"))?;
+            sound.draw(d, labels.get("Звук"))?;
+            quit.draw(d, labels.get("Выход"))?;
 
-            // Состояние видно и текстом. Подписи считаются до кадра: внутри
-            // замыкания это был бы второй изменяемый займ на тот же ресурс.
-            let (nw, nh) = (note.size().0 as f32, note.size().1 as f32);
-            let (lw, lh) = (line.size().0 as f32, line.size().1 as f32);
-
-            // Всё это -- интерфейс, значит координаты экрана.
-            d.screen_space(|d| {
-                d.fill_textured_object(&Object::from_xywh(vw / 2.0, 60.0, nw, nh), &note)?;
-                d.fill_textured_object(&Object::from_xywh(vw / 2.0, vh - 50.0, lw, lh), &line)
-            })
+            // Всё это -- интерфейс, `Label::draw` снимает камеру сам.
+            note_label.draw(d)?;
+            line_label.draw(d)
         })?;
 
         clock.tick();

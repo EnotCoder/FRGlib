@@ -3,7 +3,7 @@
 //! Слайдер, в отличие от кнопки, не знает своего текста: подпись стоит
 //! *рядом* с дорожкой, а не на ней, иначе ручка наполовину её закрывает. Поэтому
 //! `Slider::draw` рисует только дорожку, заливку и ручку, а текст -- тот же
-//! SDL3_ttf, что и в примере с кнопками.
+//! SDL3_ttf, что и в примере с кнопками, посаженный на экран через [`Label`].
 //!
 //! Три слайдера подобраны так, чтобы показать три разных случая: непрерывный
 //! (громкость), с дробным шагом (скорость) и целочисленный (размер). Ручка
@@ -17,8 +17,8 @@
 use std::path::PathBuf;
 
 use frglib::{
-    Camera, Color, Event, FrameClock, Image, Keycode, Object, Rect, Slider, SliderState, Vec2,
-    Window,
+    Anchor, Camera, Color, Event, FrameClock, Image, Keycode, Label, Object, Rect, Slider,
+    SliderState, TextCache, Vec2, Window,
 };
 use sdl3::pixels::Color as SdlColor;
 
@@ -39,6 +39,12 @@ const HEADING_H: f32 = 96.0;
 /// Сколько снизу отдано под подсказку и отладочную строку.
 const FOOTER_H: f32 = 90.0;
 
+/// Щель между краем дорожки и текстом рядом с ней.
+const GAP: f32 = 20.0;
+
+/// Отступ от края окна. Текст не должен липнуть к нему впритык.
+const MARGIN: f32 = 8.0;
+
 /// Сколько точек следа набирается на полной громкости.
 const TRAIL: usize = 10;
 
@@ -46,42 +52,6 @@ fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("examples/ui/assets")
         .join(name)
-}
-
-/// Ошибка шрифта и ошибка окна — разные типы, а `main` обязан вернуть один.
-#[derive(Debug)]
-enum Error {
-    Sdl(sdl3::Error),
-    Font(sdl3::ttf::FontError),
-    Frglib(frglib::Error),
-}
-
-impl From<sdl3::Error> for Error {
-    fn from(e: sdl3::Error) -> Self {
-        Error::Sdl(e)
-    }
-}
-
-impl From<sdl3::ttf::FontError> for Error {
-    fn from(e: sdl3::ttf::FontError) -> Self {
-        Error::Font(e)
-    }
-}
-
-impl From<frglib::Error> for Error {
-    fn from(e: frglib::Error) -> Self {
-        Error::Frglib(e)
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Sdl(e) => write!(f, "SDL: {e}"),
-            Error::Font(e) => write!(f, "шрифт: {e}"),
-            Error::Frglib(e) => write!(f, "frglib: {e}"),
-        }
-    }
 }
 
 /// Раскладка под текущий размер окна: три дорожки по центру.
@@ -106,11 +76,11 @@ fn layout(view: (u32, u32)) -> [Rect; ROWS] {
     std::array::from_fn(|row| Rect::new(x, top + row as f32 * step, TRACK_W, TRACK_H))
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ttf = sdl3::ttf::init()?;
     // Два кегля: крупный для подписей и заголовка, мелкий для длинных строк
     // внизу. Один кегль на всё означал бы либо мелкий заголовок, либо строку,
-    // которая не влезает в окно.
+    // которая не влезает в окно. Кеша тоже два -- по одному на кегль.
     let font = ttf.load_font(asset("font.otf"), 38.0)?;
     let font_small = ttf.load_font(asset("font.otf"), 24.0)?;
     let white = SdlColor::RGBA(238, 242, 250, 255);
@@ -146,19 +116,26 @@ fn main() -> Result<(), Error> {
             Color::rgb(196, 150, 60),
         );
 
-    let say = |text: &str, color: SdlColor| -> Result<Image, Error> {
-        Ok(Image::from_surface(font.render(text).solid(color)?))
-    };
-    let say_small = |text: &str, color: SdlColor| -> Result<Image, Error> {
-        Ok(Image::from_surface(font_small.render(text).solid(color)?))
-    };
+    // Кеш рендерит сам: библиотека шрифтов не видит, ей достаётся готовая
+    // картинка. Считаем до кадра -- внутри замыкания это был бы второй
+    // изменяемый займ на тот же ресурс.
+    let mut big = TextCache::new(
+        |text: &str| -> Result<Image, Box<dyn std::error::Error>> {
+            Ok(Image::from_surface(font.render(text).solid(white)?))
+        },
+    );
+    let mut small = TextCache::new(
+        |text: &str| -> Result<Image, Box<dyn std::error::Error>> {
+            Ok(Image::from_surface(font_small.render(text).solid(dim)?))
+        },
+    );
 
-    // Подписи не меняются, поэтому рисуются один раз.
-    let heading = say("СЛАЙДЕРЫ", white)?;
-    let label_volume = say("громкость", dim)?;
-    let label_speed = say("скорость", dim)?;
-    let label_size = say("размер", dim)?;
-    let hint = say_small("тяните мышью: значение меняется уже на нажатии", dim)?;
+    // Подписи и подсказка не меняются, поэтому кладутся в кеш один раз.
+    big.keep("СЛАЙДЕРЫ")?;
+    big.keep("громкость")?;
+    big.keep("скорость")?;
+    big.keep("размер")?;
+    small.keep("тяните мышью: значение меняется уже на нажатии")?;
 
     let mut pressed: Vec<Keycode> = Vec::new();
     let mut clock = FrameClock::new(60.0);
@@ -251,21 +228,25 @@ fn main() -> Result<(), Error> {
             trail.pop();
         }
 
-        // Значения и состояния считаются до кадра: внутри замыкания это был бы
-        // второй изменяемый займ на тот же ресурс шрифта.
-        let value_volume = say(&format!("{:.2}", volume.value()), white)?;
-        let value_speed = say(&format!("{:.1}", speed.value()), white)?;
-        let value_size = say(&format!("{:.0}", size.value()), white)?;
-        let states = say_small(
-            &format!(
-                "громкость: {}   скорость: {}   размер: {}   изменений: {}",
-                name(volume.state()),
-                name(speed.state()),
-                name(size.state()),
-                moved
-            ),
-            dim,
-        )?;
+        // Значения и состояния -- строки, которые меняются, поэтому кладутся
+        // в кеш каждый кадр: закешированное не перерисовывается.
+        let value_volume = format!("{:.2}", volume.value());
+        let value_speed = format!("{:.1}", speed.value());
+        let value_size = format!("{:.0}", size.value());
+        let states = format!(
+            "громкость: {}   скорость: {}   размер: {}   изменений: {}",
+            name(volume.state()),
+            name(speed.state()),
+            name(size.state()),
+            moved
+        );
+
+        big.keep(&value_volume)?;
+        big.keep(&value_speed)?;
+        big.keep(&value_size)?;
+        small.keep(&states)?;
+
+        let (vw, vh) = (view.0 as f32, view.1 as f32);
 
         window.frame_with(|d| {
             d.set_camera(camera);
@@ -286,48 +267,56 @@ fn main() -> Result<(), Error> {
             )?;
 
             // Интерфейс -- значит координаты экрана. Именно это и делает
-            // `Slider::draw` внутри: он снимает камеру на время вызова.
+            // `Slider::draw` и `Label::draw` внутри: они снимают камеру на
+            // время вызова.
             volume.draw(d)?;
             speed.draw(d)?;
             size.draw(d)?;
 
-            // Картинка кладётся по центру точки, поэтому размер приходится
-            // смотреть у самой картинки. Fallible здесь нечему: `place` всегда
-            // даёт `Object`.
-            let place = |img: &Image, cx: f32, cy: f32| {
-                let (w, h) = (img.size().0 as f32, img.size().1 as f32);
-                Object::from_xywh(cx, cy, w, h)
-            };
+            Label::new(big.get("СЛАЙДЕРЫ"))
+                .anchored(Anchor::Top)
+                .at(vw / 2.0, 30.0)
+                .draw(d)?;
 
-            d.screen_space(|d| {
-                let (vw, vh) = (view.0 as f32, view.1 as f32);
-                d.fill_textured_object(&place(&heading, vw / 2.0, 48.0), &heading)?;
+            // Подпись прижата к левому краю дорожки, значение -- к правому.
+            // Раньше тут стояли `120.0` и `650.0`, подсчитанные под 720
+            // пикселей ширины: в tiled-режиме, где окно уже, текст уезжал
+            // за край. Теперь всё считается от дорожки, а отступ от края
+            // окна держит текст на месте даже в очень узком окне.
+            for (row, (name_text, value_text)) in [
+                ("громкость", value_volume.as_str()),
+                ("скорость", value_speed.as_str()),
+                ("размер", value_size.as_str()),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let track = rects[row];
+                let cy = track.y + track.h / 2.0;
 
-                // Подпись стоит в левом жёлобе, значение -- в правом, оба
-                // центрируются между краем окна и дорожкой. Раньше тут стояли
-                // `120.0` и `650.0`, подсчитанные под 720 пикселей ширины:
-                // в tiled-режиме, где окно уже, текст уезжал за край.
-                // По ссылкам, а не по значению: массив из `Image` иначе
-                // разобрал бы картинки и больше их не показал.
-                for (row, (name_img, value_img)) in [
-                    (&label_volume, &value_volume),
-                    (&label_speed, &value_speed),
-                    (&label_size, &value_size),
-                ]
-                .into_iter()
-                .enumerate()
-                {
-                    let track = rects[row];
-                    let cy = track.y + track.h / 2.0;
-                    let left = track.x / 2.0;
-                    let right = track.x + track.w + (vw - track.x - track.w) / 2.0;
-                    d.fill_textured_object(&place(name_img, left, cy), name_img)?;
-                    d.fill_textured_object(&place(value_img, right, cy), value_img)?;
-                }
+                let name = Label::new(big.get(name_text)).anchored(Anchor::TopRight);
+                let value = Label::new(big.get(value_text)).anchored(Anchor::TopLeft);
 
-                d.fill_textured_object(&place(&hint, vw / 2.0, vh - 74.0), &hint)?;
-                d.fill_textured_object(&place(&states, vw / 2.0, vh - 34.0), &states)
-            })
+                // Якорь стоит ровно на краю дорожки, но так, чтобы сам текст
+                // остался внутри окна: узкое окно сдвигает подпись вправо, а
+                // значение влево, и они съезжаются на дорожку, но не за край.
+                let name_x = (track.x - GAP).max(name.size().0 as f32 + MARGIN);
+                let value_x =
+                    (track.x + track.w + GAP).min(vw - value.size().0 as f32 - MARGIN);
+
+                name.at(name_x, cy).draw(d)?;
+                value.at(value_x, cy).draw(d)?;
+            }
+
+            Label::new(small.get("тяните мышью: значение меняется уже на нажатии"))
+                .anchored(Anchor::Bottom)
+                .at(vw / 2.0, vh - 66.0)
+                .draw(d)?;
+
+            Label::new(small.get(&states))
+                .anchored(Anchor::Bottom)
+                .at(vw / 2.0, vh - 26.0)
+                .draw(d)
         })?;
 
         clock.tick();

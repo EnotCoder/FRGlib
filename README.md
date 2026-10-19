@@ -112,6 +112,12 @@ window.frame_with(|d| {
 | `Button::with_colors(idle, hover, pressed)` | Своя палитра кнопки |
 | `Button::update(&[Event]) -> bool` | Кормит события, `true` в кадре клика |
 | `Button::draw(d, &Image)` | Рисует кнопку с подписью поверх камеры |
+| `Label::new(&Image).at(x, y)` | Готовая картинка текста, по центру на `(x, y)` |
+| `Label::anchored(Anchor)` | Какой точкой текст стоит на позиции: `TopRight`, `Bottom`, `Center`… |
+| `Label::draw(d)` | Рисует текст поверх камеры, сам снимает её |
+| `TextCache::new(render)` | Кеш строк: `render` — замыкание вызывающего, картинками |
+| `TextCache::keep(text)` | Рендерит строку, если её ещё нет |
+| `TextCache::get(text) -> &Image` | Уже отрендеренная картинка |
 | `Rect::contains(x, y)` | Точка внутри прямоугольника, края не входят |
 
 Всё рисование идёт через `Object` — метода без него в API нет. У методов
@@ -382,15 +388,47 @@ if play.update(&events) {
 
 ```rust
 let font = sdl3::ttf::init()?.load_font("assets/font.otf", 28.0)?;
-let label = frglib::Image::from_surface(font.render("Играть").solid(white)?)?;
+let image = frglib::Image::from_surface(font.render("Играть").solid(white)?);
 ```
 
-`Image::from_surface` — единственный новый вход в API, всё остальное уже было.
+`Image::from_surface` — вход в API, всё остальное уже было.
 Шрифт подключается через `[dev-dependencies]`, поэтому в публикуемый пакет он не
 попадает: читающий README без нужды в тексте его не собирает и не тащит.
 
 Режим `solid` вместо `blended` даёт заливку пиксель в пиксель, без сглаживания,
 что и нужно при `pixel_art(true)`.
+
+Картинку на экран ставит `Label` — он берёт готовую `Image` и сам снимает камеру,
+как `Button`. Ставить вручную через `Object::from_xywh` тоже можно, просто
+длиннее:
+
+```rust
+let hello = frglib::Label::new(&image).at(360.0, 240.0);           // центр текста
+let score = frglib::Label::new(&image).anchored(Anchor::TopRight)  // правый верх
+    .at(700.0, 20.0);
+
+window.frame_with(|d| {
+    hello.draw(d)?;
+    score.draw(d)
+})?;
+```
+
+`Anchor` выбирает, какой точкой текст стоит на позиции: `Center` по умолчанию,
+плюс восемь краёв и углов. Без него пришлось бы каждый раз измерять картинку и
+самому вычитать половину ширины.
+
+Для строк, которые меняются, есть `TextCache`: он держит `HashMap` строка →
+`Image` и не рендерит одно и то же заново шестьдесят раз в секунду. Рендерит
+вызывающий, поэтому шрифт в библиотеку по-прежнему не попадает:
+
+```rust
+let mut cache = frglib::TextCache::new(|text: &str| {
+    Ok(frglib::Image::from_surface(font.render(text).solid(white)?))
+});
+
+cache.keep("Очки: 120")?;                  // до кадра
+// d.fill_textured_object(&obj, cache.get("Очки: 120"))?;   // внутри кадра
+```
 
 ### Что изменилось в 0.3.0
 
