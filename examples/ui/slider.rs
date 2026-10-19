@@ -22,16 +22,22 @@ use frglib::{
 };
 use sdl3::pixels::Color as SdlColor;
 
-/// Где стоят дорожки.
-const TRACK_X: f32 = 210.0;
+/// Размеры дорожки. Горизонтальное положение -- не константа: оно считается
+/// от настоящего размера окна, см. `layout`.
 const TRACK_W: f32 = 330.0;
 const TRACK_H: f32 = 26.0;
 
-/// Вертикальный шаг между строками.
+/// Вертикальный шаг между строками, когда места хватает.
 const ROW_STEP: f32 = 96.0;
 
-/// Высота всего блока дорожек: три строки со щелями.
-const BLOCK_H: f32 = ROW_STEP * 3.0;
+/// Сколько строк дорожек.
+const ROWS: usize = 3;
+
+/// Сколько сверху занимает заголовок: блок дорожек не поднимается выше.
+const HEADING_H: f32 = 96.0;
+
+/// Сколько снизу отдано под подсказку и отладочную строку.
+const FOOTER_H: f32 = 90.0;
 
 /// Сколько точек следа набирается на полной громкости.
 const TRAIL: usize = 10;
@@ -78,12 +84,26 @@ impl std::fmt::Display for Error {
     }
 }
 
-/// Верх дорожки `row`-й строки.
+/// Раскладка под текущий размер окна: три дорожки по центру.
 ///
-/// Блок стоит по центру окна, а не прижат к верху: окно тут WM раздувает до
-/// 925x991 вместо запрошенных 720x480, и сверху оставалась бы пустота.
-fn row_y(row: usize, vh: f32) -> f32 {
-    (vh - BLOCK_H) / 2.0 + row as f32 * ROW_STEP
+/// Раньше тут стояли захардкоженные `x` и `y`, подсчитанные один раз при
+/// старте. В tiled-режиме WM даёт окну совсем не те 720x480, что запрошены,
+/// и весь блок с подписями уезжал за края. Теперь положение считается от
+/// `view`, а при нехватке высоты шаг сжимается, чтобы дорожки оставались
+/// в окне.
+fn layout(view: (u32, u32)) -> [Rect; ROWS] {
+    let (vw, vh) = (view.0 as f32, view.1 as f32);
+
+    let x = ((vw - TRACK_W) / 2.0).max(0.0);
+
+    // Вертикальная полоса, отданная дорожкам: от низа заголовка до верха
+    // подсказки. Если она уже блока, шаг сжимается; дорожки при этом не
+    // уменьшаются, иначе ручка стала бы неудобно мелкой.
+    let band = (vh - HEADING_H - FOOTER_H - TRACK_H * ROWS as f32).max(0.0);
+    let step = (band / (ROWS - 1) as f32).clamp(TRACK_H, ROW_STEP);
+    let top = HEADING_H + (band - step * (ROWS - 1) as f32) / 2.0;
+
+    std::array::from_fn(|row| Rect::new(x, top + row as f32 * step, TRACK_W, TRACK_H))
 }
 
 fn main() -> Result<(), Error> {
@@ -102,23 +122,22 @@ fn main() -> Result<(), Error> {
         .pixel_art(true)
         .build()?;
 
-    // Размер читаем один раз: раскладка считается от него, и пересчитывать её
-    // каждый кадр незачем. Переехавшее окно тут просто оставит интерфейс на
-    // месте -- меню в игре dash для этого держит отдельный `layout`.
-    let view = window.size();
-    let (vw, vh) = (view.0 as f32, view.1 as f32);
-
-    let track = |row: usize| Rect::new(TRACK_X, row_y(row, vh), TRACK_W, TRACK_H);
+    // Раскладка живёт от размера окна, а WM в tiled-режиме отдаёт совсем не
+    // те 720x480, что запрошены. Поэтому размер читается каждый кадр, а
+    // слайдеры пересобираются -- но только когда он действительно изменился,
+    // иначе сбрасывалось бы состояние перетаскивания.
+    let mut view = window.size();
+    let mut rects = layout(view);
 
     // Три случая: непрерывный, с дробным шагом и целочисленный.
-    let mut volume = Slider::new(track(0)).with_range(0.0, 1.0, 0.0);
-    let mut speed = Slider::new(track(1)).with_range(0.0, 3.0, 0.1).with_colors(
+    let mut volume = Slider::new(rects[0]).with_range(0.0, 1.0, 0.0);
+    let mut speed = Slider::new(rects[1]).with_range(0.0, 3.0, 0.1).with_colors(
         Color::rgb(44, 38, 62),
         Color::rgb(150, 84, 196),
         Color::rgb(232, 220, 248),
         Color::rgb(196, 150, 60),
     );
-    let mut size = Slider::new(track(2))
+    let mut size = Slider::new(rects[2])
         .with_range(8.0, 72.0, 8.0)
         .with_colors(
             Color::rgb(38, 46, 42),
@@ -167,6 +186,37 @@ fn main() -> Result<(), Error> {
         }
 
         let held = |key| pressed.contains(&key);
+
+        // WM мог отдать окну другой размер: в tiled-режиме это норма, а не
+        // исключение. Раскладка пересобирается от настоящего размера, и
+        // значения слайдеров переносятся -- иначе resize сбрасывал бы всё
+        // в ноль.
+        let now = window.size();
+        if now != view {
+            view = now;
+            rects = layout(view);
+
+            let (v, s, z) = (volume.value(), speed.value(), size.value());
+            volume = Slider::new(rects[0]).with_range(0.0, 1.0, 0.0);
+            volume.set_value(v);
+            speed = Slider::new(rects[1]).with_range(0.0, 3.0, 0.1).with_colors(
+                Color::rgb(44, 38, 62),
+                Color::rgb(150, 84, 196),
+                Color::rgb(232, 220, 248),
+                Color::rgb(196, 150, 60),
+            );
+            speed.set_value(s);
+            size = Slider::new(rects[2])
+                .with_range(8.0, 72.0, 8.0)
+                .with_colors(
+                    Color::rgb(38, 46, 42),
+                    Color::rgb(64, 158, 120),
+                    Color::rgb(214, 244, 232),
+                    Color::rgb(196, 150, 60),
+                );
+            size.set_value(z);
+        }
+
         let mut direction = Vec2::ZERO;
         if held(Keycode::Left) || held(Keycode::A) {
             direction += Vec2::new(-1.0, 0.0);
@@ -250,8 +300,13 @@ fn main() -> Result<(), Error> {
             };
 
             d.screen_space(|d| {
+                let (vw, vh) = (view.0 as f32, view.1 as f32);
                 d.fill_textured_object(&place(&heading, vw / 2.0, 48.0), &heading)?;
 
+                // Подпись стоит в левом жёлобе, значение -- в правом, оба
+                // центрируются между краем окна и дорожкой. Раньше тут стояли
+                // `120.0` и `650.0`, подсчитанные под 720 пикселей ширины:
+                // в tiled-режиме, где окно уже, текст уезжал за край.
                 // По ссылкам, а не по значению: массив из `Image` иначе
                 // разобрал бы картинки и больше их не показал.
                 for (row, (name_img, value_img)) in [
@@ -262,9 +317,12 @@ fn main() -> Result<(), Error> {
                 .into_iter()
                 .enumerate()
                 {
-                    let cy = row_y(row, vh) + TRACK_H / 2.0;
-                    d.fill_textured_object(&place(name_img, 120.0, cy), name_img)?;
-                    d.fill_textured_object(&place(value_img, 650.0, cy), value_img)?;
+                    let track = rects[row];
+                    let cy = track.y + track.h / 2.0;
+                    let left = track.x / 2.0;
+                    let right = track.x + track.w + (vw - track.x - track.w) / 2.0;
+                    d.fill_textured_object(&place(name_img, left, cy), name_img)?;
+                    d.fill_textured_object(&place(value_img, right, cy), value_img)?;
                 }
 
                 d.fill_textured_object(&place(&hint, vw / 2.0, vh - 74.0), &hint)?;
