@@ -18,7 +18,7 @@ fn asset(name: &str) -> PathBuf {
 const SPEED: f32 = 600.0;
 
 fn main() -> Result<(), frglib::Error> {
-    let frog = Image::from_file(asset("fgoty_with_body.png"))?;
+    let frog = Image::from_file(asset("fgoty_park.png"))?;
 
     let mut window = Window::builder("FRGLib cached")
         .size(800, 600)
