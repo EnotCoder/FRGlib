@@ -1,6 +1,10 @@
-//! Карта: тайлы, атлас, по которому они берутся, и всё, что с картой считают.
+//! Карты атласа: из чего она состоит, как режется и чем заполняется.
+//!
+//! Сама сетка, координаты и отсечение по кадру -- это [`frglib::TileMap`],
+//! общее для всех карт. Здесь остаётся только то, что знает про этот лес:
+//! какие бывают тайлы, что из них проходимо и как карта собирается.
 
-use frglib::{Camera, Image, Vec2};
+use frglib::Image;
 
 /// Сторона одного тайла в атласе, в пикселях.
 pub const SRC_TILE: u32 = 16;
@@ -26,6 +30,9 @@ pub const TILE_WATER: usize = 4;
 pub const TILE_RUST: usize = 5;
 
 /// Тайлы карты.
+///
+/// Смысл живёт здесь: библиотеке [`TileMap`] всё равно, что такое трава, --
+/// она хранит `T` и не спрашивает, зачем.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Tile {
     Grass,
@@ -37,6 +44,7 @@ pub enum Tile {
 }
 
 impl Tile {
+    /// Номер в нарезке атласа, либо `None` для тайла, который не рисуется.
     pub fn texture(self) -> Option<usize> {
         match self {
             Tile::Grass => Some(TILE_GRASS),
@@ -50,12 +58,15 @@ impl Tile {
 
     /// Ветка лежит на земле, а пруд глубокий -- по пруду не ходим.
     pub fn walkable(self) -> bool {
-        !matches!(self, Tile::Water) && !matches!(self, Tile::Rust)
+        !matches!(self, Tile::Water | Tile::Rust)
     }
 }
 
 /// Режет атлас на отдельные картинки: в атласе несколько тайлов рядом, а
 /// рисовать их надо по одному.
+///
+/// `Draw` умеет копировать текстуру целиком, а не её кусок, поэтому нарезка
+/// делается заранее и каждый кусок заливается на GPU своей текстурой.
 pub fn slice_tiles(sheet: &Image) -> Result<Vec<Image>, frglib::Error> {
     let (cols, rows) = ATLAS;
     let mut tiles = Vec::with_capacity(cols * rows);
@@ -77,6 +88,9 @@ pub fn slice_tiles(sheet: &Image) -> Result<Vec<Image>, frglib::Error> {
 
 /// Собирает карту по простым правилам, чтобы пример не тащил за собой формат
 /// файлов: трава, дорога через лес и пруд в углу.
+///
+/// Возвращаются готовые строки -- дальше их принимает
+/// [`TileMap::from_rows`](frglib::TileMap::from_rows).
 pub fn build_map() -> Vec<Vec<Tile>> {
     let (w, h) = MAP;
     let mut map = vec![vec![Tile::Grass; w]; h];
@@ -113,41 +127,4 @@ pub fn build_map() -> Vec<Vec<Tile>> {
     }
 
     map
-}
-
-/// Тайл под точкой мира, либо `None`, если точка за краем карты.
-pub fn tile_at(map: &[Vec<Tile>], world: Vec2) -> Option<Tile> {
-    let col = (world.x / TILE).floor();
-    let row = (world.y / TILE).floor();
-
-    if col < 0.0 || row < 0.0 {
-        return None;
-    }
-    map.get(row as usize)?.get(col as usize).copied()
-}
-
-/// Можно ли сюда встать: за край карты и в воду -- нельзя.
-pub fn walkable(map: &[Vec<Tile>], world: Vec2) -> bool {
-    tile_at(map, world).is_some_and(Tile::walkable)
-}
-
-/// Держит камеру на карте, чтобы за её краями не было пустоты. Если карта уже
-/// меньше окна, камера просто центрируется.
-pub fn clamp_camera(camera: &mut Camera, view: (u32, u32)) {
-    let (w, h) = MAP;
-    let (map_w, map_h) = (w as f32 * TILE, h as f32 * TILE);
-
-    let half_w = view.0 as f32 / 2.0 / camera.zoom;
-    let half_h = view.1 as f32 / 2.0 / camera.zoom;
-
-    camera.position.x = if map_w <= half_w * 2.0 {
-        map_w / 2.0
-    } else {
-        camera.position.x.clamp(half_w, map_w - half_w)
-    };
-    camera.position.y = if map_h <= half_h * 2.0 {
-        map_h / 2.0
-    } else {
-        camera.position.y.clamp(half_h, map_h - half_h)
-    }
 }

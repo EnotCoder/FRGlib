@@ -119,6 +119,15 @@ window.frame_with(|d| {
 | `TextCache::keep(text)` | Рендерит строку, если её ещё нет |
 | `TextCache::get(text) -> &Image` | Уже отрендеренная картинка |
 | `Rect::contains(x, y)` | Точка внутри прямоугольника, края не входят |
+| `TileMap::from_ascii(rows, cell, parse)` | Карта из строк текста; символ решает `parse` |
+| `TileMap::from_rows(rows, cell)` | Карта из уже собранных клеток |
+| `TileMap::get(col, row)` / `get_at(world)` | Клетка по индексу или по точке мира |
+| `TileMap::cell_rect(col, row)` / `cell_center` | Прямоугольник и центр клетки в мире |
+| `TileMap::origin(x, y)` | Куда в мире встаёт клетка `(0, 0)` |
+| `TileMap::visible(camera, view)` | Только клетки в кадре, с запасом в одну |
+| `TileMap::clamp_camera(&mut cam, view)` | Держит камеру в границах карты |
+| `TileMap::draw(d, camera, texture_of)` | Рисует видимые клетки (фича `cached-textures`) |
+| `MapError` | Что не так с картой: рваные строки, лишний символ |
 
 Всё рисование идёт через `Object` — метода без него в API нет. У методов
 объекта:
@@ -346,10 +355,11 @@ loop {
 | `cargo run --example basic-object` | Объекты: поворот заливки, текстуры и многоугольника |
 | `cargo run --example basic-camera` | Камера: движение, зум, картинка на сцене |
 | `cargo run --features cached-textures --example basic-cached` | Текстура, залитая один раз, против заливки на кадр |
-| `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: нарезка атласа, камера, коллизии |
+| `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: `TileMap`, нарезка атласа, камера, коллизии |
 | `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
 | `cargo run --example ui-text` | Текст через SDL3_ttf, кириллица, кеш строк |
 | `cargo run --example ui-button` | Кнопки: три состояния, клик по отпусканию, интерфейс поверх камеры |
+| `cargo run --example ui-slider` | Слайдеры: диапазон, шаг, перетаскивание, раскладка от размера окна |
 
 ### Кнопки
 
@@ -397,6 +407,61 @@ let image = frglib::Image::from_surface(font.render("Играть").solid(white)
 
 Режим `solid` вместо `blended` даёт заливку пиксель в пиксель, без сглаживания,
 что и нужно при `pixel_art(true)`.
+
+### Тайлмапы
+
+Карта — это сетка клеток одинакового размера. `TileMap<T>` держит три вещи и
+не лезет в четвёртую: где клетки, какие из них в кадре, и как одна рисуется.
+Чем клетка *является* — вода это или шип — решает вызывающий: тип `T`
+вообще ничем не ограничен, ни `Copy`, ни трейтом.
+
+```rust
+#[derive(Debug)]
+enum Cell { Floor, Water }
+
+let map = frglib::TileMap::from_ascii(
+    &["......", "..~~..", "......"],
+    32.0,                          // сторона клетки в мире
+    |c| Some(match c {
+        '~' => Cell::Water,
+        _ => Cell::Floor,
+    }),
+)?;
+
+// Карта стоит в мире не в нуле, если уровень привязан к земле:
+let map = map.origin(0.0, 400.0 - map.height());
+
+// Мир -> клетка и обратно:
+let (col, row) = map.cell_at(world).unwrap();
+let tile = map.get_at(world);       // или сразу содержимое
+let rect = map.cell_rect(col, row); // и центр: cell_center
+```
+
+Строки разной длины — [`MapError::RaggedRow`], неизвестный символ —
+[`MapError::UnknownChar`]. Опечатка в карте останавливает программу, а не
+тихо превращается в пустую клетку, сквозь которую игрок провалится.
+
+Карта, собранная кодом, принимается тем же типом через `TileMap::from_rows` —
+так делает пример `2d_games-fgoty`, где карта генерируется, а не пишется рукой.
+
+В кадре рисуется только то, что видно, и камера не выходит за край карты:
+
+```rust
+map.clamp_camera(&mut camera, window.size());
+
+window.frame_with(|d| {
+    d.set_camera(camera);
+    map.draw(d, camera, |cell| match cell {
+        Cell::Water => Some(water_tex),
+        Cell::Floor => Some(grass_tex),
+    })?;
+    Ok(())
+})?;
+```
+
+`draw` стоит под фичей `cached-textures`: без неё каждый тайл заливался бы на
+GPU заново каждый кадр. `visible(camera, view)` остаётся открытым — им
+пользуются, когда клетки рисуются не текстурой, а цветом.
 
 Картинку на экран ставит `Label` — он берёт готовую `Image` и сам снимает камеру,
 как `Button`. Ставить вручную через `Object::from_xywh` тоже можно, просто

@@ -1,7 +1,7 @@
 //! Rust bindings to SDL3.
 //!
-//! A window with a renderer, plus window and input events. A Vulkan layer is
-//! still to come.
+//! A window with a renderer, window and input events, and a [`TileMap`] for
+//! laying tiles out over a world. A Vulkan layer is still to come.
 //!
 //! # Example
 //!
@@ -42,6 +42,7 @@ pub mod event;
 pub mod graphics;
 pub mod math;
 pub mod timing;
+pub mod tilemap;
 pub mod ui;
 pub mod window;
 
@@ -51,5 +52,6 @@ pub use graphics::Texture;
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{Rect, Vec2};
 pub use timing::FrameClock;
+pub use tilemap::{MapError, TileMap};
 pub use ui::{Anchor, Button, ButtonState, Label, Slider, SliderState, TextCache};
 pub use window::{Draw, Error, Window, WindowBuilder};

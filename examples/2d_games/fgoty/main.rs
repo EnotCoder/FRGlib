@@ -13,9 +13,9 @@ mod player;
 
 use std::path::PathBuf;
 
-use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window};
+use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, Object, TileMap, Vec2, Window};
 
-use map::{build_map, clamp_camera, slice_tiles, walkable, MAP, TILE};
+use map::{build_map, slice_tiles, TILE};
 use player::{Facing, SPEED};
 
 /// Спрайты лежат рядом с примером; путь строим от корня крейта, а не от
@@ -27,7 +27,7 @@ fn asset(kind: &str, name: &str) -> PathBuf {
         .join(name)
 }
 
-fn main() -> Result<(), frglib::Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sheet = Image::from_file(asset("", "tilemap_forest.png"))?;
     let tiles = slice_tiles(&sheet)?;
 
@@ -59,7 +59,9 @@ fn main() -> Result<(), frglib::Error> {
 
     println!("тайлов в атласе: {}", tiles.len());
 
-    let map = build_map();
+    // Сетка, координаты и отсечение по кадру -- за `TileMap`; пример даёт ему
+    // только то, что про этот лес знает он сам: строки из `build_map`.
+    let map = TileMap::from_rows(build_map(), TILE)?;
 
     let mut pressed: Vec<Keycode> = Vec::new();
     let mut clock = FrameClock::new(60.0);
@@ -121,7 +123,11 @@ fn main() -> Result<(), frglib::Error> {
         );
 
         let target = player.position + direction * SPEED * dt;
-        if direction == Vec2::ZERO || walkable(&map, target + lead) {
+        if direction == Vec2::ZERO
+            || map
+                .get_at(target + lead)
+                .is_some_and(|tile| tile.walkable())
+        {
             player.position = target;
         }
         player.velocity = direction * SPEED;
@@ -143,26 +149,8 @@ fn main() -> Result<(), frglib::Error> {
 
         // Камера едет за игроком и не отпускает карту.
         camera.position += (player.position - camera.position) * (8.0 * dt).min(1.0);
-        clamp_camera(&mut camera, window.size());
-
         let view = window.size();
-        let (fw, fh) = (view.0 as f32, view.1 as f32);
-        let half_w = fw / 2.0 / camera.zoom;
-        let half_h = fh / 2.0 / camera.zoom;
-
-        // Видимая полоса тайлов. Всё за её пределами и не рисуется.
-        let col0 = ((camera.position.x - half_w) / TILE).floor() as isize - 1;
-        let col1 = ((camera.position.x + half_w) / TILE).ceil() as isize + 1;
-        let row0 = ((camera.position.y - half_h) / TILE).floor() as isize - 1;
-        let row1 = ((camera.position.y + half_h) / TILE).ceil() as isize + 1;
-
-        let (map_w, map_h) = MAP;
-        let visible: Vec<(usize, usize)> = (row0.max(0) as usize
-            ..row1.min(map_h as isize) as usize)
-            .flat_map(|row| {
-                (col0.max(0) as usize..col1.min(map_w as isize) as usize).map(move |col| (col, row))
-            })
-            .collect();
+        map.clamp_camera(&mut camera, view);
 
         let hero = player.with_flip(false, false);
         let sprite = frog_tex[facing.index()];
@@ -170,18 +158,9 @@ fn main() -> Result<(), frglib::Error> {
         window.frame_with(|d| {
             d.set_camera(camera);
 
-            for (col, row) in &visible {
-                let tile = map[*row][*col];
-                let cell = Object::from_xywh(
-                    *col as f32 * TILE + TILE / 2.0,
-                    *row as f32 * TILE + TILE / 2.0,
-                    TILE,
-                    TILE,
-                );
-
-                let index: usize = tile.texture().expect("REASON");
-                d.fill_object_texture(&cell, tile_tex[index])?;
-            }
+            // Рисуются только тайлы в кадре; `texture_of` отдаёт текстуру из
+            // нарезки атласа по номеру тайла.
+            map.draw(d, camera, |tile| tile.texture().map(|i| tile_tex[i]))?;
 
             let hero = Object::from_xywh(
                 hero.position.x,
