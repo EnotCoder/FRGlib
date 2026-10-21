@@ -434,6 +434,7 @@ cargo build --release --features bundled
 | `cargo run --example basic-object` | Объекты: поворот заливки, текстуры и многоугольника |
 | `cargo run --example basic-camera` | Камера: движение, зум, картинка на сцене |
 | `cargo run --features cached-textures --example basic-cached` | Текстура, залитая один раз, против заливки на кадр |
+| `cargo run --example basic-gallery` | Листалка картинок: выбор по индексу, круговой проход |
 | `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: `TileMap`, нарезка атласа, камера, коллизии |
 | `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
 | `cargo run --example ui-text` | Текст через SDL3_ttf, кириллица, кеш строк |

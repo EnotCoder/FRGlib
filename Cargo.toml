@@ -88,6 +88,10 @@ path = "examples/basic/cached.rs"
 required-features = ["cached-textures"]
 
 [[example]]
+name = "basic-gallery"
+path = "examples/basic/gallery.rs"
+
+[[example]]
 name = "ui-button"
 path = "examples/ui/button.rs"
 
