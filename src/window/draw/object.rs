@@ -179,6 +179,29 @@ impl<'a> Draw<'a> {
         self.copy_object(obj, self.textures.get(texture))
     }
 
+    /// [`fill_textured_object`](Self::fill_textured_object) with the frame an
+    /// [`Animation`](crate::Animation) is currently showing.
+    ///
+    /// Draws nothing when the animation has no frames, which is what makes an
+    /// animation that is still being built drawable without a placeholder.
+    ///
+    /// The animation is not advanced here: it carries its own time, and the
+    /// caller decides when that moves. Same picture as
+    /// [`fill_object_texture`](Self::fill_object_texture), so rotation, flips
+    /// and the camera all behave the same way.
+    #[cfg(feature = "cached-textures")]
+    pub fn fill_object_animation(
+        &mut self,
+        obj: &Object,
+        animation: &crate::Animation,
+    ) -> Result<(), Error> {
+        let Some(texture) = animation.frame() else {
+            return Ok(());
+        };
+
+        self.copy_object(obj, self.textures.get(texture))
+    }
+
     /// Fills the triangles described by `indices` in `points` with `color`,
     /// turning them about `obj`'s centre.
     ///

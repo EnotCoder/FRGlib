@@ -92,6 +92,11 @@ name = "basic-gallery"
 path = "examples/basic/gallery.rs"
 
 [[example]]
+name = "basic-animation"
+path = "examples/basic/animation.rs"
+required-features = ["cached-textures"]
+
+[[example]]
 name = "ui-button"
 path = "examples/ui/button.rs"
 

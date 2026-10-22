@@ -32,6 +32,18 @@ pub struct Texture {
     slot: usize,
 }
 
+#[cfg(test)]
+impl Texture {
+    /// A handle pointing at `slot`, for tests that need one without a window.
+    ///
+    /// Not a constructor the crate offers: real handles only come from
+    /// [`Window::upload`], which is what keeps them pointing at the window
+    /// that owns them. Tests of the playback maths only compare slots.
+    pub(crate) fn at(slot: usize) -> Self {
+        Texture { slot }
+    }
+}
+
 /// The window's textures, indexed by [`Texture::slot`].
 ///
 /// Separate from the handle on purpose. If the handle owned the pixels, it

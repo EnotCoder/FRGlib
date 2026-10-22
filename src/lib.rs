@@ -48,7 +48,7 @@ pub mod window;
 
 pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
 #[cfg(feature = "cached-textures")]
-pub use graphics::Texture;
+pub use graphics::{Animation, Texture};
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{Rect, Vec2};
 pub use timing::FrameClock;
