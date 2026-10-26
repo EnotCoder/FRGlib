@@ -172,6 +172,16 @@ pub fn lerp<T: Lerp>(from: T, to: T, t: f32, ease: Ease) -> T {
     from.lerp(to, t, ease)
 }
 
+/// Sine of `radians`, as in Godot.
+pub fn sin(radians: f32) -> f32 {
+    radians.sin()
+}
+
+/// Cosine of `radians`, as in Godot.
+pub fn cos(radians: f32) -> f32 {
+    radians.cos()
+}
+
 impl Lerp for f32 {
     fn lerp(self, other: f32, t: f32, ease: Ease) -> f32 {
         let t = ease.apply(t);

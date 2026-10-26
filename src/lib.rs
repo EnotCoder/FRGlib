@@ -50,7 +50,7 @@ pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
 #[cfg(feature = "cached-textures")]
 pub use graphics::{Animation, Texture};
 pub use graphics::{Camera, Color, Image, Object};
-pub use math::{lerp, Ease, Lerp, Rect, Vec2};
+pub use math::{cos, lerp, sin, Ease, Lerp, Rect, Vec2};
 pub use timing::FrameClock;
 pub use tilemap::{MapError, TileMap};
 pub use ui::{Anchor, Button, ButtonState, Label, Slider, SliderState, TextCache};

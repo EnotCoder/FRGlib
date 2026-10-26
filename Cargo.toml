@@ -101,6 +101,10 @@ name = "basic-lerp"
 path = "examples/basic/lerp.rs"
 
 [[example]]
+name = "basic-sin-cos"
+path = "examples/basic/sin_cos.rs"
+
+[[example]]
 name = "ui-button"
 path = "examples/ui/button.rs"
 
