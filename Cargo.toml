@@ -97,6 +97,10 @@ path = "examples/basic/animation.rs"
 required-features = ["cached-textures"]
 
 [[example]]
+name = "basic-lerp"
+path = "examples/basic/lerp.rs"
+
+[[example]]
 name = "ui-button"
 path = "examples/ui/button.rs"
 

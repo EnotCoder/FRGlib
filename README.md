@@ -98,6 +98,7 @@ window.frame_with(|d| {
 | `set_camera(Camera)` | Задаёт камеру на текущий кадр |
 | `size()` | Размер окна, полезно для центрирования |
 | `FrameClock::new(hz)` | Таймер кадров: `dt()` и `tick()` в цикле |
+| `lerp(from, to, t, Ease)` | Интерполяция `f32`, `Vec2` и `Color`, как в Godot |
 | `pixel_art(bool)` | Флаг окна: текстуры без сглаживания |
 | `Window::pixel_art()` | Что выбрано при создании окна |
 | `screen_space(f)` | Рисует в координатах экрана, камеру временно снимает |
@@ -262,6 +263,32 @@ loop {
 
 `dt` ограничен сверху: после паузы или сворачивания окна без ограничения
 `update` получил бы на несколько секунд за раз и унёс всё за экран.
+
+### Интерполяция
+
+`lerp` ведёт значение от одного к другому, как в Godot. Четвёртый аргумент —
+тип интерполяции, пока это только `Ease::Linear`:
+
+```rust
+use frglib::{lerp, Ease, Lerp, Vec2};
+
+let from = Vec2::new(10.0, 20.0);
+let to = Vec2::new(30.0, 60.0);
+
+// Середина пути: то же самое двумя способами.
+let halfway = lerp(from, to, 0.5, Ease::Linear);
+let halfway = from.lerp(to, 0.5, Ease::Linear);
+```
+
+Работает с `f32`, `Vec2` и `Color`. Методу нужен `use frglib::Lerp;`, потому
+что это функция из трейта, а не метод структуры.
+
+Вес не зажимается: за пределами `0..=1` значение продолжает движение мимо
+цели — как в Godot, и `Ease::Linear` в этом не мешает. Исключение — `Color`:
+его каналы останавливаются на `0` и `255`, так как `u8` большего не вмещает.
+
+Когда-нибудь здесь появятся `Ease::In`, `Ease::Out` и остальные — сигнатура
+не изменится, добавится только новый вариант enum.
 
 ### Кнопки
 
@@ -436,6 +463,7 @@ cargo build --release --features bundled
 | `cargo run --features cached-textures --example basic-cached` | Текстура, залитая один раз, против заливки на кадр |
 | `cargo run --example basic-gallery` | Листалка картинок: выбор по индексу, круговой проход |
 | `cargo run --features cached-textures --example basic-animation` | Анимация из кадров: залитые текстуры, `advance(dt)`, пауза и скорость |
+| `cargo run --example basic-lerp` | Интерполяция: `lerp` позиции, размера и цвета, `Ease::Linear` |
 | `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: `TileMap`, нарезка атласа, камера, коллизии |
 | `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
 | `cargo run --example ui-text` | Текст через SDL3_ttf, кириллица, кеш строк |

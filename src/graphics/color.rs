@@ -1,5 +1,7 @@
 //! Colour, kept separate from SDL's own type.
 
+use crate::math::{Ease, Lerp};
+
 /// An 8-bit-per-channel RGBA colour.
 ///
 /// Deliberately not `sdl3::pixels::Color`: exposing that would tie this crate's
@@ -51,6 +53,28 @@ impl From<(u8, u8, u8, u8)> for Color {
 impl From<[u8; 4]> for Color {
     fn from([r, g, b, a]: [u8; 4]) -> Self {
         Color::rgba(r, g, b, a)
+    }
+}
+
+impl Lerp for Color {
+    /// Every channel moves at the same rate, then lands back on a whole
+    /// number: `u8` has nowhere to keep the fraction.
+    ///
+    /// Unlike the float types this stops at `0` and `255` rather than
+    /// extrapolating, because `u8` cannot hold a value outside its own range.
+    fn lerp(self, other: Color, t: f32, ease: Ease) -> Color {
+        let t = ease.apply(t);
+        let mix = |from: u8, to: u8| {
+            let value = f32::from(from) + (f32::from(to) - f32::from(from)) * t;
+            value.round().clamp(0.0, 255.0) as u8
+        };
+
+        Color::rgba(
+            mix(self.r, other.r),
+            mix(self.g, other.g),
+            mix(self.b, other.b),
+            mix(self.a, other.a),
+        )
     }
 }
 
@@ -141,5 +165,46 @@ mod tests {
         let sdl: sdl3::pixels::Color = Color::rgba(10, 20, 30, 40).into();
         let (r, g, b, a) = sdl.rgba();
         assert_eq!((r, g, b, a), (10, 20, 30, 40));
+    }
+
+    #[test]
+    fn colours_lerp_channel_by_channel() {
+        // 127.5 lands on 128: u8 keeps whole numbers only.
+        assert_eq!(
+            Color::BLACK.lerp(Color::WHITE, 0.5, Ease::Linear),
+            Color::rgb(128, 128, 128)
+        );
+
+        let from = Color::rgba(10, 20, 30, 40);
+        let to = Color::rgba(30, 40, 50, 60);
+        assert_eq!(
+            from.lerp(Color::rgba(20, 30, 40, 50), 0.0, Ease::Linear),
+            from
+        );
+        assert_eq!(from.lerp(to, 1.0, Ease::Linear), to);
+    }
+
+    #[test]
+    fn the_free_function_lerps_colours_too() {
+        use crate::math::lerp;
+
+        assert_eq!(
+            lerp(Color::BLACK, Color::WHITE, 1.0, Ease::Linear),
+            Color::WHITE
+        );
+    }
+
+    /// A weight past `1.0` would ask for a channel beyond `255`, or below
+    /// `0`: `u8` has nowhere to put it, so the channel stops at the edge.
+    #[test]
+    fn a_channel_stops_at_the_edge_of_its_range() {
+        assert_eq!(
+            Color::BLACK.lerp(Color::WHITE, 2.0, Ease::Linear),
+            Color::WHITE
+        );
+        assert_eq!(
+            Color::WHITE.lerp(Color::BLACK, 2.0, Ease::Linear),
+            Color::BLACK
+        );
     }
 }

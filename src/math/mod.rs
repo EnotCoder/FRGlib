@@ -1,10 +1,15 @@
-//! Two-dimensional points, vectors and boxes.
+//! Two-dimensional points, vectors and boxes, and moving between values.
 //!
 //! [`Vec2`] lives here directly; [`Rect`] is a box in the same coordinate
 //! space, so its module sits alongside rather than at the crate root.
+//! [`lerp`] and [`Ease`] are here too: they are generic over everything that
+//! interpolates, [`Color`](crate::Color) among them, rather than owned by any
+//! one type.
 
+pub mod ease;
 pub mod rect;
 
+pub use ease::Ease;
 pub use rect::Rect;
 
 /// A point or vector in pixels.
@@ -127,6 +132,60 @@ impl From<[f32; 2]> for Vec2 {
     }
 }
 
+/// A value that knows how to walk from itself towards another one.
+///
+/// [`lerp`] is the generic way to call it; the trait method is the same thing
+/// spelled as a method -- `from.lerp(to, t, ease)` -- for when a chain reads
+/// better. The method form needs this trait in scope:
+///
+/// ```
+/// use frglib::{Ease, Lerp, Vec2};
+///
+/// let halfway = Vec2::ZERO.lerp(Vec2::new(10.0, 20.0), 0.5, Ease::Linear);
+/// assert_eq!(halfway, Vec2::new(5.0, 10.0));
+/// ```
+pub trait Lerp: Sized {
+    /// The point `t` of the way from `self` to `other`, shaped by `ease`.
+    ///
+    /// `t` is not clamped: `0.0` gives `self`, `1.0` gives `other`, and a
+    /// weight outside that range extrapolates past the endpoints -- which is
+    /// what Godot's `lerp` does too. [`Color`](crate::Color) is the exception:
+    /// its channels stop at `0` and `255`, because `u8` cannot hold more.
+    fn lerp(self, other: Self, t: f32, ease: Ease) -> Self;
+}
+
+/// [`Lerp::lerp`] as a free function: `lerp(from, to, t, ease)`.
+///
+/// The method form and this one are the same call, so pick whichever reads
+/// better where you are:
+///
+/// ```
+/// use frglib::{lerp, Ease, Lerp, Vec2};
+///
+/// let from = Vec2::new(10.0, 20.0);
+/// let to = Vec2::new(30.0, 60.0);
+///
+/// assert_eq!(lerp(from, to, 0.5, Ease::Linear), Vec2::new(20.0, 40.0));
+/// assert_eq!(from.lerp(to, 0.5, Ease::Linear), Vec2::new(20.0, 40.0));
+/// ```
+pub fn lerp<T: Lerp>(from: T, to: T, t: f32, ease: Ease) -> T {
+    from.lerp(to, t, ease)
+}
+
+impl Lerp for f32 {
+    fn lerp(self, other: f32, t: f32, ease: Ease) -> f32 {
+        let t = ease.apply(t);
+        self + (other - self) * t
+    }
+}
+
+impl Lerp for Vec2 {
+    fn lerp(self, other: Vec2, t: f32, ease: Ease) -> Vec2 {
+        let t = ease.apply(t);
+        self + (other - self) * t
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,5 +281,47 @@ mod tests {
             .rotated(-std::f32::consts::FRAC_PI_2);
         assert_close(got.x, v.x);
         assert_close(got.y, v.y);
+    }
+
+    #[test]
+    fn lerping_a_scalar_walks_at_a_constant_rate() {
+        assert_eq!(lerp(0.0f32, 10.0, 0.0, Ease::Linear), 0.0);
+        assert_eq!(lerp(0.0f32, 10.0, 0.25, Ease::Linear), 2.5);
+        assert_eq!(lerp(0.0f32, 10.0, 1.0, Ease::Linear), 10.0);
+    }
+
+    #[test]
+    fn lerping_a_vector_moves_both_coordinates() {
+        let from = Vec2::new(10.0, 20.0);
+        let to = Vec2::new(30.0, 60.0);
+
+        assert_eq!(lerp(from, to, 0.0, Ease::Linear), from);
+        assert_eq!(lerp(from, to, 1.0, Ease::Linear), to);
+        assert_eq!(lerp(from, to, 0.5, Ease::Linear), Vec2::new(20.0, 40.0));
+    }
+
+    /// The weight stays a raw number: past `1.0` means past the target, the
+    /// way Godot's `lerp` carries on instead of stopping at the endpoint.
+    #[test]
+    fn the_weight_is_not_clamped() {
+        assert_eq!(lerp(0.0f32, 10.0, 2.0, Ease::Linear), 20.0);
+        assert_eq!(lerp(0.0f32, 10.0, -1.0, Ease::Linear), -10.0);
+    }
+
+    /// The free function and the method are one call spelled two ways, so
+    /// neither is allowed to drift from the other.
+    #[test]
+    fn the_function_and_the_method_agree() {
+        let from = Vec2::new(1.0, 2.0);
+        let to = Vec2::new(5.0, -3.0);
+
+        assert_eq!(
+            lerp(from, to, 0.3, Ease::Linear),
+            from.lerp(to, 0.3, Ease::Linear)
+        );
+        assert_eq!(
+            lerp(4.0f32, 9.0, 0.3, Ease::Linear),
+            (4.0f32).lerp(9.0, 0.3, Ease::Linear)
+        );
     }
 }
