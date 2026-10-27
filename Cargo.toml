@@ -105,6 +105,10 @@ name = "basic-sin-cos"
 path = "examples/basic/sin_cos.rs"
 
 [[example]]
+name = "basic-relative"
+path = "examples/basic/relative.rs"
+
+[[example]]
 name = "ui-button"
 path = "examples/ui/button.rs"
 

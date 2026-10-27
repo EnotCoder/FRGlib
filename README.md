@@ -68,6 +68,7 @@ fn main() -> Result<(), frglib::Error> {
 | `set_background(Color)` | Меняет цвет фона на лету |
 | `background() -> Color` | Текущий цвет фона |
 | `size() -> (u32, u32)` | Текущий размер окна |
+| `relative_mouse() -> Vec2` | Насколько мышь сдвинулась за кадр, в пикселях |
 | `vulkan_instance_extensions() -> Result<Vec<String>, Error>` | Расширения Vulkan, нужные этому окну |
 
 `Event::should_close()` отвечает на вопрос, стоит ли продолжать цикл.
@@ -465,6 +466,7 @@ cargo build --release --features bundled
 | `cargo run --features cached-textures --example basic-animation` | Анимация из кадров: залитые текстуры, `advance(dt)`, пауза и скорость |
 | `cargo run --example basic-lerp` | Интерполяция: `lerp` позиции, размера и цвета, `Ease::Linear` |
 | `cargo run --example basic-sin-cos` | Круговое движение с помощью `sin` и `cos` |
+| `cargo run --example basic-relative` | Абсолютная мышь против относительной: `relative_mouse()` |
 | `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: `TileMap`, нарезка атласа, камера, коллизии |
 | `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
 | `cargo run --example ui-text` | Текст через SDL3_ttf, кириллица, кеш строк |

@@ -110,6 +110,38 @@ impl Window {
         })
     }
 
+    /// How far the mouse moved since the last call, in pixels.
+    ///
+    /// Read exactly like [`FrameClock::dt`](crate::FrameClock::dt): one call
+    /// per frame, and a second call in the same frame returns zero, because
+    /// SDL hands out the movement and clears its own counter on the way.
+    ///
+    /// `x` grows to the right, `y` grows down. The result is a movement, not a
+    /// position, so it has to be added to where the thing already is:
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), frglib::Error> {
+    /// # let mut window = frglib::Window::builder("demo").build()?;
+    /// # let mut at = frglib::Vec2::ZERO;
+    /// let step = window.relative_mouse()? * 0.1;
+    /// at += step;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// While the cursor is against an edge of the window the movement is zero:
+    /// the mouse stops there, so there is nothing to report. Getting movement
+    /// past the edge needs the cursor captured, which this does not do yet.
+    ///
+    /// The error is the same one [`poll`](Self::poll) can return: the event
+    /// pump is created on first use and SDL can refuse to hand it over.
+    pub fn relative_mouse(&mut self) -> Result<crate::math::Vec2, Error> {
+        with_pump(&self._sdl, |pump| {
+            let state = pump.relative_mouse_state();
+            Ok(crate::math::Vec2::new(state.x(), state.y()))
+        })
+    }
+
     /// Current drawable size, as `(width, height)`.
     pub fn size(&self) -> (u32, u32) {
         self.canvas.window().size()
