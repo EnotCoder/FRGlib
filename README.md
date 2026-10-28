@@ -164,7 +164,7 @@ let grass = sheet.crop(0, 0, 16, 16)?;   // копия пикселей, не с
 
 ```toml
 [dependencies]
-frglib = { version = "0.2", features = ["cached-textures"] }
+frglib = { version = "0.4", features = ["cached-textures"] }
 ```
 
 ```rust
