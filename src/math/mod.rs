@@ -6,6 +6,24 @@
 //! interpolates, [`Color`](crate::Color) among them, rather than owned by any
 //! one type.
 
+
+use core::f32::consts::PI;
+
+/// Converts degrees to radians.
+#[inline]
+#[must_use]
+pub const fn deg_to_rad(deg: f32) -> f32 {
+    deg * (PI / 180.0)
+}
+
+/// Converts radians to degrees.
+#[inline]
+#[must_use]
+pub const fn rad_to_deg(rad: f32) -> f32 {
+    rad * (180.0 / PI)
+}
+
+
 pub mod ease;
 pub mod rect;
 
@@ -199,6 +217,23 @@ impl Lerp for Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::f32::consts::{FRAC_PI_2, PI};
+
+    #[test]
+    fn degrees_to_radians() {
+        assert_eq!(deg_to_rad(0.0), 0.0);
+        assert!((deg_to_rad(90.0) - FRAC_PI_2).abs() < 1e-6);
+        assert!((deg_to_rad(180.0) - PI).abs() < 1e-6);
+        assert!((deg_to_rad(-180.0) + PI).abs() < 1e-6);
+    }
+
+    #[test]
+    fn radians_to_degrees() {
+        assert_eq!(rad_to_deg(0.0), 0.0);
+        assert!((rad_to_deg(FRAC_PI_2) - 90.0).abs() < 1e-4);
+        assert!((rad_to_deg(PI) - 180.0).abs() < 1e-4);
+        assert!((rad_to_deg(-PI) + 180.0).abs() < 1e-4);
+    }
 
     /// How far two numbers may differ and still count as equal in a test.
     const EPS: f32 = 1e-4;
