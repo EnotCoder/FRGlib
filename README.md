@@ -1,5 +1,6 @@
 ## FRGLib
 
+
 ![Логотип библиотеки](logo.svg)
 
 [![crates.io](https://img.shields.io/crates/v/frglib.svg)](https://crates.io/crates/frglib)
