@@ -63,6 +63,19 @@ impl Vec2 {
         self.x * other.x + self.y * other.y
     }
 
+    pub fn direction_to(self, to: Self) -> Self {
+        let dx = to.x - self.x;
+        let dy = to.y - self.y;
+
+        let length = dx.hypot(dy);
+
+        if length == 0.0 {
+            return Self::new(0.0, 0.0);
+        }
+
+        Self::new(dx / length, dy / length)
+    }
+
     /// Length made 1, direction unchanged. A zero vector stays zero.
     pub fn normalized(self) -> Vec2 {
         let len = self.length();
@@ -218,6 +231,35 @@ impl Lerp for Vec2 {
 mod tests {
     use super::*;
     use core::f32::consts::{FRAC_PI_2, PI};
+
+    #[test]
+    fn direction_to_diagonal() {
+        let from = Vec2::new(10.0, 20.0);
+        let to = Vec2::new(13.0, 24.0);
+
+        let direction = from.direction_to(to);
+
+        assert!((direction.x - 0.6).abs() < 0.00001);
+        assert!((direction.y - 0.8).abs() < 0.00001);
+    }
+
+    #[test]
+    fn direction_to_same_point() {
+        let point = Vec2::new(10.0, 20.0);
+        let direction = point.direction_to(point);
+
+        assert_eq!(direction.x, 0.0);
+        assert_eq!(direction.y, 0.0);
+    }
+
+    #[test]
+    fn direction_to_left() {
+        let direction = Vec2::new(10.0, 0.0)
+            .direction_to(Vec2::new(0.0, 0.0));
+
+        assert_eq!(direction.x, -1.0);
+        assert_eq!(direction.y, 0.0);
+    }
 
     #[test]
     fn degrees_to_radians() {
