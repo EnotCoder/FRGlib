@@ -26,9 +26,11 @@ pub const fn rad_to_deg(rad: f32) -> f32 {
 
 pub mod ease;
 pub mod rect;
+pub mod mat3;
 
 pub use ease::Ease;
 pub use rect::Rect;
+pub use mat3::Mat3;
 
 /// A point or vector in pixels.
 ///

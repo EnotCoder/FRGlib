@@ -105,6 +105,10 @@ name = "math-sin-cos"
 path = "examples/math/sin_cos.rs"
 
 [[example]]
+name = "math-matrix"
+path = "examples/math/matrix.rs"
+
+[[example]]
 name = "ui-button"
 path = "examples/ui/button.rs"
 
