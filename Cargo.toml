@@ -136,7 +136,7 @@ path = "examples/2d_games/gallery.rs"
 
 [[example]]
 name = "2d_games-space"
-path = "examples/2d_games/space.rs"
+path = "examples/2d_games/space/main.rs"
 
 [profile.release]
 lto = true
