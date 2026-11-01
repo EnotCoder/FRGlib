@@ -4,7 +4,7 @@
 //! проход: после последней идёт первая. Имя и номер текущей картинки
 //! печатаются в консоль.
 //!
-//! Запуск: `cargo run --example basic-gallery`
+//! Запуск: `cargo run --example 2d_games-gallery`
 
 use frglib::{Color, Event, FrameClock, Image, Keycode, Object, Window};
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/basic/assets")
+        .join("examples/2d_games/assets/gallery")
         .join(name)
 }
 

@@ -1,6 +1,6 @@
 //! Пример использования функций sin и cos для кругового движения.
 //!
-//! Запуск: `cargo run --example basic-sin-cos`
+//! Запуск: `cargo run --example math-sin-cos`
 
 use frglib::{cos, sin, Color, Event, FrameClock, Object, Vec2, Window};
 

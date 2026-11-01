@@ -11,7 +11,7 @@
 //!
 //! Управление: движение мышью, Escape -- выход.
 //!
-//! Запуск: `cargo run --example basic-relative`
+//! Запуск: `cargo run --example input-relative`
 
 use frglib::{Color, Event, FrameClock, Object, Vec2, Window};
 

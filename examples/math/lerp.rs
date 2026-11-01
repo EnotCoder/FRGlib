@@ -11,7 +11,7 @@
 //!
 //! Управление: пробел -- пауза, Escape -- выход.
 //!
-//! Запуск: `cargo run --example basic-lerp`
+//! Запуск: `cargo run --example math-lerp`
 
 use frglib::{lerp, Color, Ease, Event, FrameClock, Keycode, Lerp, Object, Vec2, Window};
 

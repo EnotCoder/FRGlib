@@ -463,13 +463,13 @@ cargo build --release --features bundled
 | `cargo run --example basic-object` | Объекты: поворот заливки, текстуры и многоугольника |
 | `cargo run --example basic-camera` | Камера: движение, зум, картинка на сцене |
 | `cargo run --features cached-textures --example basic-cached` | Текстура, залитая один раз, против заливки на кадр |
-| `cargo run --example basic-gallery` | Листалка картинок: выбор по индексу, круговой проход |
 | `cargo run --features cached-textures --example basic-animation` | Анимация из кадров: залитые текстуры, `advance(dt)`, пауза и скорость |
-| `cargo run --example basic-lerp` | Интерполяция: `lerp` позиции, размера и цвета, `Ease::Linear` |
-| `cargo run --example basic-sin-cos` | Круговое движение с помощью `sin` и `cos` |
-| `cargo run --example basic-relative` | Абсолютная мышь против относительной: `relative_mouse()` |
-| `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: `TileMap`, нарезка атласа, камера, коллизии |
-| `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
+| `cargo run --example input-relative` | Абсолютная мышь против относительной: `relative_mouse()` |
+| `cargo run --example math-lerp` | Интерполяция: `lerp` позиции, размера и цвета, `Ease::Linear` |
+| `cargo run --example math-sin-cos` | Круговое движение с помощью `sin` и `cos` |
 | `cargo run --example ui-text` | Текст через SDL3_ttf, кириллица, кеш строк |
 | `cargo run --example ui-button` | Кнопки: три состояния, клик по отпусканию, интерфейс поверх камеры |
 | `cargo run --example ui-slider` | Слайдеры: диапазон, шаг, перетаскивание, раскладка от размера окна |
+| `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: `TileMap`, нарезка атласа, камера, коллизии |
+| `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
+| `cargo run --example 2d_games-gallery` | Листалка картинок: выбор по индексу, круговой проход |

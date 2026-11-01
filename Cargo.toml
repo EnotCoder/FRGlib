@@ -88,25 +88,21 @@ path = "examples/basic/cached.rs"
 required-features = ["cached-textures"]
 
 [[example]]
-name = "basic-gallery"
-path = "examples/basic/gallery.rs"
-
-[[example]]
 name = "basic-animation"
 path = "examples/basic/animation.rs"
 required-features = ["cached-textures"]
 
 [[example]]
-name = "basic-lerp"
-path = "examples/basic/lerp.rs"
+name = "input-relative"
+path = "examples/input/relative.rs"
 
 [[example]]
-name = "basic-sin-cos"
-path = "examples/basic/sin_cos.rs"
+name = "math-lerp"
+path = "examples/math/lerp.rs"
 
 [[example]]
-name = "basic-relative"
-path = "examples/basic/relative.rs"
+name = "math-sin-cos"
+path = "examples/math/sin_cos.rs"
 
 [[example]]
 name = "ui-button"
@@ -129,6 +125,10 @@ required-features = ["cached-textures"]
 name = "2d_games-fgoty-dash"
 path = "examples/2d_games/dash/main.rs"
 required-features = ["cached-textures"]
+
+[[example]]
+name = "2d_games-gallery"
+path = "examples/2d_games/gallery.rs"
 
 [profile.release]
 lto = true
