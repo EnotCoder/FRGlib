@@ -41,7 +41,7 @@ fn main() -> Result<(), frglib::Error> {
 
         // 1. Матрица планеты: вращение + перенос от центра
         let planet_orbit_radius = 150.0;
-        let planet_angle = elapsed * 3.0; // 1 рад/сек
+        let planet_angle = elapsed * 1.0; // 1 рад/сек
         
         let planet_transform = Mat3::translation(center) 
             * Mat3::rotation(planet_angle)
@@ -52,7 +52,7 @@ fn main() -> Result<(), frglib::Error> {
 
         // 2. Матрица спутника: относительна планеты
         let moon_orbit_radius = 60.0;
-        let moon_angle = elapsed * 6.0; // вращается быстрее
+        let moon_angle = elapsed * 3.0; // вращается быстрее
 
         // Матрица спутника строится поверх матрицы планеты
         let moon_transform = planet_transform 

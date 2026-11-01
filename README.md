@@ -473,3 +473,4 @@ cargo build --release --features bundled
 | `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: `TileMap`, нарезка атласа, камера, коллизии |
 | `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
 | `cargo run --example 2d_games-gallery` | Листалка картинок: выбор по индексу, круговой проход |
+| `cargo run --example 2d_games-space` | Симуляция Солнечной системы: Пример работы матрицы |

@@ -134,6 +134,10 @@ required-features = ["cached-textures"]
 name = "2d_games-gallery"
 path = "examples/2d_games/gallery.rs"
 
+[[example]]
+name = "2d_games-space"
+path = "examples/2d_games/space.rs"
+
 [profile.release]
 lto = true
 codegen-units = 1
