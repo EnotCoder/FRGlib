@@ -9,6 +9,8 @@
 //!
 //! Запуск: `cargo run --features cached-textures --example 2d_games-fgoty-dash`
 
+mod draw;
+mod game;
 mod level;
 mod menu;
 mod player;
@@ -16,14 +18,12 @@ mod player;
 use std::path::PathBuf;
 
 use frglib::{
-    Camera, Color, Draw, Event, FrameClock, Image, Keycode, Object, Texture, Vec2, Window,
+    Camera, Event, FrameClock, Image, Keycode, Vec2, Window,
 };
 
-use level::{hit, parse, top_of, Tile, BODY, COLS, GROUND, GROUND_SCREEN, LEVEL_TOP, ROWS, TILE};
-use player::{
-    Player, State, GRAVITY, JUMP, LAND_TOLERANCE, MENU_SCROLL, SCREEN_X, SPEED, SPEED_SPIN,
-    SPIKE_INSET,
-};
+use draw::{draw_player, Tiles, SKY_TOP};
+use level::{parse, COLS, GROUND, GROUND_SCREEN, TILE};
+use player::{Player, State, MENU_SCROLL, SCREEN_X};
 
 fn asset(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -46,129 +46,6 @@ const FLOOR_H: u32 = 48;
 
 /// Где в файле кончается каменная шапка и начинается грунт.
 const CAP: u32 = 18;
-
-/// Высота каменной шапки на экране.
-const CAP_H: f32 = 36.0;
-
-/// Высота одного куска грунта на экране.
-const DIRT_H: f32 = 60.0;
-
-/// Небо.
-const SKY_TOP: Color = Color::rgb(58, 152, 233);
-const SKY_LOW: Color = Color::rgb(191, 233, 252);
-const SKY_BANDS: usize = 8;
-
-/// Смешивает два цвета: `0` — `a`, `1` — `b`.
-fn mix(a: Color, b: Color, t: f32) -> Color {
-    let ch = |x: u8, y: u8| {
-        (x as f32 + (y as f32 - x as f32) * t)
-            .round()
-            .clamp(0.0, 255.0) as u8
-    };
-    Color::rgba(ch(a.r, b.r), ch(a.g, b.g), ch(a.b, b.b), 255)
-}
-
-/// Текстуры мира, которыми заливается уровень.
-///
-/// Отдельная структура, а не четыре отдельных аргумента функции: их иначе
-/// пришлось бы перечислять в обоих местах, где рисуется мир, и легко
-/// перепутать местами.
-#[derive(Clone, Copy)]
-struct Tiles {
-    top: Texture,
-    body: Texture,
-    spike: Texture,
-}
-
-impl Tiles {
-    /// Рисует небо, землю и уровень при камере `camera`.
-    ///
-    /// Куб сюда не входит: у меню мира без игрока, и это позволяет ему ехать
-    /// под панелью.
-    fn draw(
-        &self,
-        d: &mut Draw<'_>,
-        grid: &[Vec<Tile>],
-        camera: Camera,
-        view: (u32, u32),
-    ) -> std::result::Result<(), frglib::Error> {
-        let (vw, vh) = (view.0 as f32, view.1 as f32);
-
-        // Видимый кусок мира: камера стоит в центре окна, поэтому в кадр
-        // попадает ровно пол-окна в каждую сторону. Рисовать надо в этих
-        // мировых координатах -- `Draw` сам спроецирует их на экран.
-        let left = camera.position.x - vw / 2.0;
-        let top = camera.position.y - vh / 2.0;
-        let bottom = camera.position.y + vh / 2.0;
-
-        // Видимые столбцы -- со знаком: камера спокойно выезжает и за левый
-        // край уровня. Земля отсюда не кончается никогда, а шипы и платформы
-        // есть только внутри уровня, и их обрезаем отдельно.
-        let vis0 = (left / TILE).floor() as isize;
-        let vis1 = ((camera.position.x + vw / 2.0) / TILE).ceil() as isize;
-
-        let col0 = vis0.max(0) as usize;
-        let col1 = (vis1.min(COLS as isize)).max(0) as usize;
-        let row0 = ((top - LEVEL_TOP) / TILE).floor().max(0.0) as usize;
-        let row1 = (((bottom - LEVEL_TOP) / TILE).ceil().max(0.0)).min(ROWS as f32) as usize;
-
-        d.set_camera(camera);
-
-        // Небо полосами: дешёвый градиент из одного цвета не выйдет.
-        let band = vh / SKY_BANDS as f32;
-        for i in 0..SKY_BANDS {
-            let t = i as f32 / (SKY_BANDS - 1) as f32;
-            d.fill_object(
-                &Object::from_xywh(
-                    camera.position.x,
-                    top + band * (i as f32 + 0.5),
-                    vw + TILE,
-                    band + 1.0,
-                ),
-                mix(SKY_TOP, SKY_LOW, t),
-            )?;
-        }
-
-        // Земля: каменная шапка по верхнему краю, грунт вниз до низа окна.
-        for col in vis0..vis1 {
-            let x = col as f32 * TILE + TILE / 2.0;
-            d.fill_object_texture(
-                &Object::from_xywh(x, GROUND + CAP_H / 2.0, TILE, CAP_H),
-                self.top,
-            )?;
-        }
-
-        let mut y = GROUND + CAP_H;
-        while y < bottom + DIRT_H {
-            for col in vis0..vis1 {
-                let x = col as f32 * TILE + TILE / 2.0;
-                d.fill_object_texture(
-                    &Object::from_xywh(x, y + DIRT_H / 2.0, TILE, DIRT_H),
-                    self.body,
-                )?;
-            }
-            y += DIRT_H;
-        }
-
-        for (row, cells) in grid.iter().enumerate().take(row1).skip(row0) {
-            let y = top_of(row) + TILE / 2.0;
-
-            for (col, tile) in cells.iter().enumerate().take(col1).skip(col0) {
-                let cell = Object::from_xywh(col as f32 * TILE + TILE / 2.0, y, TILE, TILE);
-
-                match tile {
-                    Tile::Spike => d.fill_object_texture(&cell, self.spike)?,
-                    // Платформа -- тот же камень, что и верх земли, но земля
-                    // под ней, так что читается как выступ.
-                    Tile::Platform => d.fill_object_texture(&cell, self.top)?,
-                    Tile::Empty => {}
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
 
 /// Что показывать: меню или саму игру.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -218,11 +95,7 @@ fn main() -> Result<()> {
     let mut menu = menu::Menu::new(&font, &title_font, window.size())?;
 
     let grid = parse();
-    let tiles = Tiles {
-        top: top_tex,
-        body: body_tex,
-        spike: spike_tex,
-    };
+    let tiles = Tiles::new(top_tex, body_tex, spike_tex);
 
     let mut pressed: Vec<Keycode> = Vec::new();
     let mut clock = FrameClock::new(60.0);
@@ -309,96 +182,7 @@ fn main() -> Result<()> {
             continue;
         }
 
-        match player.state {
-            State::Run => {
-                if jump && player.grounded {
-                    player.vy = -JUMP;
-                    player.grounded = false;
-                }
-
-                player.vy += GRAVITY * dt;
-                player.x += SPEED * dt;
-
-                let previous_bottom = player.y + BODY / 2.0;
-                player.y += player.vy * dt;
-
-                // Крутим куб в полёте: у настоящего dash куб вертится.
-                if !player.grounded {
-                    player.spin += SPEED_SPIN * dt;
-                }
-
-                let (col0, col1) = player.columns();
-                let half = BODY / 2.0;
-
-                for col in col0.max(0)..=col1.min(COLS as isize - 1) {
-                    let row_lo = ((player.y - half - LEVEL_TOP) / TILE).floor() as isize;
-                    let row_hi = ((player.y + half - LEVEL_TOP) / TILE).floor() as isize;
-
-                    for row in row_lo.max(0)..=row_hi.min(ROWS as isize - 1) {
-                        let col = col as usize;
-                        let row = row as usize;
-
-                        match grid[row][col] {
-                            Tile::Spike => {
-                                let center = Vec2::new(
-                                    col as f32 * TILE + TILE / 2.0,
-                                    top_of(row) + TILE / 2.0,
-                                );
-                                let reach = TILE / 2.0 - SPIKE_INSET;
-                                let reach = Vec2::new(reach, reach);
-                                if hit(player.center(), Vec2::new(half, half), center, reach) {
-                                    player.state = State::Dead;
-                                    println!("шип. Столбец {col}, пробел — заново.");
-                                }
-                            }
-                            Tile::Platform => {
-                                let top = top_of(row);
-                                let bottom = top + TILE;
-                                let left = col as f32 * TILE;
-                                let right = left + TILE;
-
-                                let sideways = player.x + half > left && player.x - half < right;
-
-                                if !sideways {
-                                    continue;
-                                }
-
-                                let lands = previous_bottom <= top + LAND_TOLERANCE
-                                    && player.y + half >= top
-                                    && player.vy > 0.0;
-
-                                if lands {
-                                    player.y = top - half;
-                                    player.vy = 0.0;
-                                    player.grounded = true;
-                                    player.spin = 0.0;
-                                } else if player.y - half < bottom {
-                                    // Врезались в бок платформы.
-                                    player.state = State::Dead;
-                                    println!("бок платформы. Столбец {col}, пробел — заново.");
-                                }
-                            }
-                            Tile::Empty => {}
-                        }
-                    }
-                }
-
-                // Земля: одна бесконечная плита под уровнем.
-                if player.y + half >= GROUND {
-                    player.y = GROUND - half;
-                    player.vy = 0.0;
-                    player.grounded = true;
-                    player.spin = 0.0;
-                }
-
-                if player.state == State::Run && player.x >= COLS as f32 * TILE {
-                    player.state = State::Won;
-                    println!("уровень пройден: {COLS} столбцов.");
-                }
-            }
-            // Смерть и финиш обрабатываются выше: они возвращают в меню.
-            State::Dead | State::Won => {}
-        }
+        game::update(&mut player, &grid, jump, dt);
 
         // Мир едет влево, потому что игрок едет вправо: камера держит его на
         // одной и той же точке экрана.
@@ -415,14 +199,7 @@ fn main() -> Result<()> {
 
             // Куб. После смерти красим, чтобы было видно без текста: в
             // библиотеке нет шрифтов.
-            let mut body = Object::from_xywh(player.x, player.y, BODY, BODY);
-            body.rotation = player.spin;
-
-            if player.state == State::Dead {
-                d.fill_object_texture(&body, cube_dead_tex)?;
-            } else {
-                d.fill_object_texture(&body, cube_tex)?;
-            }
+            draw_player(d, &player, cube_tex, cube_dead_tex)?;
 
             Ok(())
         })?;

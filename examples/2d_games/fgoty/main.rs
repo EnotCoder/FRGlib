@@ -8,15 +8,19 @@
 //!
 //! Запуск: `cargo run --features cached-textures --example 2d_games-fgoty`
 
+mod draw;
+mod game;
 mod map;
 mod player;
 
 use std::path::PathBuf;
 
-use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, Object, TileMap, Vec2, Window};
+use frglib::{Camera, Color, Event, FrameClock, Image, Keycode, TileMap, Vec2, Window};
 
+use draw::draw_scene;
+use game::World;
 use map::{build_map, slice_tiles, TILE};
-use player::{Facing, SPEED};
+use player::Facing;
 
 /// Спрайты лежат рядом с примером; путь строим от корня крейта, а не от
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
@@ -65,11 +69,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut pressed: Vec<Keycode> = Vec::new();
     let mut clock = FrameClock::new(60.0);
-    let mut facing = Facing::Down;
-    let mut step = 0u32;
 
-    let mut player = Object::from_xywh(TILE * 2.5, TILE * 2.5, TILE, TILE);
-    let mut camera = Camera::new(player.position);
+    let mut world = World::new();
+    let mut camera = Camera::new(world.player.position);
 
     loop {
         let dt = clock.dt();
@@ -101,76 +103,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let direction = direction.normalized();
-
-        // Пробуем шагнуть и проверяем точку, в которую приземлились: в воду и за
-        // край карты не ходим, упираемся в границу вплотную.
-        //
-        // Проверяется только тот угол, в сторону которого идём: у нуля в Rust
-        // знак равен единице, так что через `signum` проверка уехала бы на
-        // пол-объекта в сторону, куда движения нет.
-        let half = player.size * 0.5;
-        let lead = Vec2::new(
-            match direction.x {
-                x if x > 0.0 => half.x,
-                x if x < 0.0 => -half.x,
-                _ => 0.0,
-            },
-            match direction.y {
-                y if y > 0.0 => half.y,
-                y if y < 0.0 => -half.y,
-                _ => 0.0,
-            },
-        );
-
-        let target = player.position + direction * SPEED * dt;
-        if direction == Vec2::ZERO
-            || map
-                .get_at(target + lead)
-                .is_some_and(|tile| tile.walkable())
-        {
-            player.position = target;
-        }
-        player.velocity = direction * SPEED;
-
-        if let Some(next) = Facing::of(direction) {
-            facing = next;
-        }
-
-        // Покачивание при ходьбе: кадров анимации нет, так что просто качаем.
-        let moving = direction != Vec2::ZERO;
-        if moving {
-            step += 1;
-        }
-        let bob = if moving && (step / 7) % 2 == 0 {
-            3.0
-        } else {
-            0.0
-        };
+        let bob = world.update(&map, direction, dt);
 
         // Камера едет за игроком и не отпускает карту.
-        camera.position += (player.position - camera.position) * (8.0 * dt).min(1.0);
+        camera.position +=
+            (world.player.position - camera.position) * (8.0 * dt).min(1.0);
         let view = window.size();
         map.clamp_camera(&mut camera, view);
 
-        let hero = player.with_flip(false, false);
-        let sprite = frog_tex[facing.index()];
-
         window.frame_with(|d| {
-            d.set_camera(camera);
-
-            // Рисуются только тайлы в кадре; `texture_of` отдаёт текстуру из
-            // нарезки атласа по номеру тайла.
-            map.draw(d, camera, |tile| tile.texture().map(|i| tile_tex[i]))?;
-
-            let hero = Object::from_xywh(
-                hero.position.x,
-                hero.position.y - bob,
-                hero.size.x,
-                hero.size.y,
-            );
-            d.fill_object_texture(&hero, sprite)?;
-
-            Ok(())
+            draw_scene(
+                d,
+                &map,
+                &tile_tex,
+                &frog_tex,
+                camera,
+                &world.player,
+                world.facing,
+                bob,
+            )
         })?;
 
         clock.tick();
