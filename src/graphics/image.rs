@@ -73,3 +73,10 @@ impl Image {
         self.surface.size()
     }
 }
+
+impl Clone for Image {
+    fn clone(&self) -> Self {
+        let (w, h) = self.size();
+        self.crop(0, 0, w, h).expect("Failed to clone Image surface")
+    }
+}

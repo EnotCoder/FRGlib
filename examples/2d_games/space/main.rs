@@ -31,6 +31,20 @@ fn main() -> Result<(), frglib::Error> {
     let uran_image = Image::from_file(asset("planets/uran.png"))?;
     let neptune_image = Image::from_file(asset("planets/neptune.png"))?;
 
+    let moon_textures = [
+        "moons/moon.png",
+        "moons/thomas_deimos.png",
+        "moons/io.png",
+        "moons/callisto.png",
+        "moons/ganymede.png",
+        "moons/titan.png",
+        "moons/rhea.png",
+        "moons/titania.png",
+        "moons/triton.png",
+    ].iter()
+     .map(|name| Image::from_file(asset(name)).ok())
+     .collect::<Vec<_>>();
+
     // create window
     let mut window = Window::builder("FRGlib: planets and stars")
         .size(1200, 900)
@@ -53,9 +67,17 @@ fn main() -> Result<(), frglib::Error> {
     let orbit_thickness = 2.0;
     let orbit_color = Color::rgb(80, 80, 85);
 
-    let planets = get_planets(mercury_image, vinera_image, 
-        earth_image, mars_image, jupiter_image, 
-        saturn_image, uran_image, neptune_image);
+    let planets = get_planets(
+        mercury_image,
+        vinera_image,
+        earth_image,
+        mars_image,
+        jupiter_image,
+        saturn_image,
+        uran_image,
+        neptune_image,
+        &moon_textures,
+    );
 
     // Пояса создаём один раз: между Марсом и Юпитером
     // и сразу за Нептуном.
@@ -177,8 +199,14 @@ fn main() -> Result<(), frglib::Error> {
 
             // Планеты
 
-            let _ = draw_bodies(d, &planets, elapsed, 
-                center, orbit_thickness, orbit_color);
+            let _ = draw_bodies(
+                d,
+                &planets,
+                elapsed,
+                center,
+                orbit_thickness,
+                orbit_color,
+            );
 
             Ok(())
         })?;
