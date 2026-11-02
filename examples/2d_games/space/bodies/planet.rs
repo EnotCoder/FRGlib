@@ -75,7 +75,7 @@ pub fn get_planets(
             size: 34.0,
             color: Color::rgb(210, 160, 120),
             texture: Some(jupiter_image),
-            orbit_radius: 220.0,
+            orbit_radius: 230.0,
             speed: 0.45,
             start_angle: 3.2,
             moons: get_moon(5),

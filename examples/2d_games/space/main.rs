@@ -47,6 +47,11 @@ fn main() -> Result<(), frglib::Error> {
         earth_image, mars_image, jupiter_image, 
         saturn_image, uran_image, neptune_image);
 
+    // Пояса создаём один раз: между Марсом и Юпитером
+    // и сразу за Нептуном.
+    let asteroid_belt = get_asteroid_belt();
+    let kuiper_belt = get_kuiper_belt();
+
     // Создаём звёзды один раз.
     let stars = get_stars();
 
@@ -82,6 +87,10 @@ fn main() -> Result<(), frglib::Error> {
             // Орбиты планет.
             let _ = draw_orbit(d, &planets, 
                 center, orbit_thickness, orbit_color);
+
+            // Пояса астероидов и Койпера.
+            let _ = draw_belt(d, &asteroid_belt, elapsed, center);
+            let _ = draw_belt(d, &kuiper_belt, elapsed, center);
 
             // Солнце.
             let sun = Object::new(
