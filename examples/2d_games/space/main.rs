@@ -1,5 +1,6 @@
 use frglib::{
-    Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window,
+    Camera, Color, Event, FrameClock, Image, Keycode, MouseButton,
+    Object, Vec2, Window,
 };
 use std::path::PathBuf;
 
@@ -40,6 +41,15 @@ fn main() -> Result<(), frglib::Error> {
     let mut clock = FrameClock::new(60.0);
     let mut elapsed = 0.0f32;
 
+    // Камера смотрит в начало координат -- там Солнце.
+    // Колесо мыши: вертикально -- зум к курсору,
+    // горизонтально -- движение вбок.
+    // Средняя кнопка мыши -- перетаскивание сцены.
+    let mut camera = Camera::new(Vec2::ZERO);
+    let mut cursor: Option<Vec2> = None;
+    let mut last_cursor: Option<Vec2> = None;
+    let mut dragging = false;
+
     let orbit_thickness = 2.0;
     let orbit_color = Color::rgb(80, 80, 85);
 
@@ -68,6 +78,67 @@ fn main() -> Result<(), frglib::Error> {
                     ..
                 } => return Ok(()),
 
+                Event::MouseMotion { x, y } => {
+                    let position = Vec2::new(x, y);
+
+                    if dragging {
+                        if let Some(last) = last_cursor {
+                            // Тянем сцену за собой, поэтому камера
+                            // едет в обратную сторону.
+                            camera.position = camera.position
+                                - (position - last) / camera.zoom;
+                        }
+                    }
+
+                    last_cursor = Some(position);
+                    cursor = Some(position);
+                }
+
+                Event::MouseButtonDown {
+                    button: MouseButton::Middle,
+                    x,
+                    y,
+                    ..
+                } => {
+                    dragging = true;
+                    last_cursor = Some(Vec2::new(x, y));
+                }
+
+                Event::MouseButtonUp {
+                    button: MouseButton::Middle,
+                    ..
+                } => {
+                    dragging = false;
+                    last_cursor = None;
+                }
+
+                Event::MouseWheel { x, y, .. } => {
+                    let size = window.size();
+                    let mouse = cursor.unwrap_or_else(|| {
+                        Vec2::new(
+                            size.0 as f32 / 2.0,
+                            size.1 as f32 / 2.0,
+                        )
+                    });
+
+                    // Вертикальный скролл -- зум к положению курсора,
+                    // чтобы точка под мышью оставалась на месте.
+                    if y != 0.0 {
+                        let before = camera.to_world(mouse, size);
+                        camera.zoom = (camera.zoom
+                            * (1.0 + y * 0.1))
+                            .clamp(0.25, 6.0);
+                        let after = camera.to_world(mouse, size);
+                        camera.position += before - after;
+                    }
+
+                    // Горизонтальный скролл двигает камеру вбок.
+                    if x != 0.0 {
+                        camera.position.x +=
+                            x * 60.0 / camera.zoom;
+                    }
+                }
+
                 _ => {}
             }
         }
@@ -75,14 +146,18 @@ fn main() -> Result<(), frglib::Error> {
         let (w, h) = window.size();
         let window_size = Vec2::new(w as f32, h as f32);
 
-        let center = Vec2::new(
-            window_size.x / 2.0,
-            window_size.y / 2.0,
-        );
+        // Солнце и все орбиты живут в начале координат.
+        let center = Vec2::ZERO;
 
         window.frame_with(|d| {
-            // Звёзды на заднем плане.
-            let _ = draw_stars(d, &stars, &window_size);
+            d.set_camera(camera);
+
+            // Звёзды рисуем в экранных координатах:
+            // они не должны уезжать вместе с камерой.
+            let _ = d.screen_space(|d| {
+                let _ = draw_stars(d, &stars, &window_size);
+                Ok(())
+            });
 
             // Орбиты планет.
             let _ = draw_orbit(d, &planets, 
