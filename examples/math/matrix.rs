@@ -75,6 +75,11 @@ fn main() -> Result<(), frglib::Error> {
             // Спутник
             d.fill_object(&moon_obj, Color::rgb(200, 200, 200))?;
 
+            // Вывод определителя в консоль раз в секунду
+            if elapsed as i32 % 5 == 0 && (elapsed - elapsed.floor()) < 0.016 {
+                println!("Planet matrix determinant: {}", planet_transform.determinant());
+            }
+
             Ok(())
         })?;
 

@@ -54,6 +54,12 @@ impl Mat3 {
             self.rows[1][0] * v.x + self.rows[1][1] * v.y + self.rows[1][2],
         )
     }
+
+    /// Calculates the determinant of the matrix.
+    pub fn determinant(&self) -> f32 {
+        let [[a, b, c], [d, e, f], [g, h, i]] = self.rows;
+        a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
+    }
 }
 
 impl Mul for Mat3 {
@@ -125,5 +131,22 @@ mod tests {
         // (0,0) -> translate -> (10,0) -> rotate -> (0,10)
         assert!((got.x - 0.0).abs() < 1e-6);
         assert!((got.y - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn determinant_works() {
+        assert_eq!(Mat3::IDENTITY.determinant(), 1.0);
+        
+        let m = Mat3 {
+            rows: [
+                [1.0, 2.0, 3.0],
+                [4.0, 5.0, 6.0],
+                [7.0, 8.0, 9.0],
+            ],
+        };
+        // 1(5*9 - 6*8) - 2(4*9 - 6*7) + 3(4*8 - 5*7)
+        // 1(45-48) - 2(36-42) + 3(32-35)
+        // 1(-3) - 2(-6) + 3(-3) = -3 + 12 - 9 = 0
+        assert_eq!(m.determinant(), 0.0);
     }
 }
