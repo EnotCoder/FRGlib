@@ -1,6 +1,7 @@
 use frglib::{
-    Color, Event, FrameClock, Keycode, Object, Vec2, Window,
+    Color, Event, FrameClock, Image, Keycode, Object, Vec2, Window,
 };
+use std::path::PathBuf;
 
 mod bodies;
 mod draw;
@@ -8,9 +9,31 @@ mod draw;
 use bodies::*;
 use draw::*;
 
+/// Путь к картинке из общей папки ассетов.
+fn asset(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("examples/2d_games/assets/space")
+        .join(name)
+}
+
 fn main() -> Result<(), frglib::Error> {
+    // textures
+    let sun_image = Image::from_file(asset("sun.png"))?;
+
+    let mercury_image = Image::from_file(asset("planets/mercury.png"))?;
+    let vinera_image = Image::from_file(asset("planets/vinera.png"))?;
+    let earth_image = Image::from_file(asset("planets/earth.png"))?;
+    let mars_image = Image::from_file(asset("planets/mars.png"))?;
+
+    let jupiter_image = Image::from_file(asset("planets/jupiter.png"))?;
+    let saturn_image = Image::from_file(asset("planets/saturn.png"))?;
+    let uran_image = Image::from_file(asset("planets/uran.png"))?;
+    let neptune_image = Image::from_file(asset("planets/neptune.png"))?;
+
+    // create window
     let mut window = Window::builder("FRGlib: planets and stars")
         .size(1200, 900)
+        .pixel_art(true)
         .background(Color::rgb(20, 20, 25))
         .build()?;
 
@@ -20,7 +43,9 @@ fn main() -> Result<(), frglib::Error> {
     let orbit_thickness = 2.0;
     let orbit_color = Color::rgb(80, 80, 85);
 
-    let planets = get_planets();
+    let planets = get_planets(mercury_image, vinera_image, 
+        earth_image, mars_image, jupiter_image, 
+        saturn_image, uran_image, neptune_image);
 
     // Создаём звёзды один раз.
     let stars = get_stars();
@@ -64,7 +89,7 @@ fn main() -> Result<(), frglib::Error> {
                 Vec2::new(35.0, 35.0),
             );
 
-            d.fill_object(&sun, Color::rgb(255, 200, 50))?;
+            d.fill_textured_object(&sun, &sun_image)?;
 
             // Планеты
 

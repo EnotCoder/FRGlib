@@ -61,7 +61,11 @@ pub fn draw_bodies(
             Vec2::new(planet.size, planet.size),
         );
 
-        d.fill_object(&planet_obj, planet.color)?;
+        // Спрайт, если он есть, иначе цветной круг.
+        match &planet.texture {
+            Some(image) => d.fill_textured_object(&planet_obj, image)?,
+            None => d.fill_object(&planet_obj, planet.color)?,
+        }
 
         // Спутники.
         for moon in &planet.moons {
