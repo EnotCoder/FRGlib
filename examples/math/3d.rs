@@ -25,7 +25,7 @@ impl Mat4 {
     };
 }
 
-// Позволяет писать matrix_a * matrix_b.
+// Позволяет matrix_a * matrix_b.
 impl std::ops::Mul for Mat4 {
     type Output = Self;
 
