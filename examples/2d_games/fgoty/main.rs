@@ -26,7 +26,7 @@ use player::Facing;
 /// текущего каталога, чтобы `cargo run --example` работал из любого места.
 fn asset(kind: &str, name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/2d_games/assets")
+        .join("examples/2d_games/assets/fgoty")
         .join(kind)
         .join(name)
 }
