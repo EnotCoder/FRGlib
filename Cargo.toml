@@ -110,7 +110,7 @@ path = "examples/math/matrix.rs"
 
 [[example]]
 name = "math-3d"
-path = "examples/math/3d.rs"
+path = "examples/math/3d/main.rs"
 
 [[example]]
 name = "ui-button"
