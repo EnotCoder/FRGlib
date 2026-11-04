@@ -74,10 +74,10 @@ pub fn get_asteroid_belt() -> Belt {
 /// Пояс Койпера -- за Нептуном.
 pub fn get_kuiper_belt() -> Belt {
     let mut random = Random::new(0xC01D_2E4D);
-    let mut particles = Vec::with_capacity(320);
+    let mut particles = Vec::with_capacity(600);
 
-    for _ in 0..320 {
-        let orbit_radius = random.range(418.0, 442.0);
+    for _ in 0..600 {
+        let orbit_radius = random.range(418.0, 500.0);
 
         let speed = 0.16 * (425.0 / orbit_radius).sqrt();
 

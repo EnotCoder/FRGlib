@@ -84,6 +84,8 @@ fn main() -> Result<(), frglib::Error> {
     let asteroid_belt = get_asteroid_belt();
     let kuiper_belt = get_kuiper_belt();
 
+    let cloud_orte = get_cloud_orte();
+
     // Создаём звёзды один раз.
     let stars = get_stars();
 
@@ -188,6 +190,7 @@ fn main() -> Result<(), frglib::Error> {
             // Пояса астероидов и Койпера.
             let _ = draw_belt(d, &asteroid_belt, elapsed, center);
             let _ = draw_belt(d, &kuiper_belt, elapsed, center);
+            let _ = draw_cloud(d, &cloud_orte, elapsed, center);
 
             // Солнце.
             let sun = Object::new(
