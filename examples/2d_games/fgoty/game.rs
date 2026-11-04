@@ -23,36 +23,34 @@ impl World {
 
     /// Двигает фрогти и возвращает смещение для покачивания при ходьбе.
     pub fn update(&mut self, map: &TileMap<Tile>, direction: Vec2, dt: f32) -> f32 {
-        // Пробуем шагнуть и проверяем точку, в которую приземлились: в воду и за
-        // край карты не ходим, упираемся в границу вплотную.
-        //
-        // Проверяется только тот угол, в сторону которого идём: у нуля в Rust
-        // знак равен единице, так что через `signum` проверка уехала бы на
-        // пол-объекта в сторону, куда движения нет.
-        let half = self.player.size * 0.5;
-        let lead = Vec2::new(
-            match direction.x {
-                x if x > 0.0 => half.x,
-                x if x < 0.0 => -half.x,
-                _ => 0.0,
-            },
-            match direction.y {
-                y if y > 0.0 => half.y,
-                y if y < 0.0 => -half.y,
-                _ => 0.0,
-            },
-        );
+        let velocity = direction * SPEED;
 
-        let target = self.player.position + direction * SPEED * dt;
-        if direction == Vec2::ZERO
-            || map
-                .get_at(target + lead)
-                .is_some_and(|tile| tile.walkable())
-        {
-            self.player.position = target;
+        // Движение по X
+        if velocity.x != 0.0 {
+            let next_x = self.player.position.x + velocity.x * dt;
+            let mut next_rect = self.player.rect();
+            next_rect.x = next_x - next_rect.w / 2.0;
+            next_rect.y = self.player.position.y - next_rect.h / 2.0;
+
+            if !self.check_collision(map, next_rect) {
+                self.player.position.x = next_x;
+            }
         }
-        self.player.velocity = direction * SPEED;
 
+        // Движение по Y
+        if velocity.y != 0.0 {
+            let next_y = self.player.position.y + velocity.y * dt;
+            let mut next_rect = self.player.rect();
+            next_rect.x = self.player.position.x - next_rect.w / 2.0;
+            next_rect.y = next_y - next_rect.h / 2.0;
+
+            if !self.check_collision(map, next_rect) {
+                self.player.position.y = next_y;
+            }
+        }
+
+        self.player.velocity = velocity;
+        
         if let Some(next) = Facing::of(direction) {
             self.facing = next;
         }
@@ -68,5 +66,31 @@ impl World {
         } else {
             0.0
         }
+    }
+
+    fn check_collision(&self, map: &TileMap<Tile>, rect: frglib::Rect) -> bool {
+        let tile_x = (rect.x / TILE).floor() as i32;
+        let tile_y = (rect.y / TILE).floor() as i32;
+        let tile_w = (rect.w / TILE).ceil() as i32 + 1;
+        let tile_h = (rect.h / TILE).ceil() as i32 + 1;
+
+        for dx in 0..=tile_w {
+            for dy in 0..=tile_h {
+                let tx = tile_x + dx;
+                let ty = tile_y + dy;
+                if tx >= 0 && ty >= 0 {
+                    if let Some(tile) = map.get(tx as usize, ty as usize) {
+                        if !tile.walkable() {
+                            let wall_rect =
+                                frglib::Rect::new(tx as f32 * TILE, ty as f32 * TILE, TILE, TILE);
+                            if rect.overlaps(&wall_rect) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 }

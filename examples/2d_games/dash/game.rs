@@ -1,9 +1,7 @@
 //! Обновление игры: прыжок, гравитация и столкновения куба с уровнем.
 
-use frglib::Vec2;
-
 use crate::level::{
-    hit, top_of, Tile, BODY, COLS, GROUND, LEVEL_TOP, ROWS, TILE,
+    top_of, Tile, BODY, COLS, GROUND, LEVEL_TOP, ROWS, TILE,
 };
 use crate::player::{
     Player, State, GRAVITY, JUMP, LAND_TOLERANCE, SPEED, SPEED_SPIN, SPIKE_INSET,
@@ -32,7 +30,11 @@ pub fn update(player: &mut Player, grid: &[Vec<Tile>], jump: bool, dt: f32) {
                 player.spin += SPEED_SPIN * dt;
             }
 
-            let (col0, col1) = player.columns();
+            let half = BODY / 2.0;
+            let (col0, col1) = (
+                ((player.x - half) / TILE).floor() as isize,
+                ((player.x + half) / TILE).floor() as isize,
+            );
             let half = BODY / 2.0;
 
             for col in col0.max(0)..=col1.min(COLS as isize - 1) {
@@ -45,13 +47,19 @@ pub fn update(player: &mut Player, grid: &[Vec<Tile>], jump: bool, dt: f32) {
 
                     match grid[row][col] {
                         Tile::Spike => {
-                            let center = Vec2::new(
-                                col as f32 * TILE + TILE / 2.0,
-                                top_of(row) + TILE / 2.0,
+                            let spike_rect = frglib::Rect::new(
+                                col as f32 * TILE + SPIKE_INSET,
+                                top_of(row) + SPIKE_INSET,
+                                TILE - SPIKE_INSET * 2.0,
+                                TILE - SPIKE_INSET * 2.0,
                             );
-                            let reach = TILE / 2.0 - SPIKE_INSET;
-                            let reach = Vec2::new(reach, reach);
-                            if hit(player.center(), Vec2::new(half, half), center, reach) {
+                            let player_rect = frglib::Rect::new(
+                                player.x - half,
+                                player.y - half,
+                                BODY,
+                                BODY,
+                            );
+                            if player_rect.overlaps(&spike_rect) {
                                 player.state = State::Dead;
                                 println!("шип. Столбец {col}, пробел — заново.");
                             }

@@ -71,6 +71,7 @@ pub fn top_of(row: usize) -> f32 {
 }
 
 /// Прямоугольники по центру пересекаются?
+#[allow(dead_code)]
 pub fn hit(a: Vec2, a_half: Vec2, b: Vec2, b_half: Vec2) -> bool {
     (a.x - b.x).abs() < a_half.x + b_half.x && (a.y - b.y).abs() < a_half.y + b_half.y
 }

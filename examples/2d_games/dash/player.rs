@@ -64,16 +64,8 @@ impl Player {
         }
     }
 
+    #[allow(dead_code)]
     pub fn center(&self) -> Vec2 {
         Vec2::new(self.x, self.y)
-    }
-
-    /// Тайлы, которых касается куб по горизонтали.
-    pub fn columns(&self) -> (isize, isize) {
-        let half = BODY / 2.0;
-        (
-            ((self.x - half) / TILE).floor() as isize,
-            ((self.x + half) / TILE).floor() as isize,
-        )
     }
 }

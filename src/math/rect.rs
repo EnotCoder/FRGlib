@@ -46,6 +46,16 @@ impl Rect {
     pub fn contains(&self, x: f32, y: f32) -> bool {
         x >= self.x && x < self.x + self.w && y >= self.y && y < self.y + self.h
     }
+
+    /// Whether this rectangle overlaps with another one.
+    ///
+    /// This is a standard Axis-Aligned Bounding Box (AABB) collision check.
+    pub fn overlaps(&self, other: &Rect) -> bool {
+        self.x < other.x + other.w
+            && self.x + self.w > other.x
+            && self.y < other.y + other.h
+            && self.y + self.h > other.y
+    }
 }
 
 impl From<(f32, f32, f32, f32)> for Rect {
@@ -119,5 +129,17 @@ mod tests {
         let empty = Rect::new(5.0, 5.0, 0.0, 10.0);
 
         assert!(!empty.contains(5.0, 7.0));
+    }
+
+    #[test]
+    fn overlaps() {
+        let r1 = Rect::new(0.0, 0.0, 10.0, 10.0);
+        let r2 = Rect::new(5.0, 5.0, 10.0, 10.0);
+        let r3 = Rect::new(20.0, 20.0, 10.0, 10.0);
+
+        assert!(r1.overlaps(&r2));
+        assert!(r2.overlaps(&r1));
+        assert!(!r1.overlaps(&r3));
+        assert!(!r2.overlaps(&r3));
     }
 }
