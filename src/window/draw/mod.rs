@@ -210,4 +210,23 @@ impl<'a> Draw<'a> {
     pub fn size(&self) -> (u32, u32) {
         self.canvas.window().size()
     }
+
+    /// Returns the rectangle of the world currently visible to the camera,
+    /// or the whole window in screen coordinates if there is no camera.
+    pub fn camera_rect(&self) -> Rect {
+        let (w, h) = self.size();
+        match self.camera {
+            Some(camera) => {
+                let top_left = camera.to_world(Vec2::ZERO, (w, h));
+                let bottom_right = camera.to_world(Vec2::new(w as f32, h as f32), (w, h));
+                Rect::new(
+                    top_left.x,
+                    top_left.y,
+                    bottom_right.x - top_left.x,
+                    bottom_right.y - top_left.y,
+                )
+            }
+            None => Rect::new(0.0, 0.0, w as f32, h as f32),
+        }
+    }
 }

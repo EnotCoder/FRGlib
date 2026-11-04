@@ -1,5 +1,7 @@
 //! Axis-aligned rectangles, kept separate from SDL's own type.
 
+use super::Vec2;
+
 /// An axis-aligned rectangle in pixels.
 ///
 /// Coordinates are `f32` because SDL fills rectangles in floating point, and
@@ -55,6 +57,16 @@ impl Rect {
             && self.x + self.w > other.x
             && self.y < other.y + other.h
             && self.y + self.h > other.y
+    }
+
+    /// Whether this rectangle intersects with another one. Alias for `overlaps`.
+    pub fn intersects(&self, other: Rect) -> bool {
+        self.overlaps(&other)
+    }
+
+    /// Whether the vector `v` is inside this rectangle.
+    pub fn contains_vec(&self, v: Vec2) -> bool {
+        self.contains(v.x, v.y)
     }
 }
 

@@ -13,6 +13,8 @@ pub fn draw_bodies(
     orbit_thickness: f32,
     orbit_color: Color,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let view_rect = d.camera_rect();
+
     for planet in planets {
         let angle = planet.start_angle + elapsed * planet.speed;
 
@@ -22,48 +24,50 @@ pub fn draw_bodies(
 
         let planet_pos = planet_transform.transform_point(Vec2::ZERO);
 
-        // Орбиты спутников вокруг текущей позиции планеты.
+        // Орбиты спутников
         for moon in &planet.moons {
-            let segments = 360;
+            // Адаптивное количество сегментов: увеличиваем плотность для чёткости
+            let segments = (moon.orbit_radius * 4.0).max(128.0) as i32;
 
             for i in 0..segments {
                 let angle = TAU * i as f32 / segments as f32;
-
                 let point = Vec2::new(
                     planet_pos.x + angle.cos() * moon.orbit_radius,
                     planet_pos.y + angle.sin() * moon.orbit_radius,
                 );
 
-                let dot = Object::new(point, Vec2::new(orbit_thickness, orbit_thickness));
-
-                d.fill_object(&dot, orbit_color)?;
+                if view_rect.contains_vec(point) {
+                    let dot = Object::new(point, Vec2::new(orbit_thickness, orbit_thickness));
+                    d.fill_object(&dot, orbit_color)?;
+                }
             }
         }
 
         // Планета.
         let planet_obj = Object::new(planet_pos, Vec2::new(planet.size, planet.size));
 
-        // Спрайт, если он есть, иначе цветной круг.
-        match &planet.texture {
-            Some(image) => d.fill_textured_object(&planet_obj, image)?,
-            None => d.fill_object(&planet_obj, planet.color)?,
+        if view_rect.intersects(planet_obj.rect()) {
+            match &planet.texture {
+                Some(image) => d.fill_textured_object(&planet_obj, image)?,
+                None => d.fill_object(&planet_obj, planet.color)?,
+            }
         }
 
         // Спутники.
         for moon in &planet.moons {
             let moon_angle = moon.start_angle + elapsed * moon.speed;
-
             let moon_transform = planet_transform
                 * Mat3::rotation(moon_angle)
                 * Mat3::translation(Vec2::new(moon.orbit_radius, 0.0));
 
             let moon_pos = moon_transform.transform_point(Vec2::ZERO);
-
             let moon_obj = Object::new(moon_pos, Vec2::new(moon.size, moon.size));
 
-            match &moon.texture {
-                Some(image) => d.fill_textured_object(&moon_obj, image)?,
-                None => d.fill_object(&moon_obj, moon.color)?,
+            if view_rect.intersects(moon_obj.rect()) {
+                match &moon.texture {
+                    Some(image) => d.fill_textured_object(&moon_obj, image)?,
+                    None => d.fill_object(&moon_obj, moon.color)?,
+                }
             }
         }
     }
@@ -78,8 +82,11 @@ pub fn draw_orbit(
     orbit_thickness: f32,
     orbit_color: Color
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let view_rect = d.camera_rect();
+
     for planet in planets {
-        let segments = 1440;
+        // Увеличиваем множитель с 2.0 до 8.0 для максимальной чёткости при любом зуме
+        let segments = (planet.orbit_radius * 8.0).max(1440.0) as i32;
 
         for i in 0..segments {
             let angle = TAU * i as f32 / segments as f32;
@@ -89,12 +96,15 @@ pub fn draw_orbit(
                 center.y + angle.sin() * planet.orbit_radius,
             );
 
-            let dot = Object::new(
-                point,
-                Vec2::new(orbit_thickness, orbit_thickness),
-            );
+            // Оптимизация: рисуем только если точка в кадре
+            if view_rect.contains_vec(point) {
+                let dot = Object::new(
+                    point,
+                    Vec2::new(orbit_thickness, orbit_thickness),
+                );
 
-            d.fill_object(&dot, orbit_color)?;
+                d.fill_object(&dot, orbit_color)?;
+            }
         }
     }
 

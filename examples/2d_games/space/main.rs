@@ -64,6 +64,15 @@ fn main() -> Result<(), frglib::Error> {
     let mut last_cursor: Option<Vec2> = None;
     let mut dragging = false;
 
+    let mut camera_velocity = Vec2::ZERO;
+    let move_speed = 1000.0;
+    let friction = 10.0;
+
+    let mut up_pressed = false;
+    let mut down_pressed = false;
+    let mut left_pressed = false;
+    let mut right_pressed = false;
+
     let orbit_thickness = 2.0;
     let orbit_color = Color::rgb(80, 80, 85);
 
@@ -93,14 +102,53 @@ fn main() -> Result<(), frglib::Error> {
         let dt = clock.dt();
         elapsed += dt;
 
+        // Определяем желаемое направление движения на основе зажатых клавиш
+        let mut move_dir = Vec2::ZERO;
+        if up_pressed { move_dir.y -= 1.0; }
+        if down_pressed { move_dir.y += 1.0; }
+        if left_pressed { move_dir.x -= 1.0; }
+        if right_pressed { move_dir.x += 1.0; }
+
+        // Если есть ввод, ускоряем камеру, иначе замедляем
+        if move_dir.length_squared() > 0.0 {
+            // Нормализуем, чтобы по диагонали не двигаться быстрее
+            let target_vel = move_dir.normalized() * move_speed;
+            // Плавное приближение к целевой скорости (lerp-like)
+            camera_velocity = camera_velocity + (target_vel - camera_velocity) * (friction * dt);
+        } else {
+            // Плавное торможение
+            camera_velocity = camera_velocity * (1.0 - friction * dt).max(0.0);
+        }
+
+        camera.position += camera_velocity * (dt / camera.zoom);
+
         for event in window.poll()? {
             match event {
                 Event::Quit | Event::CloseRequested => return Ok(()),
 
                 Event::KeyDown {
-                    key: Keycode::Escape,
+                    key,
                     ..
-                } => return Ok(()),
+                } => {
+                    match key {
+                        Keycode::Escape => return Ok(()),
+                        Keycode::Up => up_pressed = true,
+                        Keycode::Down => down_pressed = true,
+                        Keycode::Left => left_pressed = true,
+                        Keycode::Right => right_pressed = true,
+                        _ => {}
+                    }
+                }
+
+                Event::KeyUp { key, .. } => {
+                    match key {
+                        Keycode::Up => up_pressed = false,
+                        Keycode::Down => down_pressed = false,
+                        Keycode::Left => left_pressed = false,
+                        Keycode::Right => right_pressed = false,
+                        _ => {}
+                    }
+                }
 
                 Event::MouseMotion { x, y } => {
                     let position = Vec2::new(x, y);
@@ -151,7 +199,7 @@ fn main() -> Result<(), frglib::Error> {
                         let before = camera.to_world(mouse, size);
                         camera.zoom = (camera.zoom
                             * (1.0 + y * 0.1))
-                            .clamp(0.25, 6.0);
+                            .clamp(0.001, 10.0);
                         let after = camera.to_world(mouse, size);
                         camera.position += before - after;
                     }
