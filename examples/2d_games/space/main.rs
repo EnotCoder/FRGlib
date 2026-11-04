@@ -46,7 +46,7 @@ fn main() -> Result<(), frglib::Error> {
      .collect::<Vec<_>>();
 
     // create window
-    let mut window = Window::builder("FRGlib: planets and stars")
+    let mut window = Window::builder("FRGlib: Space")
         .size(1200, 900)
         .pixel_art(true)
         .background(Color::rgb(20, 20, 25))
@@ -84,7 +84,7 @@ fn main() -> Result<(), frglib::Error> {
     let asteroid_belt = get_asteroid_belt();
     let kuiper_belt = get_kuiper_belt();
 
-    let cloud_orte = get_cloud_orte();
+    let cloud_orte = get_orte_belt();
 
     // Создаём звёзды один раз.
     let stars = get_stars();
@@ -195,7 +195,7 @@ fn main() -> Result<(), frglib::Error> {
             // Солнце.
             let sun = Object::new(
                 center,
-                Vec2::new(35.0, 35.0),
+                Vec2::new(120.0, 120.0),
             );
 
             d.fill_textured_object(&sun, &sun_image)?;

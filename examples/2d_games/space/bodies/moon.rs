@@ -46,7 +46,7 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 size: 6.0,
                 color: Color::rgb(240, 210, 100),
                 texture: get_tex(2), // io.png
-                orbit_radius: 28.0,
+                orbit_radius: 45.0,
                 speed: 2.5,
                 start_angle: 0.0,
             },
@@ -54,7 +54,7 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 size: 5.0,
                 color: Color::rgb(200, 220, 240),
                 texture: get_tex(3), // callisto.png
-                orbit_radius: 40.0,
+                orbit_radius: 60.0,
                 speed: 1.7,
                 start_angle: 2.0,
             },
@@ -62,7 +62,7 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 size: 7.0,
                 color: Color::rgb(160, 150, 140),
                 texture: get_tex(4), // ganymede.png
-                orbit_radius: 53.0,
+                orbit_radius: 75.0,
                 speed: 1.2,
                 start_angle: 4.0,
             },
@@ -72,7 +72,7 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 size: 7.0,
                 color: Color::rgb(220, 170, 90),
                 texture: get_tex(5), // titan.png
-                orbit_radius: 28.0,
+                orbit_radius: 35.0,
                 speed: 1.8,
                 start_angle: 1.0,
             },
@@ -80,7 +80,7 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 size: 4.0,
                 color: Color::rgb(220, 230, 240),
                 texture: get_tex(6), // rhea.png
-                orbit_radius: 40.0,
+                orbit_radius: 48.0,
                 speed: 1.1,
                 start_angle: 3.0,
             },
@@ -89,7 +89,7 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
             size: 5.0,
             color: Color::rgb(180, 190, 200),
             texture: get_tex(7), // titania.png
-            orbit_radius: 25.0,
+            orbit_radius: 35.0,
             speed: 1.7,
             start_angle: 0.0,
         }],
@@ -97,7 +97,7 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
             size: 6.0,
             color: Color::rgb(190, 210, 220),
             texture: get_tex(8), // triton.png
-            orbit_radius: 25.0,
+            orbit_radius: 35.0,
             speed: -1.5,
             start_angle: 0.0,
         }],

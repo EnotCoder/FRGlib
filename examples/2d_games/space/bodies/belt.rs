@@ -44,10 +44,10 @@ impl Random {
 /// Пояс астероидов -- между Марсом и Юпитером.
 pub fn get_asteroid_belt() -> Belt {
     let mut random = Random::new(0xA57E_2019);
-    let mut particles = Vec::with_capacity(180);
+    let mut particles = Vec::with_capacity(250);
 
-    for _ in 0..180 {
-        let orbit_radius = random.range(178.0, 205.0);
+    for _ in 0..250 {
+        let orbit_radius = random.range(300.0, 400.0);
 
         // Чем дальше от Солнца, тем медленнее движение по орбите.
         let speed = 0.60 * (190.0 / orbit_radius).sqrt();
@@ -61,7 +61,7 @@ pub fn get_asteroid_belt() -> Belt {
 
         particles.push(BeltParticle {
             orbit_radius,
-            size: random.range(1.0, 2.6),
+            size: random.range(2.0, 3.6),
             speed,
             start_angle: random.range(0.0, TAU),
             color,
@@ -77,7 +77,7 @@ pub fn get_kuiper_belt() -> Belt {
     let mut particles = Vec::with_capacity(600);
 
     for _ in 0..600 {
-        let orbit_radius = random.range(418.0, 500.0);
+        let orbit_radius = random.range(900.0, 1050.0);
 
         let speed = 0.16 * (425.0 / orbit_radius).sqrt();
 
@@ -90,7 +90,36 @@ pub fn get_kuiper_belt() -> Belt {
 
         particles.push(BeltParticle {
             orbit_radius,
-            size: random.range(1.0, 2.4),
+            size: random.range(2.5, 3.5),
+            speed,
+            start_angle: random.range(0.0, TAU),
+            color,
+        });
+    }
+
+    Belt { particles }
+}
+
+/// Облоко Орта -- за Поясом Койпера.
+pub fn get_orte_belt() -> Belt {
+    let mut random = Random::new(0xC01D_2E4D);
+    let mut particles = Vec::with_capacity(3000);
+
+    for _ in 0..3000 {
+        let orbit_radius = random.range(1200.0, 1900.0);
+
+        let speed = 0.05 * (425.0 / orbit_radius).sqrt();
+
+        let brightness = random.range(0.65, 1.0);
+        let color = Color::rgb(
+            (100.0 * brightness) as u8,
+            (120.0 * brightness) as u8,
+            (150.0 * brightness) as u8,
+        );
+
+        particles.push(BeltParticle {
+            orbit_radius,
+            size: random.range(2.4, 3.4),
             speed,
             start_angle: random.range(0.0, TAU),
             color,
