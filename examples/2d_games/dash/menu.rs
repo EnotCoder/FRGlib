@@ -186,9 +186,9 @@ impl Menu {
         let play = self.play.rect();
         let exit = self.exit.rect();
         let panel_w = (play.w.max(exit.w)) + 80.0;
-        let panel_h = (exit.y + exit.h - play.y) + 100.0;
+        let panel_h = (exit.y + exit.h - play.y) + 160.0;
         let panel_x = (vw - panel_w) / 2.0;
-        let panel_y = play.y - 80.0;
+        let panel_y = play.y - 120.0;
         let panel = Rect::new(panel_x, panel_y, panel_w, panel_h);
         let mid = Object::from_xywh(
             panel.x + panel.w / 2.0,
@@ -200,7 +200,7 @@ impl Menu {
         // Зазор от заголовка до панели считаем от его настоящей высоты, а не
         // константой: кегль заголовка задаётся шрифтом, и при правке того
         // шрифта висящий в небе заголовок не должен поехать.
-        let title_y = panel.y - TITLE_GAP - title_size.1 as f32 / 2.0;
+        let title_y = panel.y - TITLE_GAP - title_size.1 as f32 / 2.0 + 90.0;
         let hint_y = panel.y + panel.h + 40.0;
 
         d.screen_space(|d| {
