@@ -17,6 +17,9 @@ cargo add frglib
 Rust-обвязка над SDL3: окно, рендерер и обработка событий. Слой для Vulkan
 впереди.
 
+Подробная документация по устройству проекта, модулям и внутренностям лежит в
+[`docs/`](docs/README.md).
+
 ## Сборка и запуск
 
 ```bash
@@ -467,6 +470,7 @@ cargo build --release --features bundled
 | `cargo run --example input-relative` | Абсолютная мышь против относительной: `relative_mouse()` |
 | `cargo run --example math-lerp` | Интерполяция: `lerp` позиции, размера и цвета, `Ease::Linear` |
 | `cargo run --example math-sin-cos` | Круговое движение с помощью `sin` и `cos` |
+| `cargo run --example math-aabb` | AABB-коллизии: `Rect::overlaps`, цвет игрока при пересечении |
 | `cargo run --example ui-text` | Текст через SDL3_ttf, кириллица, кеш строк |
 | `cargo run --example ui-button` | Кнопки: три состояния, клик по отпусканию, интерфейс поверх камеры |
 | `cargo run --example ui-slider` | Слайдеры: диапазон, шаг, перетаскивание, раскладка от размера окна |

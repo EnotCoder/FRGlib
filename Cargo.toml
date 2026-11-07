@@ -113,6 +113,10 @@ name = "math-matrix"
 path = "examples/math/matrix.rs"
 
 [[example]]
+name = "math-aabb"
+path = "examples/math/aabb.rs"
+
+[[example]]
 name = "ui-button"
 path = "examples/ui/button.rs"
 
