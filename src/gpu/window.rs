@@ -96,6 +96,7 @@ impl WgpuWindow {
             wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
         let surface = create_surface(&instance, &window)?;
 
+        // block_on = wait for the request to complete
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             force_fallback_adapter: false,
@@ -256,6 +257,22 @@ impl WgpuWindow {
         }))
     }
 
+    /// Reconfigures the surface when the physical size changed, and returns the
+    /// size to render at. `None` means the window has no drawable area.
+    fn sync_surface(&mut self) -> Option<(u32, u32)> {
+        let size = self.window.size_in_pixels();
+        if size.0 == 0 || size.1 == 0 {
+            return None;
+        }
+
+        if size != self.gpu.size() {
+            self.gpu.configure(&self.surface, size);
+            self.depth = create_depth_view(self.gpu.device(), size);
+        }
+
+        Some(size)
+    }
+
     /// Submits the recorded commands and presents the frame.
     ///
     /// The renderer's pass must already be closed; [`Renderer3D::finish`]
@@ -272,22 +289,6 @@ impl WgpuWindow {
         self.gpu.queue.submit(std::iter::once(encoder.finish()));
         self.gpu.queue.present(surface_texture);
         Ok(())
-    }
-
-    /// Reconfigures the surface when the physical size changed, and returns the
-    /// size to render at. `None` means the window has no drawable area.
-    fn sync_surface(&mut self) -> Option<(u32, u32)> {
-        let size = self.window.size_in_pixels();
-        if size.0 == 0 || size.1 == 0 {
-            return None;
-        }
-
-        if size != self.gpu.size() {
-            self.gpu.configure(&self.surface, size);
-            self.depth = create_depth_view(self.gpu.device(), size);
-        }
-
-        Some(size)
     }
 }
 
