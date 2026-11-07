@@ -52,11 +52,7 @@ impl<T> TileMap<T> {
             match width {
                 None => width = Some(got),
                 Some(expected) if expected != got => {
-                    return Err(MapError::RaggedRow {
-                        row,
-                        expected,
-                        got,
-                    })
+                    return Err(MapError::RaggedRow { row, expected, got })
                 }
                 _ => {}
             }

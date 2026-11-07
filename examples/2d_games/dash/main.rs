@@ -17,9 +17,7 @@ mod player;
 
 use std::path::PathBuf;
 
-use frglib::{
-    Camera, Event, FrameClock, Image, Keycode, Vec2, Window,
-};
+use frglib::{Camera, Event, FrameClock, Image, Keycode, Vec2, Window};
 
 use draw::{draw_player, Tiles, SKY_TOP};
 use level::{parse, COLS, GROUND, GROUND_SCREEN, TILE};

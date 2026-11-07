@@ -28,11 +28,7 @@ impl std::fmt::Display for MapError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MapError::NoRows => write!(f, "a map needs at least one non-empty row"),
-            MapError::RaggedRow {
-                row,
-                expected,
-                got,
-            } => {
+            MapError::RaggedRow { row, expected, got } => {
                 write!(f, "row {row} has {got} cells, expected {expected}")
             }
             MapError::UnknownChar { row, col, ch } => {

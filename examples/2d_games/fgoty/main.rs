@@ -106,8 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let bob = world.update(&map, direction, dt);
 
         // Камера едет за игроком и не отпускает карту.
-        camera.position +=
-            (world.player.position - camera.position) * (8.0 * dt).min(1.0);
+        camera.position += (world.player.position - camera.position) * (8.0 * dt).min(1.0);
         let view = window.size();
         map.clamp_camera(&mut camera, view);
 

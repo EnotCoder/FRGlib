@@ -1,7 +1,12 @@
 //! Rust bindings to SDL3.
 //!
 //! A window with a renderer, window and input events, and a [`TileMap`] for
-//! laying tiles out over a world. A Vulkan layer is still to come.
+//! laying tiles out over a world.
+//!
+//! With the `wgpu` feature the crate also grows a second window flavour,
+//! [`gpu::WgpuWindow`], where SDL3 still owns the window and input but `wgpu`
+//! owns the swapchain and the drawing. The two do not mix in one window: a
+//! [`Window`] draws through `SDL_Renderer`, a [`gpu::WgpuWindow`] does not.
 //!
 //! # Example
 //!
@@ -39,19 +44,28 @@
 //! thread, so [`Window::frame`] has to be called from there too.
 
 pub mod event;
+#[cfg(feature = "wgpu")]
+pub mod gpu;
 pub mod graphics;
 pub mod math;
-pub mod timing;
 pub mod tilemap;
+pub mod timing;
 pub mod ui;
 pub mod window;
 
 pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
+#[cfg(feature = "wgpu")]
+pub use gpu::Error as GpuError;
+#[cfg(feature = "wgpu")]
+pub use gpu::{
+    Camera3D, Frame, Gpu, GpuMesh, Material, Mesh, Renderer3D, Vertex, WgpuWindow,
+    WgpuWindowBuilder,
+};
 #[cfg(feature = "cached-textures")]
 pub use graphics::{Animation, Texture};
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{cos, lerp, sin, Ease, Lerp, Mat3, Rect, Vec2};
-pub use timing::FrameClock;
 pub use tilemap::{MapError, TileMap};
+pub use timing::FrameClock;
 pub use ui::{Anchor, Button, ButtonState, Label, Slider, SliderState, TextCache};
 pub use window::{Draw, Error, Window, WindowBuilder};

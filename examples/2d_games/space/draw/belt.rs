@@ -1,6 +1,4 @@
-use frglib::{
-    Draw, Object, Vec2,
-};
+use frglib::{Draw, Object, Vec2};
 
 use crate::bodies::*;
 
@@ -13,8 +11,7 @@ pub fn draw_belt(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let view_rect = d.camera_rect();
     for particle in &belt.particles {
-        let angle =
-            particle.start_angle + elapsed * particle.speed;
+        let angle = particle.start_angle + elapsed * particle.speed;
 
         let position = Vec2::new(
             center.x + angle.cos() * particle.orbit_radius,
@@ -22,10 +19,7 @@ pub fn draw_belt(
         );
 
         if view_rect.contains_vec(position) {
-            let object = Object::new(
-                position,
-                Vec2::new(particle.size, particle.size),
-            );
+            let object = Object::new(position, Vec2::new(particle.size, particle.size));
 
             d.fill_object(&object, particle.color)?;
         }
@@ -43,8 +37,7 @@ pub fn draw_cloud(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let view_rect = d.camera_rect();
     for particle in &cloud.particles {
-        let angle =
-            particle.start_angle + elapsed * particle.speed;
+        let angle = particle.start_angle + elapsed * particle.speed;
 
         let position = Vec2::new(
             center.x + angle.cos() * particle.orbit_radius,
@@ -52,10 +45,7 @@ pub fn draw_cloud(
         );
 
         if view_rect.contains_vec(position) {
-            let object = Object::new(
-                position,
-                Vec2::new(particle.size, particle.size),
-            );
+            let object = Object::new(position, Vec2::new(particle.size, particle.size));
 
             d.fill_object(&object, particle.color)?;
         }

@@ -25,6 +25,7 @@ FRGLib — небольшая 2D-библиотека поверх SDL3: окн�
 | [07-tilemap.md](07-tilemap.md) | `TileMap<T>`, `MapError`, видимость, отрисовка тайлов |
 | [08-examples.md](08-examples.md) | Каталог примеров и ассетов |
 | [09-build-and-dev.md](09-build-and-dev.md) | Сборка, фичи, тесты, правила разработки, известные особенности |
+| [10-wgpu.md](10-wgpu.md) | 3D-рендеринг через `wgpu`, камера, меши и освещение |
 
 ## За 60 секунд
 
@@ -131,6 +132,7 @@ FRGLib/
 | `src/tilemap/` | Сетка клеток, координаты, видимость | `TileMap<T>`, `MapError` |
 | `src/event.rs` | Своё перечисление событий вместо SDL-типа | `Event` |
 | `src/timing.rs` | Держит цикл на заданной частоте | `FrameClock` |
+| `src/gpu/` | 3D рендеринг через `wgpu` | `WgpuWindow`, `Renderer3D`, `Camera3D` |
 
 ## Главные принципы
 

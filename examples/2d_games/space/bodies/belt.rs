@@ -28,10 +28,7 @@ impl Random {
 
     /// Следующее число в диапазоне `0.0..1.0`.
     fn next(&mut self) -> f32 {
-        self.seed = self
-            .seed
-            .wrapping_mul(1664525)
-            .wrapping_add(1013904223);
+        self.seed = self.seed.wrapping_mul(1664525).wrapping_add(1013904223);
 
         (self.seed >> 8) as f32 / 16_777_216.0
     }

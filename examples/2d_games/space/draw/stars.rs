@@ -1,11 +1,9 @@
-use frglib::{
-    Object, Vec2,
-};
+use frglib::{Object, Vec2};
 
 use crate::bodies::*;
 
 pub fn draw_stars(
-    d: &mut frglib::Draw, 
+    d: &mut frglib::Draw,
     stars: &[Star],
     window_size: &Vec2,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -15,10 +13,7 @@ pub fn draw_stars(
             star.position.y * window_size.y,
         );
 
-        let star_obj = Object::new(
-            position,
-            Vec2::new(star.size, star.size),
-        );
+        let star_obj = Object::new(position, Vec2::new(star.size, star.size));
 
         d.fill_object(&star_obj, star.color)?;
     }

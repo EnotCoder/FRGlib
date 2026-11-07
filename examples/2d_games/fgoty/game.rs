@@ -50,7 +50,7 @@ impl World {
         }
 
         self.player.velocity = velocity;
-        
+
         if let Some(next) = Facing::of(direction) {
             self.facing = next;
         }

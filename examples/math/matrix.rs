@@ -42,8 +42,8 @@ fn main() -> Result<(), frglib::Error> {
         // 1. Матрица планеты: вращение + перенос от центра
         let planet_orbit_radius = 150.0;
         let planet_angle = elapsed * 1.0; // 1 рад/сек
-        
-        let planet_transform = Mat3::translation(center) 
+
+        let planet_transform = Mat3::translation(center)
             * Mat3::rotation(planet_angle)
             * Mat3::translation(Vec2::new(planet_orbit_radius, 0.0));
 
@@ -55,8 +55,8 @@ fn main() -> Result<(), frglib::Error> {
         let moon_angle = elapsed * 3.0; // вращается быстрее
 
         // Матрица спутника строится поверх матрицы планеты
-        let moon_transform = planet_transform 
-            * Mat3::rotation(moon_angle) 
+        let moon_transform = planet_transform
+            * Mat3::rotation(moon_angle)
             * Mat3::translation(Vec2::new(moon_orbit_radius, 0.0));
 
         let moon_pos = moon_transform.transform_point(Vec2::ZERO);
@@ -77,7 +77,10 @@ fn main() -> Result<(), frglib::Error> {
 
             // Вывод определителя в консоль раз в секунду
             if elapsed as i32 % 5 == 0 && (elapsed - elapsed.floor()) < 0.016 {
-                println!("Planet matrix determinant: {}", planet_transform.determinant());
+                println!(
+                    "Planet matrix determinant: {}",
+                    planet_transform.determinant()
+                );
             }
 
             Ok(())

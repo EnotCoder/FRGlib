@@ -5,9 +5,7 @@
 
 use frglib::{Camera, Color, Draw, Object, Texture};
 
-use crate::level::{
-    top_of, Tile, BODY, COLS, GROUND, LEVEL_TOP, ROWS, TILE,
-};
+use crate::level::{top_of, Tile, BODY, COLS, GROUND, LEVEL_TOP, ROWS, TILE};
 use crate::player::{Player, State};
 
 /// Высота каменной шапки на экране.

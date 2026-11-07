@@ -32,10 +32,41 @@ bundled = ["sdl3/build-from-source-static"]
 # reason this is opt-in rather than always on, so the crate stays sound for
 # everyone who does not ask for it.
 cached-textures = ["sdl3/unsafe_textures"]
+# A second window flavour that hands the frame to `wgpu` instead of
+# `SDL_Renderer`. Opt-in: it pulls in a full GPU stack and the GPU API leaks
+# through `frglib::gpu`, so a default build stays as light as it was.
+wgpu = ["dep:wgpu", "dep:pollster", "dep:bytemuck", "dep:glam"]
 
 [dependencies.sdl3]
 version = "0.20"
 features = ["raw-window-handle"]
+
+# GPU side of `WgpuWindow`. Only the native backends are listed: the default
+# feature set also enables the browser backend, which this crate never targets.
+[dependencies.wgpu]
+version = "30"
+optional = true
+default-features = false
+features = ["std", "parking_lot", "wgsl", "vulkan", "metal", "dx12", "gles"]
+
+# wgpu's adapter and device requests are futures; this keeps `build()` looking
+# like the rest of the crate rather than forcing every caller into async.
+[dependencies.pollster]
+version = "1"
+optional = true
+
+# Plain-old-data vertex and uniform structs, so they can be uploaded as bytes
+# without hand-written `unsafe` casts.
+[dependencies.bytemuck]
+version = "1"
+optional = true
+features = ["derive"]
+
+# Mat4/Vec3 for the 3D camera. Re-exported through `frglib::gpu`, so callers do
+# not have to add it themselves.
+[dependencies.glam]
+version = "0.34"
+optional = true
 
 # Только для примеров, и в публикуемый пакет не попадает: так библиотека не
 # тянет за собой SDL3_ttf, а пример с текстом всё равно может им
@@ -145,6 +176,11 @@ path = "examples/2d_games/gallery.rs"
 [[example]]
 name = "2d_games-space"
 path = "examples/2d_games/space/main.rs"
+
+[[example]]
+name = "wgpu-cube"
+path = "examples/wgpu/cube.rs"
+required-features = ["wgpu"]
 
 [profile.release]
 lto = true

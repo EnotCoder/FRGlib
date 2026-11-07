@@ -13,11 +13,7 @@ pub struct Mat3 {
 impl Mat3 {
     /// The identity matrix: does nothing when applied.
     pub const IDENTITY: Self = Self {
-        rows: [
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-        ],
+        rows: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
     };
 
     /// A matrix that moves points by `v`.
@@ -122,12 +118,12 @@ mod tests {
     fn matrix_multiplication_composes() {
         let t = Mat3::translation(Vec2::new(10.0, 0.0));
         let r = Mat3::rotation(FRAC_PI_2);
-        
+
         // Translate then rotate
         let combined = r * t;
         let p = Vec2::new(0.0, 0.0);
         let got = combined.transform_point(p);
-        
+
         // (0,0) -> translate -> (10,0) -> rotate -> (0,10)
         assert!((got.x - 0.0).abs() < 1e-6);
         assert!((got.y - 10.0).abs() < 1e-6);
@@ -136,13 +132,9 @@ mod tests {
     #[test]
     fn determinant_works() {
         assert_eq!(Mat3::IDENTITY.determinant(), 1.0);
-        
+
         let m = Mat3 {
-            rows: [
-                [1.0, 2.0, 3.0],
-                [4.0, 5.0, 6.0],
-                [7.0, 8.0, 9.0],
-            ],
+            rows: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]],
         };
         // 1(5*9 - 6*8) - 2(4*9 - 6*7) + 3(4*8 - 5*7)
         // 1(45-48) - 2(36-42) + 3(32-35)

@@ -6,15 +6,13 @@ pub struct Star {
     pub color: Color,
 }
 
-pub fn get_stars() -> Vec<Star>{
+pub fn get_stars() -> Vec<Star> {
     // Создаём звёзды один раз.
     let mut stars = Vec::new();
     let mut seed: u32 = 123456789;
 
     let mut next_random = || {
-        seed = seed
-            .wrapping_mul(1664525)
-            .wrapping_add(1013904223);
+        seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
 
         (seed >> 8) as f32 / 16_777_216.0
     };

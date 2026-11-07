@@ -196,7 +196,9 @@ fn main() -> Result<(), frglib::Error> {
                     chain.kick(true);
                     chain.until_kick = AUTO_KICK;
                 }
-                Event::KeyDown { key: Keycode::R, .. } => chain.reset(),
+                Event::KeyDown {
+                    key: Keycode::R, ..
+                } => chain.reset(),
                 Event::MouseButtonDown {
                     button: MouseButton::Left,
                     x,

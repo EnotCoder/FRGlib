@@ -1,6 +1,6 @@
 use frglib::{Color, Image};
 
-use super::moon::{Moon, get_moon};
+use super::moon::{get_moon, Moon};
 
 pub struct Planet {
     pub size: f32,
@@ -12,7 +12,6 @@ pub struct Planet {
     pub start_angle: f32,
     pub moons: Vec<Moon>,
 }
-
 
 pub fn get_planets(
     mercury_texture: Image,

@@ -24,12 +24,7 @@ fn parse(ch: char) -> Option<Cell> {
 /// Four rows of eight cells, all floors except the ones that are not.
 fn map() -> TileMap<Cell> {
     TileMap::from_ascii(
-        &[
-            "........",
-            "..~~~~..",
-            "..#...#.",
-            "........",
-        ],
+        &["........", "..~~~~..", "..#...#.", "........"],
         32.0,
         parse,
     )
@@ -104,21 +99,12 @@ fn an_origin_moves_every_cell_with_the_map() {
     let moved = map().origin(100.0, 200.0);
 
     // The same cell, asked for in world coordinates offset by the origin.
-    assert_eq!(
-        moved.cell_at(Vec2::new(100.0, 200.0)),
-        Some((0, 0))
-    );
-    assert_eq!(
-        moved.cell_at(Vec2::new(170.0, 270.0)),
-        Some((2, 2))
-    );
+    assert_eq!(moved.cell_at(Vec2::new(100.0, 200.0)), Some((0, 0)));
+    assert_eq!(moved.cell_at(Vec2::new(170.0, 270.0)), Some((2, 2)));
 
     // The origin is where the map starts, so cell rects move too.
     assert_eq!(plain.cell_rect(1, 1), Rect::new(32.0, 32.0, 32.0, 32.0));
-    assert_eq!(
-        moved.cell_rect(1, 1),
-        Rect::new(132.0, 232.0, 32.0, 32.0)
-    );
+    assert_eq!(moved.cell_rect(1, 1), Rect::new(132.0, 232.0, 32.0, 32.0));
 }
 
 #[test]
@@ -250,7 +236,10 @@ fn no_rows_is_an_error() {
         TileMap::<Cell>::from_ascii(&["", ""], 32.0, parse),
         Err(MapError::NoRows)
     );
-    assert_eq!(TileMap::<Cell>::from_rows(vec![], 32.0), Err(MapError::NoRows));
+    assert_eq!(
+        TileMap::<Cell>::from_rows(vec![], 32.0),
+        Err(MapError::NoRows)
+    );
 }
 
 #[test]
@@ -270,10 +259,7 @@ fn rows_of_different_lengths_are_rejected() {
 #[test]
 fn rows_of_different_lengths_from_code_are_rejected_too() {
     let got = TileMap::from_rows(
-        vec![
-            vec![Cell::Floor, Cell::Floor],
-            vec![Cell::Floor],
-        ],
+        vec![vec![Cell::Floor, Cell::Floor], vec![Cell::Floor]],
         32.0,
     );
 

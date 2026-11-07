@@ -1,11 +1,7 @@
 //! Обновление игры: прыжок, гравитация и столкновения куба с уровнем.
 
-use crate::level::{
-    top_of, Tile, BODY, COLS, GROUND, LEVEL_TOP, ROWS, TILE,
-};
-use crate::player::{
-    Player, State, GRAVITY, JUMP, LAND_TOLERANCE, SPEED, SPEED_SPIN, SPIKE_INSET,
-};
+use crate::level::{top_of, Tile, BODY, COLS, GROUND, LEVEL_TOP, ROWS, TILE};
+use crate::player::{Player, State, GRAVITY, JUMP, LAND_TOLERANCE, SPEED, SPEED_SPIN, SPIKE_INSET};
 
 /// Продвигает игрока на один кадр.
 ///
@@ -53,12 +49,8 @@ pub fn update(player: &mut Player, grid: &[Vec<Tile>], jump: bool, dt: f32) {
                                 TILE - SPIKE_INSET * 2.0,
                                 TILE - SPIKE_INSET * 2.0,
                             );
-                            let player_rect = frglib::Rect::new(
-                                player.x - half,
-                                player.y - half,
-                                BODY,
-                                BODY,
-                            );
+                            let player_rect =
+                                frglib::Rect::new(player.x - half, player.y - half, BODY, BODY);
                             if player_rect.overlaps(&spike_rect) {
                                 player.state = State::Dead;
                                 println!("шип. Столбец {col}, пробел — заново.");

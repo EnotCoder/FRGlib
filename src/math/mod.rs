@@ -6,7 +6,6 @@
 //! interpolates, [`Color`](crate::Color) among them, rather than owned by any
 //! one type.
 
-
 use core::f32::consts::PI;
 
 /// Converts degrees to radians.
@@ -23,14 +22,13 @@ pub const fn rad_to_deg(rad: f32) -> f32 {
     rad * (180.0 / PI)
 }
 
-
 pub mod ease;
-pub mod rect;
 pub mod mat3;
+pub mod rect;
 
 pub use ease::Ease;
-pub use rect::Rect;
 pub use mat3::Mat3;
+pub use rect::Rect;
 
 /// A point or vector in pixels.
 ///
@@ -256,8 +254,7 @@ mod tests {
 
     #[test]
     fn direction_to_left() {
-        let direction = Vec2::new(10.0, 0.0)
-            .direction_to(Vec2::new(0.0, 0.0));
+        let direction = Vec2::new(10.0, 0.0).direction_to(Vec2::new(0.0, 0.0));
 
         assert_eq!(direction.x, -1.0);
         assert_eq!(direction.y, 0.0);

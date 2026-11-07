@@ -27,6 +27,7 @@
   остальные типы от SDL не зависят.
 - `window` знает обо всём: именно он превращает `Object`, `Camera`, `Color` и
   `Image` в вызовы SDL-рендерера.
+- `gpu` (wgpu) стоит особняком: он использует SDL3 только для создания окна, но заменяет собой весь слой отрисовки для 3D.
 - `ui` и `tilemap` построены поверх `window::Draw`, `graphics` и `math`.
 
 ## Точка входа и реэкспорты
@@ -35,6 +36,8 @@
 
 ```rust
 pub mod event;
+#[cfg(feature = "wgpu")]
+pub mod gpu;
 pub mod graphics;
 pub mod math;
 pub mod timing;
@@ -196,6 +199,7 @@ fill_object / fill_object_polygon / fill_textured_object / ...
 |---|---|---|
 | `default` | пусто | Библиотека работает без дополнительных зависимостей |
 | `cached-textures` | `sdl3/unsafe_textures`, модули `graphics/texture.rs`, `graphics/animation.rs`, `TileMap::draw` | Позволяет хранить текстуру между кадрами |
+| `wgpu` | `dep:wgpu`, `dep:pollster`, `dep:bytemuck`, `dep:glam` | 3D-рендеринг в отдельном типе окна |
 | `bundled` | `sdl3/build-from-source-static` | Собрать SDL3 из исходников и слинковать статически |
 
 `cached-textures` — opt-in, потому что `sdl3` при отключении проверки времени

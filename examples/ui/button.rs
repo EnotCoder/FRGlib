@@ -40,11 +40,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Кеш хранит строки, которые меняются: состояния кнопок и переключатель
     // звука. Без него тот же "звук: да" разбирался бы заново шестьдесят раз
     // в секунду, хотя шрифт с той же формулой уже разобран.
-    let mut labels = TextCache::new(
-        |text: &str| -> Result<Image, Box<dyn std::error::Error>> {
-            Ok(Image::from_surface(font.render(text).solid(white)?))
-        },
-    );
+    let mut labels = TextCache::new(|text: &str| -> Result<Image, Box<dyn std::error::Error>> {
+        Ok(Image::from_surface(font.render(text).solid(white)?))
+    });
 
     let mut play = Button::new(Rect::new(60.0, 150.0, 200.0, 56.0));
     let mut sound = Button::new(Rect::new(60.0, 226.0, 200.0, 56.0));
@@ -119,7 +117,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // изменяемый займ на тот же ресурс. В кеше только то, что меняется:
         // состояния кнопок и переключатель звука -- статичные подписи кнопок
         // отрендерены один раз до цикла.
-        let note = if sound_on { "звук: да" } else { "звук: нет" };
+        let note = if sound_on {
+            "звук: да"
+        } else {
+            "звук: нет"
+        };
         let line = format!(
             "Играть: {}   Звук: {}   Выход: {}",
             name(play.state()),

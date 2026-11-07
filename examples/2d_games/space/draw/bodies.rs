@@ -1,6 +1,4 @@
-use frglib::{
-    Color, Mat3, Object, Vec2,
-};
+use frglib::{Color, Mat3, Object, Vec2};
 use std::f32::consts::TAU;
 
 use crate::bodies::*;
@@ -76,11 +74,11 @@ pub fn draw_bodies(
 }
 
 pub fn draw_orbit(
-    d: &mut frglib::Draw, 
-    planets: &[Planet], 
+    d: &mut frglib::Draw,
+    planets: &[Planet],
     center: Vec2,
     orbit_thickness: f32,
-    orbit_color: Color
+    orbit_color: Color,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let view_rect = d.camera_rect();
 
@@ -98,10 +96,7 @@ pub fn draw_orbit(
 
             // Оптимизация: рисуем только если точка в кадре
             if view_rect.contains_vec(point) {
-                let dot = Object::new(
-                    point,
-                    Vec2::new(orbit_thickness, orbit_thickness),
-                );
+                let dot = Object::new(point, Vec2::new(orbit_thickness, orbit_thickness));
 
                 d.fill_object(&dot, orbit_color)?;
             }

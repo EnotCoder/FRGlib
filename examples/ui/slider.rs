@@ -119,16 +119,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Кеш рендерит сам: библиотека шрифтов не видит, ей достаётся готовая
     // картинка. Считаем до кадра -- внутри замыкания это был бы второй
     // изменяемый займ на тот же ресурс.
-    let mut big = TextCache::new(
-        |text: &str| -> Result<Image, Box<dyn std::error::Error>> {
-            Ok(Image::from_surface(font.render(text).solid(white)?))
-        },
-    );
-    let mut small = TextCache::new(
-        |text: &str| -> Result<Image, Box<dyn std::error::Error>> {
-            Ok(Image::from_surface(font_small.render(text).solid(dim)?))
-        },
-    );
+    let mut big = TextCache::new(|text: &str| -> Result<Image, Box<dyn std::error::Error>> {
+        Ok(Image::from_surface(font.render(text).solid(white)?))
+    });
+    let mut small = TextCache::new(|text: &str| -> Result<Image, Box<dyn std::error::Error>> {
+        Ok(Image::from_surface(font_small.render(text).solid(dim)?))
+    });
 
     // Подписи и подсказка не меняются, поэтому кладутся в кеш один раз.
     big.keep("СЛАЙДЕРЫ")?;
@@ -301,8 +297,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // остался внутри окна: узкое окно сдвигает подпись вправо, а
                 // значение влево, и они съезжаются на дорожку, но не за край.
                 let name_x = (track.x - GAP).max(name.size().0 as f32 + MARGIN);
-                let value_x =
-                    (track.x + track.w + GAP).min(vw - value.size().0 as f32 - MARGIN);
+                let value_x = (track.x + track.w + GAP).min(vw - value.size().0 as f32 - MARGIN);
 
                 name.at(name_x, cy).draw(d)?;
                 value.at(value_x, cy).draw(d)?;

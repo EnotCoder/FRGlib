@@ -2,7 +2,9 @@
 mod builder;
 mod draw;
 mod error;
-mod pump;
+// The wgpu window shares this thread-local pump: SDL hands out one queue per
+// thread, and two pumps would fight over it.
+pub(crate) mod pump;
 
 pub use builder::WindowBuilder;
 pub use draw::Draw;

@@ -27,7 +27,11 @@ impl<T> TileMap<T> {
 
     /// The cell range [`visible`](Self::visible) walks, as `start..end` pairs,
     /// already clipped to the map.
-    fn visible_bounds(&self, camera: crate::Camera, view: (u32, u32)) -> (usize, usize, usize, usize) {
+    fn visible_bounds(
+        &self,
+        camera: crate::Camera,
+        view: (u32, u32),
+    ) -> (usize, usize, usize, usize) {
         // Same guard as `Camera::scale`: a zero or negative zoom would divide
         // by nothing and report the whole map as visible.
         let zoom = if camera.zoom > f32::EPSILON {
@@ -93,7 +97,10 @@ impl<T> TileMap<T> {
         camera.position.x = if map_w <= half_w * 2.0 {
             left + map_w / 2.0
         } else {
-            camera.position.x.clamp(left + half_w, left + map_w - half_w)
+            camera
+                .position
+                .x
+                .clamp(left + half_w, left + map_w - half_w)
         };
 
         camera.position.y = if map_h <= half_h * 2.0 {

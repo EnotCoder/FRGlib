@@ -26,14 +26,14 @@ fn main() -> Result<(), frglib::Error> {
 
         let (w, h) = window.size();
         let (w, h) = (w as f32, h as f32);
-        
+
         let center = Vec2::new(w / 2.0, h / 2.0);
         let radius = 150.0;
-        
+
         // Используем sin и cos для вычисления позиции на круге
         let x = center.x + cos(time * 2.0) * radius;
         let y = center.y + sin(time * 2.0) * radius;
-        
+
         let square = Object::from_xywh(x, y, 40.0, 40.0);
 
         window.frame_with(|d| {

@@ -136,12 +136,7 @@ impl<'a> Label<'a> {
 
         d.screen_space(|d| {
             d.fill_textured_object(
-                &Object::from_xywh(
-                    rect.x + rect.w / 2.0,
-                    rect.y + rect.h / 2.0,
-                    rect.w,
-                    rect.h,
-                ),
+                &Object::from_xywh(rect.x + rect.w / 2.0, rect.y + rect.h / 2.0, rect.w, rect.h),
                 self.image,
             )
         })
