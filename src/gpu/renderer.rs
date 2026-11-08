@@ -22,6 +22,8 @@ pub enum Material {
     Lit,
     /// The colour goes to the screen unchanged. Good for grids and debug lines.
     Unlit,
+    /// A custom material created with [`Renderer3D::create_material`].
+    Custom(u32),
 }
 
 /// Draws meshes with the built-in camera and light setup.
@@ -57,7 +59,9 @@ pub enum Material {
 pub struct Renderer3D {
     device: wgpu::Device,
     queue: wgpu::Queue,
+    format: wgpu::TextureFormat,
 
+    camera_layout: wgpu::BindGroupLayout,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
 
@@ -67,11 +71,16 @@ pub struct Renderer3D {
     draw_capacity: u32,
     draw_stride: u64,
 
+    pipeline_layout: wgpu::PipelineLayout,
+    textured_pipeline_layout: wgpu::PipelineLayout,
+
     lit_triangles: wgpu::RenderPipeline,
     unlit_triangles: wgpu::RenderPipeline,
     unlit_lines: wgpu::RenderPipeline,
     lit_textured: wgpu::RenderPipeline,
     unlit_textured: wgpu::RenderPipeline,
+
+    custom_pipelines: Vec<CustomPipeline>,
 
     texture_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
@@ -84,6 +93,11 @@ pub struct Renderer3D {
     camera: Camera3D,
     commands: Vec<DrawCommand>,
     line_vertices: Vec<Vertex>,
+}
+
+struct CustomPipeline {
+    triangles: wgpu::RenderPipeline,
+    textured: wgpu::RenderPipeline,
 }
 
 struct GridCache {
@@ -294,6 +308,8 @@ impl Renderer3D {
         Renderer3D {
             device,
             queue,
+            format,
+            camera_layout,
             camera_buffer,
             camera_bind_group,
             draw_layout,
@@ -301,11 +317,14 @@ impl Renderer3D {
             draw_bind_group,
             draw_capacity,
             draw_stride,
+            pipeline_layout,
+            textured_pipeline_layout,
             lit_triangles,
             unlit_triangles,
             unlit_lines,
             lit_textured,
             unlit_textured,
+            custom_pipelines: Vec::new(),
             texture_layout,
             sampler,
             texture_bind_groups: HashMap::new(),
@@ -316,6 +335,48 @@ impl Renderer3D {
             commands: Vec::new(),
             line_vertices: Vec::new(),
         }
+    }
+
+    /// Creates a custom material from a WGSL shader.
+    ///
+    /// The shader must provide the same entry points as the built-in one:
+    /// `vs_main`, `fs_main` and `fs_main_textured`. It can use the same
+    /// bind groups (0 for camera, 1 for draw, 2 for texture).
+    ///
+    /// The returned `Material` can be passed to `draw_mesh_with`.
+    pub fn create_material(&mut self, source: &str) -> Material {
+        let shader = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("frglib custom shader"),
+            source: wgpu::ShaderSource::Wgsl(source.into()),
+        });
+
+        let triangles = create_pipeline(
+            &self.device,
+            &self.pipeline_layout,
+            &shader,
+            self.format,
+            wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
+            "fs_main",
+        );
+
+        let textured = create_pipeline(
+            &self.device,
+            &self.textured_pipeline_layout,
+            &shader,
+            self.format,
+            wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
+            "fs_main_textured",
+        );
+
+        let id = self.custom_pipelines.len() as u32;
+        self.custom_pipelines.push(CustomPipeline {
+            triangles,
+            textured,
+        });
+
+        Material::Custom(id)
     }
 
     /// Uploads caller geometry to the GPU.
@@ -593,8 +654,18 @@ impl Renderer3D {
                 (Material::Lit, wgpu::PrimitiveTopology::TriangleList, false) => {
                     &self.lit_triangles
                 }
-                (_, wgpu::PrimitiveTopology::TriangleList, true) => &self.unlit_textured,
-                (_, wgpu::PrimitiveTopology::TriangleList, false) => &self.unlit_triangles,
+                (Material::Unlit, wgpu::PrimitiveTopology::TriangleList, true) => {
+                    &self.unlit_textured
+                }
+                (Material::Unlit, wgpu::PrimitiveTopology::TriangleList, false) => {
+                    &self.unlit_triangles
+                }
+                (Material::Custom(id), wgpu::PrimitiveTopology::TriangleList, true) => {
+                    &self.custom_pipelines[id as usize].textured
+                }
+                (Material::Custom(id), wgpu::PrimitiveTopology::TriangleList, false) => {
+                    &self.custom_pipelines[id as usize].triangles
+                }
                 (_, wgpu::PrimitiveTopology::LineList, _) => &self.unlit_lines,
                 _ => &self.unlit_triangles,
             };
