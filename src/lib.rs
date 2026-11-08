@@ -6,7 +6,10 @@
 //! With the `wgpu` feature the crate also grows a second window flavour,
 //! [`gpu::WgpuWindow`], where SDL3 still owns the window and input but `wgpu`
 //! owns the swapchain and the drawing. The two do not mix in one window: a
-//! [`Window`] draws through `SDL_Renderer`, a [`gpu::WgpuWindow`] does not.
+//! [`Window`] draws through `SDL_Renderer`, a [`gpu::WgpuWindow`] draws through
+//! [`gpu::Renderer3D`] and [`gpu::Renderer2D`]. The latter covers 2D shapes,
+//! textures, interface widgets and text, so the GPU window is not limited to
+//! 3D scenes.
 //!
 //! # Example
 //!
@@ -58,8 +61,8 @@ pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
 pub use gpu::Error as GpuError;
 #[cfg(feature = "wgpu")]
 pub use gpu::{
-    Camera3D, Frame, Gpu, GpuMesh, Material, Mesh, Renderer3D, Vertex, WgpuWindow,
-    WgpuWindowBuilder,
+    Camera3D, FontId, Frame, Gpu, GpuMesh, GpuTexture, Material, Mesh, Renderer2D, Renderer3D,
+    TextAlign, Vertex, WgpuWindow, WgpuWindowBuilder,
 };
 #[cfg(feature = "cached-textures")]
 pub use graphics::{Animation, Texture};

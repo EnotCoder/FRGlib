@@ -144,4 +144,42 @@ impl<T> TileMap<T> {
 
         Ok(())
     }
+
+    /// Draws the visible cells on a [`wgpu`](crate::gpu) renderer.
+    ///
+    /// The GPU counterpart of [`draw`](Self::draw). `texture_of` maps a cell to
+    /// a [`GpuTexture`](crate::gpu::GpuTexture) loaded through
+    /// [`Renderer2D::create_texture`](crate::gpu::Renderer2D::create_texture);
+    /// [`None`] skips the cell.
+    ///
+    /// The map is drawn in world space through `camera`, and the renderer's
+    /// previous camera and space are restored afterwards. `camera` also decides
+    /// which cells are visible, exactly as in the SDL version.
+    #[cfg(feature = "wgpu")]
+    pub fn draw_gpu(
+        &self,
+        renderer: &mut crate::gpu::Renderer2D,
+        camera: crate::Camera,
+        texture_of: impl Fn(&T) -> Option<crate::gpu::GpuTexture>,
+    ) {
+        renderer.with_camera(camera, |renderer| {
+            for (col, row, tile) in self.visible(camera, renderer.size()) {
+                let Some(texture) = texture_of(tile) else {
+                    continue;
+                };
+
+                let centre = self.cell_center(col, row);
+                renderer.draw_texture(
+                    &texture,
+                    crate::Rect::new(
+                        centre.x - self.cell / 2.0,
+                        centre.y - self.cell / 2.0,
+                        self.cell,
+                        self.cell,
+                    ),
+                    crate::Color::WHITE,
+                );
+            }
+        });
+    }
 }

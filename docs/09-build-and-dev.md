@@ -22,10 +22,16 @@ include = ["src/**", "Cargo.toml", "README.md", "LICENSE", "logo.svg"]
 |---|---|---|
 | `sdl3` | 0.20 | Всегда; включён `raw-window-handle` |
 | `sdl3` (dev) | 0.20 | Только примеры; включены `ttf` и `build-from-source-static` |
+| `wgpu` | 30 | Только с фичей `wgpu` |
+| `pollster` | 1 | Только с фичей `wgpu`; блокирующее ожидание запросов адаптера и устройства |
+| `bytemuck` | 1 | Только с фичей `wgpu`; вершины и юниформы как POD |
+| `glam` | 0.34 | Только с фичей `wgpu`; математика 3D |
+| `fontdue` | 0.9 | Только с фичей `wgpu`; разбор TTF/OTF и растрирование глифов |
 
-Библиотека не тянет SDL3_ttf. Примеры с текстом используют dev-зависимость,
-поэтому пользователь крейта не получает парсер шрифтов, если текст ему не
-нужен.
+Библиотека не тянет SDL3_ttf. В SDL-слое текст по-прежнему рисует вызывающий
+код, а примеры с текстом используют dev-зависимость. Под фичей `wgpu` текст
+рисует `Renderer2D`, и там парсер шрифтов (`fontdue`) уже часть библиотеки —
+но только для тех, кто включил GPU-окно.
 
 `build-from-source-static` у dev-зависимости нужен потому, что SDL3_ttf в
 системе обычно не установлен. Первая сборка примера с текстом занимает около
@@ -54,6 +60,29 @@ cached-textures = ["sdl3/unsafe_textures"]
 текстуру с чужим canvas (UB). FRGLib гарантирует, что этого не происходит:
 `Store` лежит в окне, поле объявлено до canvas, рисование достаёт текстуру из
 того же окна. Но фича opt-in, чтобы крейт оставался sound по умолчанию.
+
+### `wgpu`
+
+```toml
+wgpu = ["dep:wgpu", "dep:pollster", "dep:bytemuck", "dep:glam", "dep:fontdue"]
+```
+
+Включает:
+
+- `gpu/window.rs` — `WgpuWindow`, `WgpuWindowBuilder`, `Gpu`, `Frame`;
+- `gpu/renderer.rs` — `Renderer3D`, `Camera3D`, `Mesh`, `GpuMesh`;
+- `gpu/renderer2d.rs` — `Renderer2D`, `GpuTexture`;
+- `gpu/font.rs` — `FontId`, `TextAlign`, атлас глифов;
+- методы `Button::draw_gpu`, `Slider::draw_gpu`, `TileMap::draw_gpu`;
+- реэкспорты GPU-типов из корня крейта.
+
+Зачем отдельная фича: она приносит полный GPU-стек и меняет тип окна.
+`Window` и `WgpuWindow` не смешиваются в одном окне — это разные бэкенды.
+
+```bash
+cargo run --features wgpu --example wgpu-cube
+cargo run --features wgpu --example wgpu-hud
+```
 
 ### `bundled`
 
@@ -178,7 +207,9 @@ cargo publish --dry-run
 
 | Особенность | Детали |
 |---|---|
-| Vulkan не реализован | Только флаг окна и `vulkan_instance_extensions()` |
+| Отдельного Vulkan-рендерера нет | У SDL-окна только флаг и `vulkan_instance_extensions()`; GPU-рендеринг — в `WgpuWindow` под фичей `wgpu` |
+| `WgpuWindow` и `Window` несовместимы | В одном окне нельзя одновременно `SDL_Renderer` и `wgpu` |
+| Атлас шрифтов фиксирован | 2048×2048 без вытеснения; рассчитан на несколько размеров шрифта |
 | `Window` не `Send`/`Sync` | Требование SDL: окно и рендерер живут в потоке инициализации |
 | Одна очередь событий | `poll()` фильтрует по `window_id`, `Quit` — исключение |
 | Текстуры по умолчанию заливаются каждый кадр | Для повторного рисования нужна фича `cached-textures` |

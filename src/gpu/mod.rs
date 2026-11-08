@@ -3,17 +3,22 @@
 //! [`WgpuWindow`] is a sibling of [`crate::Window`], not a mode of it. SDL3
 //! still creates the window, pumps the events and gives us the native handle,
 //! but no `SDL_Renderer` is attached: the swapchain, the command encoder and
-//! the pipelines all belong to `wgpu`. That is why [`crate::Draw`],
-//! [`crate::ui`] and [`crate::TileMap`] do not work here -- they are built on
-//! `SDL_Renderer` and have no access to this window.
+//! the pipelines all belong to `wgpu`. The SDL [`crate::Draw`] type does not
+//! work here; [`Renderer2D`] is its GPU counterpart.
 //!
 //! Two levels are available on purpose:
 //!
-//! - ready-made pieces: [`Camera3D`], [`Mesh`], [`Renderer3D`] draw a cube, a
-//!   grid or a line without touching `wgpu`;
+//! - ready-made pieces: [`Camera3D`], [`Mesh`], [`Renderer3D`] draw 3D;
+//!   [`Renderer2D`] draws 2D shapes, sprites, [`crate::ui`] widgets and text,
+//!   with its own [`Camera`](crate::Camera), font atlas and GPU textures;
 //! - the raw API: [`Gpu`] exposes the `wgpu` instance, adapter, device and
 //!   queue, and [`Frame`] exposes the encoder and both attachments, so custom
 //!   pipelines can be recorded in the same frame.
+//!
+//! A 3D scene and a 2D overlay share a frame: record the 3D pass with
+//! [`Renderer3D::finish`], then call [`Renderer2D::begin_overlay`] and
+//! [`Renderer2D::finish`]. For a purely 2D frame use [`Renderer2D::begin`],
+//! which clears the screen instead.
 //!
 //! ```no_run
 //! use frglib::{Color, Event};
@@ -47,15 +52,19 @@
 mod builder;
 mod camera;
 mod error;
+mod font;
 mod mesh;
 mod renderer;
+mod renderer2d;
 mod window;
 
 pub use builder::WgpuWindowBuilder;
 pub use camera::Camera3D;
 pub use error::Error;
+pub use font::{FontId, TextAlign};
 pub use mesh::{GpuMesh, Mesh, Vertex};
 pub use renderer::{Material, Renderer3D};
+pub use renderer2d::{GpuTexture, Renderer2D};
 pub use window::{Frame, Gpu, WgpuWindow};
 
 /// Depth format shared by the built-in pipelines and the frame's depth buffer.

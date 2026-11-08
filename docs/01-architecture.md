@@ -27,8 +27,12 @@
   остальные типы от SDL не зависят.
 - `window` знает обо всём: именно он превращает `Object`, `Camera`, `Color` и
   `Image` в вызовы SDL-рендерера.
-- `gpu` (wgpu) стоит особняком: он использует SDL3 только для создания окна, но заменяет собой весь слой отрисовки для 3D.
-- `ui` и `tilemap` построены поверх `window::Draw`, `graphics` и `math`.
+- `gpu` (wgpu) стоит особняком: он использует SDL3 только для создания окна,
+  но заменяет собой весь слой отрисовки. Внутри два независимых рендерера:
+  `Renderer3D` для сцен и `Renderer2D` для примитивов, текстур и текста.
+- `ui` и `tilemap` построены поверх `window::Draw`, `graphics` и `math`. Под
+  фичей `wgpu` у тех же типов есть методы `draw_gpu`, которые рисуют их через
+  `gpu::Renderer2D`; SDL-API при этом не меняется.
 
 ## Точка входа и реэкспорты
 
@@ -53,6 +57,13 @@ pub mod window;
 ```rust
 #[cfg(feature = "cached-textures")]
 pub use graphics::{Animation, Texture};
+#[cfg(feature = "wgpu")]
+pub use gpu::Error as GpuError;
+#[cfg(feature = "wgpu")]
+pub use gpu::{
+    Camera3D, FontId, Frame, Gpu, GpuMesh, GpuTexture, Material, Mesh, Renderer2D, Renderer3D,
+    TextAlign, Vertex, WgpuWindow, WgpuWindowBuilder,
+};
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{cos, lerp, sin, Ease, Lerp, Mat3, Rect, Vec2};
 pub use timing::FrameClock;
@@ -199,7 +210,7 @@ fill_object / fill_object_polygon / fill_textured_object / ...
 |---|---|---|
 | `default` | пусто | Библиотека работает без дополнительных зависимостей |
 | `cached-textures` | `sdl3/unsafe_textures`, модули `graphics/texture.rs`, `graphics/animation.rs`, `TileMap::draw` | Позволяет хранить текстуру между кадрами |
-| `wgpu` | `dep:wgpu`, `dep:pollster`, `dep:bytemuck`, `dep:glam` | 3D-рендеринг в отдельном типе окна |
+| `wgpu` | `dep:wgpu`, `dep:pollster`, `dep:bytemuck`, `dep:glam`, `dep:fontdue` | 3D и 2D, текст, UI и тайлмапы в отдельном типе окна |
 | `bundled` | `sdl3/build-from-source-static` | Собрать SDL3 из исходников и слинковать статически |
 
 `cached-textures` — opt-in, потому что `sdl3` при отключении проверки времени

@@ -6,8 +6,9 @@
 
 FRGLib — небольшая 2D-библиотека поверх SDL3: окно, рендерер, события,
 рисование примитивов и текстур, камера, интерфейсные виджеты, тайлмапы и
-немного математики. Vulkan-слой пока не реализован: есть только флаг
-`SDL_WINDOW_VULKAN` и запрос нужных расширений.
+немного математики. Опциональная фича `wgpu` добавляет параллельное окно с
+современным GPU-бэкендом (Vulkan, Metal, DX12): 3D-сцену, 2D-примитивы,
+текстуры, текст, UI и тайлмапы. Отдельного Vulkan-рендерера вне `wgpu` нет.
 
 Это оглавление документации. Каждый файл — отдельная тема; ссылки ниже ведут
 на подробности.
@@ -25,7 +26,7 @@ FRGLib — небольшая 2D-библиотека поверх SDL3: окн�
 | [07-tilemap.md](07-tilemap.md) | `TileMap<T>`, `MapError`, видимость, отрисовка тайлов |
 | [08-examples.md](08-examples.md) | Каталог примеров и ассетов |
 | [09-build-and-dev.md](09-build-and-dev.md) | Сборка, фичи, тесты, правила разработки, известные особенности |
-| [10-wgpu.md](10-wgpu.md) | 3D-рендеринг через `wgpu`, камера, меши и освещение |
+| [10-wgpu.md](10-wgpu.md) | 3D и 2D через `wgpu`: камера, меши, текстуры, текст, UI и тайлмапы |
 
 ## За 60 секунд
 
@@ -83,6 +84,15 @@ FRGLib/
 │   ├── lib.rs          # корень крейта: модули и публичные реэкспорты
 │   ├── event.rs        # Event + трансляция из SDL
 │   ├── timing.rs       # FrameClock
+│   ├── gpu/            # окно и рендереры на wgpu (фича wgpu)
+│   │   ├── mod.rs
+│   │   ├── window.rs   # WgpuWindow, Gpu, Frame
+│   │   ├── renderer.rs # Renderer3D
+│   │   ├── renderer2d.rs # Renderer2D, GpuTexture
+│   │   ├── font.rs     # FontId, атлас глифов, раскладка текста
+│   │   ├── camera.rs
+│   │   ├── mesh.rs
+│   │   └── shaders/
 │   ├── window/         # окно, рендерер, события окна, рисование
 │   │   ├── mod.rs
 │   │   ├── builder.rs
@@ -132,7 +142,7 @@ FRGLib/
 | `src/tilemap/` | Сетка клеток, координаты, видимость | `TileMap<T>`, `MapError` |
 | `src/event.rs` | Своё перечисление событий вместо SDL-типа | `Event` |
 | `src/timing.rs` | Держит цикл на заданной частоте | `FrameClock` |
-| `src/gpu/` | 3D рендеринг через `wgpu` | `WgpuWindow`, `Renderer3D`, `Camera3D` |
+| `src/gpu/` | 3D и 2D через `wgpu` | `WgpuWindow`, `Renderer3D`, `Renderer2D`, `Camera3D`, `FontId`, `GpuTexture` |
 
 ## Главные принципы
 
@@ -140,9 +150,11 @@ FRGLib/
    `Object` — собственные типы, чтобы обновление `sdl3` не ломало API
    библиотеки. Исключения: `Image::from_surface` (принимает `sdl3::surface::Surface`)
    и реэкспорт `Keycode`, `Mod`, `MouseButton`, `MouseWheelDirection`.
-2. **Шрифтов в библиотеке нет.** Текст рисует вызывающий код (например,
+2. **Шрифтов в SDL-слое нет.** Текст рисует вызывающий код (например,
    SDL3_ttf), а `frglib` только принимает готовую `Image`. Поэтому `Button` и
-   `Label` работают с картинками, а не со строками.
+   `Label` работают с картинками, а не со строками. Исключение — опциональный
+   `wgpu`-слой: там `Renderer2D` сам разбирает TTF/OTF через `fontdue`, потому
+   что SDL-рендерера в этом окне нет.
 3. **Значение клетки тайлмапа — дело игры.** `TileMap<T>` не требует от `T`
    ни `Copy`, ни трейтов: библиотека знает, где клетка, но не что она значит.
 4. **Дорогие текстуры — опционально.** По умолчанию `Image` заливается на GPU
@@ -151,9 +163,10 @@ FRGLib/
 5. **Ошибки — значения, а не паника.** Там, где SDL позволяет, методы
    возвращают `Result`. Паники остаются только в местах, где сам `sdl3`
    паникует, и в `TextCache::get` при обращении к незакешированной строке.
-6. **Vulkan пока впереди.** `WindowBuilder::vulkan(true)` ставит флаг окна, а
-   `Window::vulkan_instance_extensions()` отдаёт расширения. Собственного
-   Vulkan-рендерера нет.
+6. **Vulkan — через `wgpu`, и по желанию.** `WindowBuilder::vulkan(true)`
+   ставит флаг окна, а `Window::vulkan_instance_extensions()` отдаёт
+   расширения, но собственного Vulkan-рендерера у SDL-окна нет. Современный
+   бэкенд живёт в `WgpuWindow` под фичей `wgpu`.
 
 ## Быстрые команды
 
@@ -162,6 +175,8 @@ cargo build
 cargo test
 cargo run --example basic-window
 cargo run --features cached-textures --example basic-cached
+cargo run --features wgpu --example wgpu-cube
+cargo run --features wgpu --example wgpu-hud
 cargo doc --open
 ```
 

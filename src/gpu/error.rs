@@ -30,6 +30,23 @@ pub enum Error {
     /// `get_current_texture` caught a validation error. This is a bug in the
     /// program, not in the window, so it is reported rather than retried.
     SurfaceValidation,
+    /// `fontdue` refused to parse the font bytes.
+    Font(String),
+    /// A draw call named a [`FontId`](super::FontId) this renderer does not
+    /// know. A font belongs to the renderer that loaded it.
+    UnknownFont,
+    /// The glyph atlas ran out of space. Load fewer sizes, or fewer fonts, or
+    /// use a renderer with a larger atlas.
+    AtlasFull,
+    /// A texture was asked for with a zero width or height.
+    EmptyTexture,
+    /// The RGBA byte slice does not match `width * height * 4`.
+    PixelData {
+        /// Bytes the given dimensions need.
+        expected: usize,
+        /// Bytes actually supplied.
+        actual: usize,
+    },
 }
 
 impl fmt::Display for Error {
@@ -45,6 +62,14 @@ impl fmt::Display for Error {
             Error::SurfaceValidation => {
                 write!(f, "wgpu rejected the surface texture: validation error")
             }
+            Error::Font(message) => write!(f, "could not parse the font: {message}"),
+            Error::UnknownFont => write!(f, "the font does not belong to this renderer"),
+            Error::AtlasFull => write!(f, "the glyph atlas is full"),
+            Error::EmptyTexture => write!(f, "a texture needs a non-zero width and height"),
+            Error::PixelData { expected, actual } => write!(
+                f,
+                "texture data is {actual} bytes, but the dimensions need {expected}"
+            ),
         }
     }
 }
@@ -58,7 +83,13 @@ impl StdError for Error {
             Error::Surface(err) => Some(err),
             Error::NoAdapter(err) => Some(err),
             Error::Device(err) => Some(err),
-            Error::NoSurfaceFormat | Error::SurfaceValidation => None,
+            Error::NoSurfaceFormat
+            | Error::SurfaceValidation
+            | Error::Font(_)
+            | Error::UnknownFont
+            | Error::AtlasFull
+            | Error::EmptyTexture
+            | Error::PixelData { .. } => None,
         }
     }
 }

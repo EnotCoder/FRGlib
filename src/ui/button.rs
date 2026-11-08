@@ -163,6 +163,59 @@ impl Button {
             d.fill_textured_object(&Object::from_xywh(cx, cy, lw as f32, lh as f32), label)
         })
     }
+
+    /// Draws the background and a text caption on a [`wgpu`](crate::gpu)
+    /// renderer.
+    ///
+    /// The GPU counterpart of [`draw`](Self::draw): same colours and the same
+    /// centred caption, but the caption is text from a
+    /// [`FontId`](crate::gpu::FontId) loaded by the renderer instead of an
+    /// [`Image`]. The button is drawn in screen space and the renderer's
+    /// previous camera is restored afterwards.
+    ///
+    /// ```no_run
+    /// # use frglib::{Button, Color, Rect};
+    /// # use frglib::gpu::{Renderer2D, WgpuWindow};
+    /// # fn main() -> Result<(), frglib::gpu::Error> {
+    /// # let mut window = WgpuWindow::builder("demo").build()?;
+    /// # let mut renderer = Renderer2D::new(window.gpu());
+    /// # let font = renderer.load_font(std::fs::read("font.otf").unwrap())?;
+    /// # let Some(mut frame) = window.begin_frame()? else { return Ok(()) };
+    /// let play = Button::new(Rect::new(40.0, 200.0, 180.0, 44.0));
+    ///
+    /// renderer.begin(&frame);
+    /// play.draw_gpu(&mut renderer, font, "Play", 22.0)?;
+    /// renderer.finish(&mut frame);
+    /// # window.present(frame)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "wgpu")]
+    pub fn draw_gpu(
+        &self,
+        renderer: &mut crate::gpu::Renderer2D,
+        font: crate::gpu::FontId,
+        label: &str,
+        size: f32,
+    ) -> Result<(), crate::gpu::Error> {
+        let background = match self.state {
+            ButtonState::Idle => self.idle,
+            ButtonState::Hover => self.hover,
+            ButtonState::Pressed => self.pressed,
+        };
+
+        renderer.screen_space(|renderer| {
+            renderer.fill_rect(self.rect, background);
+            renderer.draw_text_centered(
+                font,
+                label,
+                self.rect.x + self.rect.w / 2.0,
+                self.rect.y + self.rect.h / 2.0,
+                size,
+                Color::WHITE,
+            )
+        })
+    }
 }
 
 #[cfg(test)]

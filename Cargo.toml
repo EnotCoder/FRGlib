@@ -35,7 +35,7 @@ cached-textures = ["sdl3/unsafe_textures"]
 # A second window flavour that hands the frame to `wgpu` instead of
 # `SDL_Renderer`. Opt-in: it pulls in a full GPU stack and the GPU API leaks
 # through `frglib::gpu`, so a default build stays as light as it was.
-wgpu = ["dep:wgpu", "dep:pollster", "dep:bytemuck", "dep:glam"]
+wgpu = ["dep:wgpu", "dep:pollster", "dep:bytemuck", "dep:glam", "dep:fontdue"]
 
 [dependencies.sdl3]
 version = "0.20"
@@ -66,6 +66,13 @@ features = ["derive"]
 # not have to add it themselves.
 [dependencies.glam]
 version = "0.34"
+optional = true
+
+# Parses TTF/OTF and rasterizes glyphs for `Renderer2D`. Pure Rust, so the GPU
+# window flavour does not need SDL3_ttf just to draw a caption. Optional for
+# the same reason the rest of the GPU stack is: a plain `Window` never needs it.
+[dependencies.fontdue]
+version = "0.9"
 optional = true
 
 # Только для примеров, и в публикуемый пакет не попадает: так библиотека не
@@ -180,6 +187,11 @@ path = "examples/2d_games/space/main.rs"
 [[example]]
 name = "wgpu-cube"
 path = "examples/wgpu/cube.rs"
+required-features = ["wgpu"]
+
+[[example]]
+name = "wgpu-hud"
+path = "examples/wgpu/hud.rs"
 required-features = ["wgpu"]
 
 [profile.release]

@@ -252,6 +252,43 @@ impl Slider {
         })
     }
 
+    /// Draws the track, the filled part and the knob on a
+    /// [`wgpu`](crate::gpu) renderer.
+    ///
+    /// The GPU counterpart of [`draw`](Self::draw). The slider is drawn in
+    /// screen space and the renderer's previous camera is restored afterwards.
+    /// No caption, for the same reason as [`draw`](Self::draw): a label belongs
+    /// beside the track.
+    #[cfg(feature = "wgpu")]
+    pub fn draw_gpu(&self, renderer: &mut crate::gpu::Renderer2D) {
+        let side = self.knob_side();
+        let cx = self.knob_x();
+        let cy = self.rect.y + self.rect.h / 2.0;
+        let knob = if self.state == SliderState::Dragging {
+            self.knob_held
+        } else {
+            self.knob
+        };
+
+        let filled = cx - self.rect.x;
+
+        renderer.screen_space(|renderer| {
+            renderer.fill_rect(self.rect, self.track);
+
+            if filled > 0.0 {
+                renderer.fill_rect(
+                    Rect::new(self.rect.x, self.rect.y, filled, self.rect.h),
+                    self.fill,
+                );
+            }
+
+            renderer.fill_rect(
+                Rect::new(cx - side / 2.0, cy - side / 2.0, side, side),
+                knob,
+            );
+        });
+    }
+
     /// Horizontal centre of the knob, in screen pixels.
     fn knob_x(&self) -> f32 {
         self.rect.x + self.knob_side() / 2.0 + self.fraction() * self.travel()

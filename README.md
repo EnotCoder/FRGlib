@@ -14,8 +14,9 @@
 cargo add frglib
 ```
 
-Rust-обвязка над SDL3: окно, рендерер и обработка событий. Слой для Vulkan
-впереди.
+Rust-обвязка над SDL3: окно, рендерер и обработка событий. Под опциональной
+фичей `wgpu` — второй тип окна с современным GPU-бэкендом (Vulkan, Metal,
+DX12), 3D-сценой, 2D-примитивами, текстом, UI и тайлмапами.
 
 Подробная документация по устройству проекта, модулям и внутренностям лежит в
 [`docs/`](docs/README.md).
@@ -55,6 +56,36 @@ fn main() -> Result<(), frglib::Error> {
     }
 }
 ```
+
+### GPU-окно и 2D-текст
+
+Фича `wgpu` добавляет `WgpuWindow`. SDL3 по-прежнему создаёт окно и приносит
+события, а кадром владеют `Renderer3D` и `Renderer2D`. Текст разбирает
+`fontdue`, поэтому SDL3_ttf для GPU-окна не нужен.
+
+```rust
+use frglib::gpu::{Renderer2D, WgpuWindow};
+use frglib::{Color, Rect};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut window = WgpuWindow::builder("FRGLib").build()?;
+    let mut ui = Renderer2D::new(window.gpu());
+    let font = ui.load_font(std::fs::read("font.otf")?)?;
+
+    loop {
+        let Some(mut frame) = window.begin_frame()? else { continue };
+
+        ui.begin(&frame);
+        ui.fill_rect(Rect::new(20.0, 20.0, 200.0, 60.0), Color::BLUE);
+        ui.draw_text(font, "Hello", 28.0, 32.0, 24.0, Color::WHITE)?;
+        ui.finish(&mut frame);
+
+        window.present(frame)?;
+    }
+}
+```
+
+Подробнее: [docs/10-wgpu.md](docs/10-wgpu.md).
 
 ## API
 
@@ -478,3 +509,5 @@ cargo build --release --features bundled
 | `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
 | `cargo run --example 2d_games-gallery` | Листалка картинок: выбор по индексу, круговой проход |
 | `cargo run --example 2d_games-space` | Симуляция Солнечной системы: Пример работы матрицы |
+| `cargo run --features wgpu --example wgpu-cube` | 3D на `wgpu`: куб, сетка, орбитальная камера |
+| `cargo run --features wgpu --example wgpu-hud` | 3D + 2D на `wgpu`: текст, кнопка, слайдер, текстуры и тайлмап поверх сцены |
