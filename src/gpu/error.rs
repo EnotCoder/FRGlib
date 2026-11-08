@@ -47,6 +47,8 @@ pub enum Error {
         /// Bytes actually supplied.
         actual: usize,
     },
+    /// A Wavefront OBJ model could not be read or parsed.
+    Obj(super::ObjError),
 }
 
 impl fmt::Display for Error {
@@ -70,6 +72,7 @@ impl fmt::Display for Error {
                 f,
                 "texture data is {actual} bytes, but the dimensions need {expected}"
             ),
+            Error::Obj(err) => write!(f, "OBJ model error: {err}"),
         }
     }
 }
@@ -83,6 +86,7 @@ impl StdError for Error {
             Error::Surface(err) => Some(err),
             Error::NoAdapter(err) => Some(err),
             Error::Device(err) => Some(err),
+            Error::Obj(err) => Some(err),
             Error::NoSurfaceFormat
             | Error::SurfaceValidation
             | Error::Font(_)
@@ -91,6 +95,12 @@ impl StdError for Error {
             | Error::EmptyTexture
             | Error::PixelData { .. } => None,
         }
+    }
+}
+
+impl From<super::ObjError> for Error {
+    fn from(err: super::ObjError) -> Self {
+        Error::Obj(err)
     }
 }
 

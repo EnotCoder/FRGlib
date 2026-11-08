@@ -54,8 +54,10 @@ mod camera;
 mod error;
 mod font;
 mod mesh;
+mod obj;
 mod renderer;
 mod renderer2d;
+mod texture;
 mod window;
 
 pub use builder::WgpuWindowBuilder;
@@ -63,8 +65,10 @@ pub use camera::Camera3D;
 pub use error::Error;
 pub use font::{FontId, TextAlign};
 pub use mesh::{GpuMesh, Mesh, Vertex};
+pub use obj::ObjError;
 pub use renderer::{Material, Renderer3D};
 pub use renderer2d::{GpuTexture, Renderer2D};
+pub use texture::Texture;
 pub use window::{Frame, Gpu, WgpuWindow};
 
 /// Depth format shared by the built-in pipelines and the frame's depth buffer.

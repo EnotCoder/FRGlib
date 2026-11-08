@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::mem::size_of;
 use std::num::NonZeroU64;
 
@@ -5,9 +6,11 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec2, Vec3};
 
 use crate::gpu::camera::Camera3D;
+use crate::gpu::error::Error;
 use crate::gpu::mesh::{GpuMesh, Mesh, Vertex};
+use crate::gpu::texture::Texture;
 use crate::gpu::window::{Frame, Gpu};
-use crate::graphics::Color;
+use crate::graphics::{Color, Image};
 
 use super::color_to_linear;
 
@@ -67,6 +70,12 @@ pub struct Renderer3D {
     lit_triangles: wgpu::RenderPipeline,
     unlit_triangles: wgpu::RenderPipeline,
     unlit_lines: wgpu::RenderPipeline,
+    lit_textured: wgpu::RenderPipeline,
+    unlit_textured: wgpu::RenderPipeline,
+
+    texture_layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    texture_bind_groups: HashMap<u64, wgpu::BindGroup>,
 
     cube: GpuMesh,
     plane: GpuMesh,
@@ -88,6 +97,8 @@ struct DrawCommand {
     model: Mat4,
     color: [f32; 4],
     material: Material,
+    /// Resolved texture binding, when the draw samples a texture.
+    texture: Option<wgpu::BindGroup>,
 }
 
 #[repr(C)]
@@ -177,11 +188,59 @@ impl Renderer3D {
             size_of::<DrawUniform>() as u64,
         );
 
+        let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("frglib 3d texture layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("frglib 3d sampler"),
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 32.0,
+            compare: None,
+            anisotropy_clamp: 1,
+            border_color: None,
+        });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("frglib 3d layout"),
             bind_group_layouts: &[Some(&camera_layout), Some(&draw_layout)],
             immediate_size: 0,
         });
+
+        let textured_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("frglib 3d textured layout"),
+                bind_group_layouts: &[
+                    Some(&camera_layout),
+                    Some(&draw_layout),
+                    Some(&texture_layout),
+                ],
+                immediate_size: 0,
+            });
 
         let lit_triangles = create_pipeline(
             &device,
@@ -210,6 +269,24 @@ impl Renderer3D {
             None,
             "fs_unlit",
         );
+        let lit_textured = create_pipeline(
+            &device,
+            &textured_pipeline_layout,
+            &shader,
+            format,
+            wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
+            "fs_lit_textured",
+        );
+        let unlit_textured = create_pipeline(
+            &device,
+            &textured_pipeline_layout,
+            &shader,
+            format,
+            wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
+            "fs_unlit_textured",
+        );
 
         let cube = GpuMesh::upload(&device, &Mesh::cube(1.0));
         let plane = GpuMesh::upload(&device, &Mesh::plane(1.0, 1.0));
@@ -227,6 +304,11 @@ impl Renderer3D {
             lit_triangles,
             unlit_triangles,
             unlit_lines,
+            lit_textured,
+            unlit_textured,
+            texture_layout,
+            sampler,
+            texture_bind_groups: HashMap::new(),
             cube,
             plane,
             grid: None,
@@ -242,6 +324,30 @@ impl Renderer3D {
     /// are reference-counted, not copied.
     pub fn create_mesh(&self, mesh: &Mesh) -> GpuMesh {
         GpuMesh::upload(&self.device, mesh)
+    }
+
+    /// Uploads an [`Image`] as a texture this renderer can sample.
+    ///
+    /// The result can be passed to [`draw_mesh_textured`](Self::draw_mesh_textured)
+    /// any number of times and across frames. For a model loaded from OBJ, this
+    /// is the picture its `vt` coordinates point into.
+    pub fn create_texture(&self, image: &Image) -> Result<Texture, Error> {
+        let (width, height) = image.size();
+        let pixels = super::texture::image_rgba8(image)?;
+        self.create_texture_rgba8(width, height, &pixels)
+    }
+
+    /// Uploads tightly packed RGBA8 pixels as a texture.
+    ///
+    /// `pixels` must be exactly `width * height * 4` bytes, one row after
+    /// another from top to bottom.
+    pub fn create_texture_rgba8(
+        &self,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+    ) -> Result<Texture, Error> {
+        Texture::upload(&self.device, &self.queue, width, height, pixels)
     }
 
     /// Starts a frame against `camera`, discarding anything queued before.
@@ -273,7 +379,75 @@ impl Renderer3D {
             model: transform,
             color: color_to_linear(color),
             material,
+            texture: None,
         });
+    }
+
+    /// Queues a lit mesh draw that samples `texture`.
+    ///
+    /// The vertex colours and the `color` argument multiply the sampled texel,
+    /// so pass [`Color::WHITE`] to show the image unchanged. Texture
+    /// coordinates come from the mesh: OBJ models carry them, and the built-in
+    /// cube and plane map the image onto every face.
+    pub fn draw_mesh_textured(
+        &mut self,
+        mesh: &GpuMesh,
+        texture: &Texture,
+        transform: Mat4,
+        color: Color,
+    ) {
+        self.draw_mesh_textured_with(mesh, texture, transform, Material::Lit, color);
+    }
+
+    /// Queues a textured mesh draw with an explicit [`Material`].
+    pub fn draw_mesh_textured_with(
+        &mut self,
+        mesh: &GpuMesh,
+        texture: &Texture,
+        transform: Mat4,
+        material: Material,
+        color: Color,
+    ) {
+        if mesh.vertex_count == 0 {
+            return;
+        }
+
+        let bind_group = self.texture_bind_group(texture);
+
+        self.commands.push(DrawCommand {
+            mesh: mesh.clone(),
+            model: transform,
+            color: color_to_linear(color),
+            material,
+            texture: Some(bind_group),
+        });
+    }
+
+    /// Queues a textured unit cube moved and scaled into place.
+    pub fn draw_cube_textured(
+        &mut self,
+        center: Vec3,
+        size: Vec3,
+        texture: &Texture,
+        color: Color,
+    ) {
+        let model = Mat4::from_translation(center) * Mat4::from_scale(size);
+        let cube = self.cube.clone();
+        self.draw_mesh_textured(&cube, texture, model, color);
+    }
+
+    /// Queues a textured flat XZ quad, scaled by `size`.
+    pub fn draw_plane_textured(
+        &mut self,
+        center: Vec3,
+        size: Vec2,
+        texture: &Texture,
+        color: Color,
+    ) {
+        let model =
+            Mat4::from_translation(center) * Mat4::from_scale(Vec3::new(size.x, 1.0, size.y));
+        let plane = self.plane.clone();
+        self.draw_mesh_textured(&plane, texture, model, color);
     }
 
     /// Queues a unit cube moved and scaled into place.
@@ -307,6 +481,7 @@ impl Renderer3D {
             model: Mat4::IDENTITY,
             color: color_to_linear(color),
             material: Material::Unlit,
+            texture: None,
         });
     }
 
@@ -340,6 +515,7 @@ impl Renderer3D {
                 model: Mat4::IDENTITY,
                 color: [1.0; 4],
                 material: Material::Unlit,
+                texture: None,
             });
         }
 
@@ -407,10 +583,19 @@ impl Renderer3D {
         pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
         for (index, command) in self.commands.iter().enumerate() {
-            let pipeline = match (command.material, command.mesh.topology) {
-                (Material::Lit, wgpu::PrimitiveTopology::TriangleList) => &self.lit_triangles,
-                (_, wgpu::PrimitiveTopology::TriangleList) => &self.unlit_triangles,
-                (_, wgpu::PrimitiveTopology::LineList) => &self.unlit_lines,
+            // A texture only makes sense on triangles; lines have no sampler
+            // and their pipeline layout has no texture group.
+            let textured = command.texture.is_some()
+                && command.mesh.topology == wgpu::PrimitiveTopology::TriangleList;
+
+            let pipeline = match (command.material, command.mesh.topology, textured) {
+                (Material::Lit, wgpu::PrimitiveTopology::TriangleList, true) => &self.lit_textured,
+                (Material::Lit, wgpu::PrimitiveTopology::TriangleList, false) => {
+                    &self.lit_triangles
+                }
+                (_, wgpu::PrimitiveTopology::TriangleList, true) => &self.unlit_textured,
+                (_, wgpu::PrimitiveTopology::TriangleList, false) => &self.unlit_triangles,
+                (_, wgpu::PrimitiveTopology::LineList, _) => &self.unlit_lines,
                 _ => &self.unlit_triangles,
             };
 
@@ -420,6 +605,13 @@ impl Renderer3D {
                 &self.draw_bind_group,
                 &[(index as u64 * self.draw_stride) as u32],
             );
+
+            if textured {
+                if let Some(texture) = &command.texture {
+                    pass.set_bind_group(2, texture, &[]);
+                }
+            }
+
             pass.set_vertex_buffer(0, command.mesh.vertex_buffer.slice(..));
 
             match &command.mesh.index_buffer {
@@ -433,6 +625,21 @@ impl Renderer3D {
 
         drop(pass);
         self.commands.clear();
+    }
+
+    fn texture_bind_group(&mut self, texture: &Texture) -> wgpu::BindGroup {
+        if let Some(group) = self.texture_bind_groups.get(&texture.id()) {
+            return group.clone();
+        }
+
+        let group = create_texture_bind_group(
+            &self.device,
+            &self.texture_layout,
+            &self.sampler,
+            texture.view(),
+        );
+        self.texture_bind_groups.insert(texture.id(), group.clone());
+        group
     }
 
     fn grid_mesh(&mut self, slices: u32, spacing: f32) -> GpuMesh {
@@ -526,6 +733,28 @@ fn create_pipeline(
         },
         multiview_mask: None,
         cache: None,
+    })
+}
+
+fn create_texture_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    view: &wgpu::TextureView,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("frglib 3d texture"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
     })
 }
 

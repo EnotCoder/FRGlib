@@ -382,27 +382,7 @@ impl Renderer2D {
     /// works.
     pub fn create_texture(&mut self, image: &Image) -> Result<GpuTexture, Error> {
         let (width, height) = image.size();
-        let converted = image
-            .surface
-            .convert_format(sdl3::pixels::PixelFormat::RGBA32)?;
-
-        let pitch = converted.pitch() as usize;
-        let row_bytes = width as usize * 4;
-
-        // SDL pads rows to its own pitch; wgpu wants tightly packed rows.
-        let pixels = converted.with_lock(|data| {
-            if pitch == row_bytes {
-                data[..row_bytes * height as usize].to_vec()
-            } else {
-                let mut packed = Vec::with_capacity(row_bytes * height as usize);
-                for row in 0..height as usize {
-                    let start = row * pitch;
-                    packed.extend_from_slice(&data[start..start + row_bytes]);
-                }
-                packed
-            }
-        });
-
+        let pixels = super::texture::image_rgba8(image)?;
         self.create_texture_rgba8(width, height, &pixels)
     }
 

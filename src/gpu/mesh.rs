@@ -4,25 +4,29 @@ use wgpu::util::DeviceExt;
 
 use crate::graphics::Color;
 
-/// One vertex: position, normal and a colour multiplier.
+/// One vertex: position, normal, colour multiplier and texture coordinates.
 ///
 /// The built-in primitives are white, so the colour passed to a draw call
 /// decides their shade; a custom mesh can bake per-vertex colours in instead.
+/// The UV pair is read only by textured draws; untextured ones ignore it.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub color: [f32; 4],
+    /// Texture coordinates, with `(0, 0)` at the top-left of the image.
+    pub uv: [f32; 2],
 }
 
 impl Vertex {
-    /// A white vertex with `normal` for lighting.
+    /// A white vertex with `normal` for lighting and no texture coordinates.
     pub const fn new(position: [f32; 3], normal: [f32; 3]) -> Self {
         Vertex {
             position,
             normal,
             color: [1.0, 1.0, 1.0, 1.0],
+            uv: [0.0, 0.0],
         }
     }
 
@@ -32,12 +36,38 @@ impl Vertex {
             position,
             normal,
             color,
+            uv: [0.0, 0.0],
+        }
+    }
+
+    /// A white vertex with texture coordinates.
+    pub const fn with_uv(position: [f32; 3], normal: [f32; 3], uv: [f32; 2]) -> Self {
+        Vertex {
+            position,
+            normal,
+            color: [1.0, 1.0, 1.0, 1.0],
+            uv,
+        }
+    }
+
+    /// A vertex with both a colour and texture coordinates.
+    pub const fn with_color_uv(
+        position: [f32; 3],
+        normal: [f32; 3],
+        color: [f32; 4],
+        uv: [f32; 2],
+    ) -> Self {
+        Vertex {
+            position,
+            normal,
+            color,
+            uv,
         }
     }
 
     /// How `wgpu` should read [`Vertex`] out of the vertex buffer.
     pub(crate) fn layout() -> wgpu::VertexBufferLayout<'static> {
-        const ATTRIBUTES: [wgpu::VertexAttribute; 3] = [
+        const ATTRIBUTES: [wgpu::VertexAttribute; 4] = [
             wgpu::VertexAttribute {
                 format: wgpu::VertexFormat::Float32x3,
                 offset: 0,
@@ -53,6 +83,11 @@ impl Vertex {
                 offset: 24,
                 shader_location: 2,
             },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x2,
+                offset: 40,
+                shader_location: 3,
+            },
         ];
 
         wgpu::VertexBufferLayout {
@@ -66,7 +101,9 @@ impl Vertex {
 /// CPU-side geometry: vertex and index lists plus how to interpret them.
 ///
 /// Primitive constructors return a mesh in its own local space, centred on the
-/// origin. A draw call then places it with a model matrix.
+/// origin. A draw call then places it with a model matrix. Models can also come
+/// from a Wavefront OBJ file with [`Mesh::from_obj_str`] or
+/// [`Mesh::from_obj_file`].
 #[derive(Debug, Clone)]
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
@@ -166,10 +203,10 @@ impl Mesh {
 
         Mesh {
             vertices: vec![
-                Vertex::new([-half_x, 0.0, half_z], normal),
-                Vertex::new([half_x, 0.0, half_z], normal),
-                Vertex::new([half_x, 0.0, -half_z], normal),
-                Vertex::new([-half_x, 0.0, -half_z], normal),
+                Vertex::with_uv([-half_x, 0.0, half_z], normal, [0.0, 1.0]),
+                Vertex::with_uv([half_x, 0.0, half_z], normal, [1.0, 1.0]),
+                Vertex::with_uv([half_x, 0.0, -half_z], normal, [1.0, 0.0]),
+                Vertex::with_uv([-half_x, 0.0, -half_z], normal, [0.0, 0.0]),
             ],
             indices: vec![0, 1, 2, 0, 2, 3],
             topology: wgpu::PrimitiveTopology::TriangleList,
@@ -228,6 +265,36 @@ impl Mesh {
             Vertex::with_color(to.to_array(), normal, color),
         ])
     }
+
+    /// Parses a Wavefront OBJ model.
+    ///
+    /// Positions, normals, texture coordinates and polygon faces are read.
+    /// Faces without normals are shaded flat; polygons are triangulated as a
+    /// fan. Material names in the file are ignored: the texture is chosen by
+    /// the draw call instead.
+    ///
+    /// ```
+    /// use frglib::gpu::Mesh;
+    ///
+    /// let mesh = Mesh::from_obj_str("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")?;
+    /// assert_eq!(mesh.indices.len(), 3);
+    /// # Ok::<(), frglib::gpu::ObjError>(())
+    /// ```
+    pub fn from_obj_str(source: &str) -> Result<Self, super::ObjError> {
+        super::obj::parse(source)
+    }
+
+    /// Reads and parses a Wavefront OBJ file.
+    ///
+    /// ```no_run
+    /// use frglib::gpu::Mesh;
+    ///
+    /// let mesh = Mesh::from_obj_file("models/crate.obj")?;
+    /// # Ok::<(), frglib::gpu::ObjError>(())
+    /// ```
+    pub fn from_obj_file(path: impl AsRef<std::path::Path>) -> Result<Self, super::ObjError> {
+        super::obj::parse_file(path.as_ref())
+    }
 }
 
 fn quad(
@@ -237,8 +304,10 @@ fn quad(
     normal: [f32; 3],
 ) {
     let base = vertices.len() as u32;
-    for corner in corners {
-        vertices.push(Vertex::new(corner, normal));
+    let uvs = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+
+    for (corner, uv) in corners.into_iter().zip(uvs) {
+        vertices.push(Vertex::with_uv(corner, normal, uv));
     }
     indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
 }
@@ -297,6 +366,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_vertex_is_forty_eight_bytes() {
+        // position (12) + normal (12) + colour (16) + uv (8).
+        assert_eq!(std::mem::size_of::<Vertex>(), 48);
+    }
+
+    #[test]
+    fn the_vertex_layout_covers_every_attribute() {
+        let layout = Vertex::layout();
+        let offsets: Vec<u64> = layout
+            .attributes
+            .iter()
+            .map(|attribute| attribute.offset)
+            .collect();
+
+        assert_eq!(layout.array_stride, 48);
+        assert_eq!(offsets, vec![0, 12, 24, 40]);
+        assert_eq!(layout.attributes[3].shader_location, 3);
+    }
+
+    #[test]
     fn a_cube_has_six_faces_of_two_triangles() {
         let cube = Mesh::cube(2.0);
 
@@ -324,6 +413,16 @@ mod tests {
         for vertex in &cube.vertices {
             let dot = Vec3::from_array(vertex.position).dot(Vec3::from_array(vertex.normal));
             assert!(dot > 0.0, "normal should point outwards, dot was {dot}");
+        }
+    }
+
+    #[test]
+    fn cube_faces_carry_unit_texture_coordinates() {
+        let cube = Mesh::cube(1.0);
+
+        for vertex in &cube.vertices {
+            assert!((0.0..=1.0).contains(&vertex.uv[0]));
+            assert!((0.0..=1.0).contains(&vertex.uv[1]));
         }
     }
 
