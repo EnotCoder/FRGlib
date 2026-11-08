@@ -91,11 +91,13 @@ src/gpu/
 | `window.rs` | Окно, GPU-ручки и один кадр | `WgpuWindow`, `Gpu`, `Frame` |
 | `camera.rs` | Перспективная 3D-камера | `Camera3D` |
 | `mesh.rs` | Геометрия на CPU и на GPU | `Vertex`, `Mesh`, `GpuMesh` |
-| `renderer.rs` | 3D-рендерер с освещением | `Renderer3D`, `Material` |
-| `renderer2d.rs` | Батчевый 2D-рендерер | `Renderer2D`, `GpuTexture` |
+| `Renderer3D` | 3D-рендерер с освещением и кастомными шейдерами | `Renderer3D`, `Material` |
+| `Renderer2D` | Батчевый 2D-рендерер | `Renderer2D`, `GpuTexture` |
+| `texture.rs` | Текстуры для 3D и общие GPU-изображения | `Texture` |
+| `obj.rs` | Загрузка моделей Wavefront OBJ | `ObjError` |
 | `font.rs` | Шрифты, глифы и раскладка строк | `FontId`, `TextAlign` |
 | `error.rs` | Ошибки окна, GPU и рисования | `Error` |
-| `shaders/lit.wgsl` | WGSL для 3D | — |
+| `shaders/lit.wgsl` | WGSL для 3D (lit, unlit, textured) | — |
 | `shaders/sprite.wgsl` | WGSL для 2D | — |
 
 Дальше — каждый файл по порядку.
@@ -341,23 +343,29 @@ pub struct Vertex {
 | Значение | Что делает |
 |---|---|
 | `Material::Lit` | Направленный свет + ambient 0.18 + блик Блинна-Фонга (степень 32, вклад 0.25). По умолчанию |
-| `Material::Unlit` | Цвет уходит на экран без изменений. Для сеток, осей и отладки |
+| `Material::Unlit` | Цвет или текстура уходят на экран без изменений. Для сеток, осей и ярких объектов |
+| `Material::Custom(id)` | Свой шейдер, созданный через `Renderer3D::create_material` |
 
 ### Методы
 
 | Метод | Что делает |
 |---|---|
 | `new(&Gpu)` | Создаёт пайплайны, буферы юниформ и встроенные куб с плоскостью |
+| `create_material(source) -> Material` | Компилирует WGSL-код в новый материал. Автоматически подставляет структуры `Camera`, `Draw`, `VertexInput` и `VertexOutput` |
 | `create_mesh(&Mesh) -> GpuMesh` | Загружает свою геометрию; handle можно хранить между кадрами |
+| `create_texture(&Image) -> Texture` | Загружает изображение на GPU для использования в 3D |
 | `begin(&Camera3D)` | Начинает кадр с камерой и сбрасывает очередь |
 | `draw_mesh(&GpuMesh, Mat4, Color)` | Ставит lit-меш модельной матрицей |
+| `draw_mesh_textured(&GpuMesh, &Texture, Mat4, Color)` | Рисует меш с текстурой и освещением |
 | `draw_mesh_with(&GpuMesh, Mat4, Material, Color)` | То же с явным материалом |
+| `draw_mesh_textured_with(...)` | Текстурированный меш с кастомным материалом |
 | `draw_cube(center, size, Color)` | Куб, сдвинутый и растянутый; внутри `translation * scale` |
+| `draw_cube_textured(center, size, &Texture, Color)` | Текстурированный куб |
 | `draw_cube_model(Mat4, Color)` | Единичный куб с произвольной матрицей — для поворотов |
 | `draw_plane(center, size, Color)` | Плоский quad в XZ |
 | `draw_grid(slices, spacing, Color)` | Проволочная сетка; меш кешируется по `(slices, spacing)` |
 | `draw_line(from, to, Color)` | Один отрезок; копится в общий буфер кадра |
-| `draw_lines(&[Vec3], Color)` | Связная ломаная через точки |
+| `draw_lines(&[Vec3], Color) ` | Связная ломаная через точки |
 | `finish(&mut Frame)` | Записывает все накопленные draw в один render pass и очищает очередь |
 
 ### Как это устроено внутри
@@ -881,6 +889,47 @@ window.present(frame)?;
   vsync-режим. Своего переключателя нет.
 - `render_size()` отстаёт от `size()` на один кадр: между событием ресайза и
   следующим `begin_frame` они могут отличаться.
+
+### Кастомные шейдеры (Renderer3D)
+
+`create_material` позволяет вставить свою логику отрисовки. В код автоматически добавляется «хедер» с определениями `Camera`, `Draw`, `VertexInput` и `VertexOutput`.
+
+Вам нужно реализовать как минимум:
+- `fs_main(input: VertexOutput) -> @location(0) vec4<f32>` (для обычных мешей)
+- `fs_main_textured(input: VertexOutput) -> @location(0) vec4<f32>` (для текстурированных)
+
+Вы можете переопределить и `vs_main`, если хотите менять геометрию (например, для колыхания травы).
+
+```rust
+let my_material = renderer.create_material(r#"
+    @fragment
+    fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+        return vec4<f32>(input.normal * 0.5 + 0.5, 1.0); // Визуализация нормалей
+    }
+    
+    @fragment
+    fn fs_main_textured(input: VertexOutput) -> @location(0) vec4<f32> {
+        let texel = textureSample(albedo, albedo_sampler, input.uv);
+        return vec4<f32>(texel.rgb * input.color.rgb, texel.a);
+    }
+"#);
+
+renderer.draw_mesh_with(&gpu_mesh, transform, my_material, Color::WHITE);
+```
+
+### Текстуры и OBJ-модели
+
+```rust
+// Модель из файла (поддерживаются треугольники и полигоны)
+let mesh = Mesh::from_obj_file("model.obj")?;
+let gpu_mesh = renderer.create_mesh(&mesh);
+
+// Текстура для 3D
+let texture = renderer.create_texture(&Image::from_file("diffuse.png")?)?;
+
+// Отрисовка
+renderer.draw_mesh_textured(&gpu_mesh, &texture, transform, Color::WHITE);
+```
 
 ## Порядок вызовов в кадре
 

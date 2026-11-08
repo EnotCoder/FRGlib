@@ -61,7 +61,6 @@ pub struct Renderer3D {
     queue: wgpu::Queue,
     format: wgpu::TextureFormat,
 
-    camera_layout: wgpu::BindGroupLayout,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
 
@@ -309,7 +308,6 @@ impl Renderer3D {
             device,
             queue,
             format,
-            camera_layout,
             camera_buffer,
             camera_bind_group,
             draw_layout,

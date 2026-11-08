@@ -6,10 +6,11 @@
 //! FRGLib и вращаем её.
 
 use frglib::gpu::glam::{Mat4, Vec3};
-use frglib::gpu::{Camera3D, Mesh, Renderer3D, Texture, WgpuWindow};
+use frglib::gpu::{Camera3D, Mesh, Renderer3D, Texture, WgpuWindow, Material};
 use frglib::{Color, Event, FrameClock, Image};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+
     let mut window = WgpuWindow::builder("FRGLib 3D Model")
         .size(800, 600)
         .background(Color::rgb(20, 22, 30))
@@ -49,31 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let transform = Mat4::from_rotation_y(angle * 0.5);
         // renderer.draw_mesh_textured(&gpu_mesh, &texture, transform, Color::WHITE);
 
-        let shader_code = r#"
-            @vertex
-            fn vs_main(input: VertexInput) -> VertexOutput {
-                let world = draw.model * vec4<f32>(input.position, 1.0);
-                var out: VertexOutput;
-                out.clip_position = camera.view_proj * world;
-                out.world_position = world.xyz;
-                out.normal = normalize((draw.model * vec4<f32>(input.normal, 0.0)).xyz);
-                out.color = input.color * draw.color;
-                out.uv = input.uv;
-                return out;
-            }
-
-            @fragment
-            fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-                return vec4<f32>(1.0, 0.0, 0.0, 1.0); // Красный без света
-            }
-            
-            @fragment
-            fn fs_main_textured(input: VertexOutput) -> @location(0) vec4<f32> {
-                return textureSample(albedo, albedo_sampler, input.uv); // Текстура без света
-            }
-        "#;
-
-        let my_material = renderer.create_material(shader_code);
+        let my_material = Material::Unlit;
         renderer.draw_mesh_textured_with(&gpu_mesh, &texture, transform, my_material, Color::WHITE);
         
         renderer.finish(&mut frame);
