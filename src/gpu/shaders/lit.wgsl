@@ -66,8 +66,8 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
 // One directional light plus a little ambient and specular. A small ambient
 // term keeps the side facing away from the light readable instead of black.
-fn shade(world_position: vec3<f32>, normal: vec3<f32>, base: vec4<f32>) -> vec4<f32> {
-    let normal = normalize(normal);
+fn shade(world_position: vec3<f32>, normal_in: vec3<f32>, base: vec4<f32>) -> vec4<f32> {
+    let normal = normalize(normal_in);
     let to_light = normalize(-camera.light_dir.xyz);
     let view_dir = normalize(camera.camera_pos.xyz - world_position);
     let half_vector = normalize(to_light + view_dir);
