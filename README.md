@@ -85,7 +85,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Подробнее: [docs/10-wgpu.md](docs/10-wgpu.md).
+Подробнее: [docs/10-wgpu.md](docs/10-wgpu.md) — полное руководство по модулю
+`src/gpu`: каждый файл, API, кадровый цикл, 3D, 2D, текст, UI и свои проходы.
 
 ## API
 
