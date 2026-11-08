@@ -345,9 +345,18 @@ impl Renderer3D {
     ///
     /// The returned `Material` can be passed to `draw_mesh_with`.
     pub fn create_material(&mut self, source: &str) -> Material {
+        let full_source = format!(
+            "{}\n{}",
+            include_str!("shaders/lit.wgsl")
+                .split("@vertex")
+                .next()
+                .unwrap(),
+            source
+        );
+
         let shader = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("frglib custom shader"),
-            source: wgpu::ShaderSource::Wgsl(source.into()),
+            source: wgpu::ShaderSource::Wgsl(full_source.into()),
         });
 
         let triangles = create_pipeline(
