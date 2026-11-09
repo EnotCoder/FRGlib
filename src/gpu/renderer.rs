@@ -8,6 +8,7 @@ use glam::{Mat4, Vec2, Vec3};
 use crate::gpu::camera::Camera3D;
 use crate::gpu::error::Error;
 use crate::gpu::gltf::{GltfModel, GpuGltfModel, GpuGltfPrimitive};
+use crate::gpu::light::{Light, LightKind, MAX_LIGHTS};
 use crate::gpu::mesh::{GpuMesh, Mesh, Vertex};
 use crate::gpu::texture::Texture;
 use crate::gpu::window::{Frame, Gpu};
@@ -18,7 +19,8 @@ use super::color_to_linear;
 /// How a draw call is lit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Material {
-    /// One directional light plus a little ambient and specular. The default.
+    /// Every active light in the scene plus a little ambient and specular.
+    /// The default.
     #[default]
     Lit,
     /// The colour goes to the screen unchanged. Good for grids and debug lines.
@@ -91,6 +93,8 @@ pub struct Renderer3D {
     grid: Option<GridCache>,
 
     camera: Camera3D,
+    lights: Vec<Light>,
+    ambient: Color,
     commands: Vec<DrawCommand>,
     line_vertices: Vec<Vertex>,
 }
@@ -120,8 +124,16 @@ struct DrawCommand {
 struct CameraUniform {
     view_proj: [[f32; 4]; 4],
     camera_pos: [f32; 4],
-    light_dir: [f32; 4],
-    light_color: [f32; 4],
+    /// `rgb` is linear colour, `a` is intensity.
+    ambient: [f32; 4],
+    /// `x` is the number of active lights; the rest pads the vec4.
+    light_count: [u32; 4],
+    /// `xyz` is the direction (directional) or position (point); `w` is 0 or 1.
+    light_position: [[f32; 4]; MAX_LIGHTS],
+    /// `rgb` is linear colour, `a` is intensity.
+    light_color: [[f32; 4]; MAX_LIGHTS],
+    /// `x` is the range of a point light.
+    light_params: [[f32; 4]; MAX_LIGHTS],
 }
 
 #[repr(C)]
@@ -331,6 +343,13 @@ impl Renderer3D {
             plane,
             grid: None,
             camera: Camera3D::perspective(60.0, 0.1, 500.0),
+            // Keep the historical single directional light until the caller
+            // sets their own. `clear_lights` starts an empty scene.
+            lights: vec![Light::directional(
+                Vec3::new(-0.4, -1.0, -0.3),
+                Color::WHITE,
+            )],
+            ambient: Color::rgb(46, 46, 46), // ~0.18 in sRGB
             commands: Vec::new(),
             line_vertices: Vec::new(),
         }
@@ -353,10 +372,12 @@ impl Renderer3D {
             source
         );
 
-        let shader = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("frglib custom shader"),
-            source: wgpu::ShaderSource::Wgsl(full_source.into()),
-        });
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("frglib custom shader"),
+                source: wgpu::ShaderSource::Wgsl(full_source.into()),
+            });
 
         let triangles = create_pipeline(
             &self.device,
@@ -463,6 +484,49 @@ impl Renderer3D {
         self.camera = *camera;
         self.commands.clear();
         self.line_vertices.clear();
+    }
+
+    /// Replaces every light in the scene.
+    ///
+    /// At most [`MAX_LIGHTS`] are kept; extra entries are dropped. An empty
+    /// iterator leaves only the ambient term, so a dark scene is possible on
+    /// purpose. The built-in default is one white directional light.
+    pub fn set_lights(&mut self, lights: impl IntoIterator<Item = Light>) {
+        self.lights = lights.into_iter().take(MAX_LIGHTS).collect();
+    }
+
+    /// Adds one light to the scene.
+    ///
+    /// Lights persist across frames until [`clear_lights`](Self::clear_lights)
+    /// or [`set_lights`](Self::set_lights) replaces them. Once [`MAX_LIGHTS`]
+    /// are present, further lights are ignored.
+    pub fn add_light(&mut self, light: Light) {
+        if self.lights.len() < MAX_LIGHTS {
+            self.lights.push(light);
+        }
+    }
+
+    /// Removes every light, leaving only the ambient term.
+    pub fn clear_lights(&mut self) {
+        self.lights.clear();
+    }
+
+    /// The lights currently used by lit draws.
+    pub fn lights(&self) -> &[Light] {
+        &self.lights
+    }
+
+    /// Sets the global ambient light colour.
+    ///
+    /// The default is a dark grey (~0.18 linear), which keeps the shadowed
+    /// sides of objects from being pitch black.
+    pub fn set_ambient(&mut self, color: Color) {
+        self.ambient = color;
+    }
+
+    /// The current global ambient light colour.
+    pub fn ambient(&self) -> Color {
+        self.ambient
     }
 
     /// Queues a lit mesh draw.
@@ -681,14 +745,42 @@ impl Renderer3D {
 
         let aspect = *size;
         let aspect = aspect.0 as f32 / aspect.1.max(1) as f32;
+
+        let mut light_position = [[0.0f32; 4]; MAX_LIGHTS];
+        let mut light_color = [[0.0f32; 4]; MAX_LIGHTS];
+        let mut light_params = [[0.0f32; 4]; MAX_LIGHTS];
+
+        for (index, light) in self.lights.iter().take(MAX_LIGHTS).enumerate() {
+            match light.kind {
+                LightKind::Directional { direction } => {
+                    let direction = direction.normalize_or_zero();
+                    // A zero vector would turn into NaN in the shader; aim a
+                    // broken light straight down instead.
+                    let direction = if direction == Vec3::ZERO {
+                        Vec3::NEG_Y
+                    } else {
+                        direction
+                    };
+                    light_position[index] = direction.extend(0.0).to_array();
+                }
+                LightKind::Point { position, range } => {
+                    light_position[index] = position.extend(1.0).to_array();
+                    light_params[index][0] = range.max(0.0);
+                }
+            }
+
+            let color = color_to_linear(light.color);
+            light_color[index] = [color[0], color[1], color[2], light.intensity.max(0.0)];
+        }
+
         let camera_uniform = CameraUniform {
             view_proj: self.camera.view_projection(aspect).to_cols_array_2d(),
             camera_pos: self.camera.position.extend(1.0).to_array(),
-            light_dir: Vec3::new(-0.4, -1.0, -0.3)
-                .normalize()
-                .extend(0.0)
-                .to_array(),
-            light_color: [1.0, 1.0, 1.0, 1.0],
+            ambient: color_to_linear(self.ambient),
+            light_count: [self.lights.len().min(MAX_LIGHTS) as u32, 0, 0, 0],
+            light_position,
+            light_color,
+            light_params,
         };
         self.queue
             .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniform));
@@ -996,8 +1088,9 @@ mod tests {
     }
 
     #[test]
-    fn the_camera_uniform_is_four_vec4_after_the_matrix() {
-        // mat4x4 (64) + three vec4 (48).
-        assert_eq!(size_of::<CameraUniform>(), 112);
+    fn the_camera_uniform_has_room_for_every_light() {
+        // mat4x4 (64) + camera vec4 (16) + ambient vec4 (16) + count vec4 (16)
+        // + three light arrays of MAX_LIGHTS vec4s.
+        assert_eq!(size_of::<CameraUniform>(), 112 + MAX_LIGHTS * 3 * 16);
     }
 }

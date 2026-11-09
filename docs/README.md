@@ -92,6 +92,7 @@ FRGLib/
 │   │   ├── font.rs     # FontId, атлас глифов, раскладка текста
 │   │   ├── camera.rs
 │   │   ├── mesh.rs
+│   │   ├── light.rs    # Light, LightKind, MAX_LIGHTS
 │   │   ├── obj.rs      # Wavefront OBJ
 │   │   ├── gltf.rs     # glTF 2.0 (.gltf/.glb)
 │   │   └── shaders/

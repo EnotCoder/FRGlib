@@ -55,6 +55,7 @@ mod camera;
 mod error;
 mod font;
 mod gltf;
+mod light;
 mod mesh;
 mod obj;
 mod renderer;
@@ -70,6 +71,7 @@ pub use gltf::{
     GltfError, GltfImage, GltfInstance, GltfMaterial, GltfModel, GltfPrimitive, GpuGltfModel,
     GpuGltfPrimitive,
 };
+pub use light::{Light, LightKind, MAX_LIGHTS};
 pub use mesh::{GpuMesh, Mesh, Vertex};
 pub use obj::ObjError;
 pub use renderer::{Material, Renderer3D};

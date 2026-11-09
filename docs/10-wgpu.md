@@ -75,6 +75,7 @@ src/gpu/
 ├── window.rs         WgpuWindow, Gpu, Frame
 ├── camera.rs         Camera3D
 ├── mesh.rs           Vertex, Mesh, GpuMesh
+├── light.rs          Light, LightKind, MAX_LIGHTS
 ├── obj.rs            загрузка Wavefront OBJ
 ├── gltf.rs           загрузка glTF 2.0 (.gltf/.glb)
 ├── renderer.rs       Renderer3D, Material
@@ -93,6 +94,7 @@ src/gpu/
 | `window.rs` | Окно, GPU-ручки и один кадр | `WgpuWindow`, `Gpu`, `Frame` |
 | `camera.rs` | Перспективная 3D-камера | `Camera3D` |
 | `mesh.rs` | Геометрия на CPU и на GPU | `Vertex`, `Mesh`, `GpuMesh` |
+| `light.rs` | Направленные и точечные источники света | `Light`, `LightKind`, `MAX_LIGHTS` |
 | `Renderer3D` | 3D-рендерер с освещением и кастомными шейдерами | `Renderer3D`, `Material` |
 | `Renderer2D` | Батчевый 2D-рендерер | `Renderer2D`, `GpuTexture` |
 | `texture.rs` | Текстуры для 3D и общие GPU-изображения | `Texture` |
@@ -339,13 +341,41 @@ pub struct Vertex {
 ## renderer.rs: `Renderer3D`
 
 Высокоуровневый 3D-рендерер. Рисует меши, кубы, плоскости, сетки и
-отладочные линии с одним направленным светом или без освещения.
+отладочные линии с набором направленных и точечных источников света или без
+освещения.
+
+### Свет
+
+`Light` бывает двух видов:
+
+```rust
+use frglib::gpu::glam::Vec3;
+use frglib::gpu::{Light, MAX_LIGHTS};
+use frglib::Color;
+
+renderer.clear_lights();
+renderer.add_light(
+    Light::directional(Vec3::new(-0.4, -1.0, -0.3), Color::WHITE)
+        .with_intensity(1.0),
+);
+renderer.add_light(
+    Light::point(Vec3::new(0.0, 2.0, 0.0), Color::rgb(255, 80, 80))
+        .with_range(8.0)
+        .with_intensity(0.6),
+);
+renderer.set_ambient(Color::rgb(46, 46, 46));
+```
+
+Встроенный шейдер обрабатывает до `MAX_LIGHTS` (8) источников за один draw.
+По умолчанию включён один белый направленный свет и серый ambient (~0.18 linear);
+`set_lights` заменяет весь набор, `clear_lights` убирает источники света,
+но оставляет ambient. Света сохраняются между кадрами.
 
 ### `Material`
 
 | Значение | Что делает |
 |---|---|
-| `Material::Lit` | Направленный свет + ambient 0.18 + блик Блинна-Фонга (степень 32, вклад 0.25). По умолчанию |
+| `Material::Lit` | Все источники света + ambient + блик Блинна-Фонга (степень 32, вклад 0.25 на источник). По умолчанию |
 | `Material::Unlit` | Цвет или текстура уходят на экран без изменений. Для сеток, осей и ярких объектов |
 | `Material::Custom(id)` | Свой шейдер, созданный через `Renderer3D::create_material` |
 
@@ -358,6 +388,12 @@ pub struct Vertex {
 | `create_mesh(&Mesh) -> GpuMesh` | Загружает свою геометрию; handle можно хранить между кадрами |
 | `create_texture(&Image) -> Texture` | Загружает изображение на GPU для использования в 3D |
 | `begin(&Camera3D)` | Начинает кадр с камерой и сбрасывает очередь |
+| `set_lights(impl IntoIterator<Item = Light>)` | Заменяет все источники света; лишние сверх `MAX_LIGHTS` отбрасываются |
+| `add_light(Light)` | Добавляет один источник к текущему набору |
+| `clear_lights()` | Убирает весь свет, оставляя только ambient |
+| `lights() -> &[Light]` | Текущий набор источников |
+| `set_ambient(Color)` | Устанавливает цвет глобального фонового освещения |
+| `ambient() -> Color` | Текущий цвет фонового освещения |
 | `draw_mesh(&GpuMesh, Mat4, Color)` | Ставит lit-меш модельной матрицей |
 | `draw_mesh_textured(&GpuMesh, &Texture, Mat4, Color)` | Рисует меш с текстурой и освещением |
 | `draw_mesh_with(&GpuMesh, Mat4, Material, Color)` | То же с явным материалом |
@@ -373,9 +409,9 @@ pub struct Vertex {
 
 ### Как это устроено внутри
 
-- **Два bind group.** Group 0 — камера: `view_proj`, позиция камеры,
-  направление и цвет света. Group 1 — конкретный draw: модельная матрица и
-  цвет.
+- **Два bind group.** Group 0 — камера: `view_proj`, позиция камеры и массивы
+  источников света (до `MAX_LIGHTS`). Group 1 — конкретный draw: модельная
+  матрица и цвет.
 - **Динамические offset-ы.** Все per-draw юниформы лежат в одном буфере;
   между draw-ами меняется только offset. Шаг выравнивается по
   `min_uniform_buffer_offset_alignment` устройства. Буфер стартует с 256
@@ -621,7 +657,8 @@ println!("{} × {}", size.x, size.y);
 
 Один шейдер на все три 3D-пайплайна.
 
-- Group 0 — камера: `view_proj`, `camera_pos`, `light_dir`, `light_color`.
+- Group 0 — камера: `view_proj`, `camera_pos`, `light_count` и массивы
+  `light_position`/`light_color`/`light_params` для `MAX_LIGHTS` источников.
 - Group 1 — draw: `model`, `color`; с dynamic offset.
 - `vs_main` умножает позицию на `model`, затем на `view_proj`; нормаль
   поворачивается модельной матрицей. Это предполагает равномерный масштаб —
@@ -1081,9 +1118,14 @@ Camera3D::{perspective, position, target, up, fov_y, clip, orbit, view, projecti
 Mesh::{cube, plane, grid, from_vertices, from_line_list, line, from_obj_str, from_obj_file}
 Vertex::{new, with_color}
 GltfModel::{from_file, from_slice}
-Renderer3D::{new, create_mesh, create_gltf, begin, draw_mesh, draw_mesh_with, draw_gltf,
-             draw_cube, draw_cube_model, draw_plane, draw_grid, draw_line, draw_lines, finish}
+Renderer3D::{new, create_mesh, create_gltf, begin, set_lights, add_light, clear_lights, lights,
+             set_ambient, ambient,
+             draw_mesh, draw_mesh_with, draw_gltf, draw_cube, draw_cube_model, draw_plane,
+             draw_grid, draw_line, draw_lines, finish}
 Material::{Lit, Unlit}
+Light::{directional, point, with_intensity, with_range, direction, position}
+LightKind::{Directional, Point}
+MAX_LIGHTS
 ```
 
 ### 2D
