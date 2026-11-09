@@ -7,6 +7,7 @@ use glam::{Mat4, Vec2, Vec3};
 
 use crate::gpu::camera::Camera3D;
 use crate::gpu::error::Error;
+use crate::gpu::gltf::{GltfModel, GpuGltfModel, GpuGltfPrimitive};
 use crate::gpu::mesh::{GpuMesh, Mesh, Vertex};
 use crate::gpu::texture::Texture;
 use crate::gpu::window::{Frame, Gpu};
@@ -418,6 +419,45 @@ impl Renderer3D {
         Texture::upload(&self.device, &self.queue, width, height, pixels)
     }
 
+    /// Uploads a whole [`GltfModel`] to the GPU.
+    ///
+    /// Every unique primitive becomes a mesh, every decoded image a texture.
+    /// The returned handle can be cloned and drawn across frames.
+    ///
+    /// ```no_run
+    /// use frglib::gpu::{GltfModel, Renderer3D};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let renderer: Renderer3D = todo!();
+    /// let model = GltfModel::from_file("models/robot.glb")?;
+    /// let gpu_model = renderer.create_gltf(&model)?;
+    /// # let _ = gpu_model;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn create_gltf(&self, model: &GltfModel) -> Result<GpuGltfModel, Error> {
+        let primitives = model
+            .primitives
+            .iter()
+            .map(|primitive| GpuGltfPrimitive {
+                mesh: self.create_mesh(&primitive.mesh),
+                material: primitive.material,
+            })
+            .collect();
+
+        let textures = model
+            .images
+            .iter()
+            .map(|image| self.create_texture_rgba8(image.width, image.height, &image.rgba8))
+            .collect::<Result<_, _>>()?;
+
+        Ok(GpuGltfModel {
+            primitives,
+            instances: model.instances.clone(),
+            materials: model.materials.clone(),
+            textures,
+        })
+    }
+
     /// Starts a frame against `camera`, discarding anything queued before.
     pub fn begin(&mut self, camera: &Camera3D) {
         self.camera = *camera;
@@ -438,17 +478,7 @@ impl Renderer3D {
         material: Material,
         color: Color,
     ) {
-        if mesh.vertex_count == 0 {
-            return;
-        }
-
-        self.commands.push(DrawCommand {
-            mesh: mesh.clone(),
-            model: transform,
-            color: color_to_linear(color),
-            material,
-            texture: None,
-        });
+        self.queue_mesh(mesh, transform, color_to_linear(color), material, None);
     }
 
     /// Queues a lit mesh draw that samples `texture`.
@@ -476,19 +506,70 @@ impl Renderer3D {
         material: Material,
         color: Color,
     ) {
-        if mesh.vertex_count == 0 {
-            return;
-        }
-
         let bind_group = self.texture_bind_group(texture);
-
-        self.commands.push(DrawCommand {
-            mesh: mesh.clone(),
-            model: transform,
-            color: color_to_linear(color),
+        self.queue_mesh(
+            mesh,
+            transform,
+            color_to_linear(color),
             material,
-            texture: Some(bind_group),
-        });
+            Some(bind_group),
+        );
+    }
+
+    /// Queues every instance of a [`GpuGltfModel`].
+    ///
+    /// `transform` is applied on top of each node's own world transform, so it
+    /// can place, rotate or scale the whole scene. Materials contribute their
+    /// base-colour factor and texture; `KHR_materials_unlit` materials use the
+    /// unlit pipeline.
+    ///
+    /// ```no_run
+    /// use frglib::gpu::glam::Mat4;
+    /// # use frglib::gpu::{GpuGltfModel, Renderer3D};
+    /// # fn draw(renderer: &mut Renderer3D, model: &GpuGltfModel) {
+    /// renderer.draw_gltf(model, Mat4::IDENTITY);
+    /// # }
+    /// ```
+    pub fn draw_gltf(&mut self, model: &GpuGltfModel, transform: Mat4) {
+        for instance in &model.instances {
+            let Some(primitive) = model.primitives.get(instance.primitive) else {
+                continue;
+            };
+
+            let placement = transform * instance.transform;
+
+            let (color, material, texture) = match primitive
+                .material
+                .and_then(|index| model.materials.get(index))
+            {
+                Some(material) => (
+                    material.base_color,
+                    if material.unlit {
+                        Material::Unlit
+                    } else {
+                        Material::Lit
+                    },
+                    material
+                        .base_color_texture
+                        .and_then(|index| model.textures.get(index)),
+                ),
+                None => ([1.0; 4], Material::Lit, None),
+            };
+
+            match texture {
+                Some(texture) => {
+                    let bind_group = self.texture_bind_group(texture);
+                    self.queue_mesh(
+                        &primitive.mesh,
+                        placement,
+                        color,
+                        material,
+                        Some(bind_group),
+                    );
+                }
+                None => self.queue_mesh(&primitive.mesh, placement, color, material, None),
+            }
+        }
     }
 
     /// Queues a textured unit cube moved and scaled into place.
@@ -703,6 +784,27 @@ impl Renderer3D {
 
         drop(pass);
         self.commands.clear();
+    }
+
+    fn queue_mesh(
+        &mut self,
+        mesh: &GpuMesh,
+        model: Mat4,
+        color: [f32; 4],
+        material: Material,
+        texture: Option<wgpu::BindGroup>,
+    ) {
+        if mesh.vertex_count == 0 {
+            return;
+        }
+
+        self.commands.push(DrawCommand {
+            mesh: mesh.clone(),
+            model,
+            color,
+            material,
+            texture,
+        });
     }
 
     fn texture_bind_group(&mut self, texture: &Texture) -> wgpu::BindGroup {

@@ -75,6 +75,8 @@ src/gpu/
 ├── window.rs         WgpuWindow, Gpu, Frame
 ├── camera.rs         Camera3D
 ├── mesh.rs           Vertex, Mesh, GpuMesh
+├── obj.rs            загрузка Wavefront OBJ
+├── gltf.rs           загрузка glTF 2.0 (.gltf/.glb)
 ├── renderer.rs       Renderer3D, Material
 ├── renderer2d.rs     Renderer2D, GpuTexture
 ├── font.rs           FontId, TextAlign, атлас глифов, раскладка текста
@@ -95,6 +97,7 @@ src/gpu/
 | `Renderer2D` | Батчевый 2D-рендерер | `Renderer2D`, `GpuTexture` |
 | `texture.rs` | Текстуры для 3D и общие GPU-изображения | `Texture` |
 | `obj.rs` | Загрузка моделей Wavefront OBJ | `ObjError` |
+| `gltf.rs` | Загрузка сцен glTF 2.0 (`.gltf`/`.glb`), материалы и текстуры | `GltfModel`, `GltfPrimitive`, `GltfInstance`, `GltfMaterial`, `GltfImage`, `GpuGltfModel`, `GpuGltfPrimitive`, `GltfError` |
 | `font.rs` | Шрифты, глифы и раскладка строк | `FontId`, `TextAlign` |
 | `error.rs` | Ошибки окна, GPU и рисования | `Error` |
 | `shaders/lit.wgsl` | WGSL для 3D (lit, unlit, textured) | — |
@@ -931,6 +934,44 @@ let texture = renderer.create_texture(&Image::from_file("diffuse.png")?)?;
 renderer.draw_mesh_textured(&gpu_mesh, &texture, transform, Color::WHITE);
 ```
 
+### glTF-модели
+
+`GltfModel` читает `.gltf` и `.glb` целиком: буферы, иерархию узлов,
+материалы и встроенные или внешние изображения. Сцена «сплющивается» в список
+уникальных примитивов и экземпляров с мировыми матрицами, поэтому один меш,
+использованный в нескольких узлах, загружается на GPU один раз.
+
+```rust
+use frglib::gpu::glam::Mat4;
+use frglib::gpu::{GltfModel, Renderer3D};
+
+let model = GltfModel::from_file("model.glb")?;
+let gpu_model = renderer.create_gltf(&model)?;
+
+// Внутри кадра:
+renderer.begin(&camera);
+renderer.draw_gltf(&gpu_model, Mat4::IDENTITY);
+renderer.finish(&mut frame);
+```
+
+- Читаются `POSITION`, `NORMAL`, `TEXCOORD_0`…`TEXCOORD_n`, `COLOR_0`, индексы,
+  режимы `TRIANGLES`/`TRIANGLE_STRIP`/`TRIANGLE_FAN`/`LINES`/`LINE_STRIP`/
+  `LINE_LOOP`, base color factor и base color texture, а также
+  `KHR_materials_unlit` и `KHR_texture_transform`.
+- Текстуры декодируются из GLB, из `data:`-URI и из внешних PNG/JPEG рядом с
+  моделью. Набор UV выбирается по `baseColorTexture.texCoord`; если такого
+  набора в меше нет, используется `TEXCOORD_0`.
+- Без нормалей геометрия затеняется плоскими нормалями; без UV все вершины
+  получают `(0, 0)`.
+- UV в glTF уже отсчитываются от верхнего левого угла, поэтому V не
+  переворачивается, в отличие от OBJ.
+- Скины, морф-таргеты, анимации, камеры, источники света и остальные
+  PBR-каналы пока не загружаются. Сэмплеры текстур игнорируются: рендерер
+  использует свой обычный sampler.
+- `GltfModel::from_slice` принимает GLB или JSON из памяти, включая
+  встроенные изображения; для JSON внешние файлы ищутся относительно текущего
+  каталога.
+
 ## Порядок вызовов в кадре
 
 ```text
@@ -1037,10 +1078,11 @@ Frame::{encoder, color, depth, size, background} + Frame::aspect
 
 ```rust
 Camera3D::{perspective, position, target, up, fov_y, clip, orbit, view, projection, view_projection}
-Mesh::{cube, plane, grid, from_vertices, from_line_list, line}
+Mesh::{cube, plane, grid, from_vertices, from_line_list, line, from_obj_str, from_obj_file}
 Vertex::{new, with_color}
-Renderer3D::{new, create_mesh, begin, draw_mesh, draw_mesh_with, draw_cube, draw_cube_model,
-             draw_plane, draw_grid, draw_line, draw_lines, finish}
+GltfModel::{from_file, from_slice}
+Renderer3D::{new, create_mesh, create_gltf, begin, draw_mesh, draw_mesh_with, draw_gltf,
+             draw_cube, draw_cube_model, draw_plane, draw_grid, draw_line, draw_lines, finish}
 Material::{Lit, Unlit}
 ```
 

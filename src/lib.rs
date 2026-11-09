@@ -61,8 +61,9 @@ pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
 pub use gpu::Error as GpuError;
 #[cfg(feature = "wgpu")]
 pub use gpu::{
-    Camera3D, FontId, Frame, Gpu, GpuMesh, GpuTexture, Material, Mesh, ObjError, Renderer2D,
-    Renderer3D, TextAlign, Texture, Vertex, WgpuWindow, WgpuWindowBuilder,
+    Camera3D, FontId, Frame, GltfError, GltfImage, GltfInstance, GltfMaterial, GltfModel,
+    GltfPrimitive, Gpu, GpuGltfModel, GpuGltfPrimitive, GpuMesh, GpuTexture, Material, Mesh,
+    ObjError, Renderer2D, Renderer3D, TextAlign, Texture, Vertex, WgpuWindow, WgpuWindowBuilder,
 };
 #[cfg(feature = "cached-textures")]
 pub use graphics::{Animation, Texture};

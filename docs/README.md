@@ -92,6 +92,8 @@ FRGLib/
 │   │   ├── font.rs     # FontId, атлас глифов, раскладка текста
 │   │   ├── camera.rs
 │   │   ├── mesh.rs
+│   │   ├── obj.rs      # Wavefront OBJ
+│   │   ├── gltf.rs     # glTF 2.0 (.gltf/.glb)
 │   │   └── shaders/
 │   ├── window/         # окно, рендерер, события окна, рисование
 │   │   ├── mod.rs

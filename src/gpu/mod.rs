@@ -8,9 +8,10 @@
 //!
 //! Two levels are available on purpose:
 //!
-//! - ready-made pieces: [`Camera3D`], [`Mesh`], [`Renderer3D`] draw 3D;
-//!   [`Renderer2D`] draws 2D shapes, sprites, [`crate::ui`] widgets and text,
-//!   with its own [`Camera`](crate::Camera), font atlas and GPU textures;
+//! - ready-made pieces: [`Camera3D`], [`Mesh`], [`GltfModel`] and
+//!   [`Renderer3D`] draw 3D; [`Renderer2D`] draws 2D shapes, sprites,
+//!   [`crate::ui`] widgets and text, with its own [`Camera`](crate::Camera),
+//!   font atlas and GPU textures;
 //! - the raw API: [`Gpu`] exposes the `wgpu` instance, adapter, device and
 //!   queue, and [`Frame`] exposes the encoder and both attachments, so custom
 //!   pipelines can be recorded in the same frame.
@@ -53,6 +54,7 @@ mod builder;
 mod camera;
 mod error;
 mod font;
+mod gltf;
 mod mesh;
 mod obj;
 mod renderer;
@@ -64,6 +66,10 @@ pub use builder::WgpuWindowBuilder;
 pub use camera::Camera3D;
 pub use error::Error;
 pub use font::{FontId, TextAlign};
+pub use gltf::{
+    GltfError, GltfImage, GltfInstance, GltfMaterial, GltfModel, GltfPrimitive, GpuGltfModel,
+    GpuGltfPrimitive,
+};
 pub use mesh::{GpuMesh, Mesh, Vertex};
 pub use obj::ObjError;
 pub use renderer::{Material, Renderer3D};

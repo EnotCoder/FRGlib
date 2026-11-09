@@ -103,7 +103,9 @@ impl Vertex {
 /// Primitive constructors return a mesh in its own local space, centred on the
 /// origin. A draw call then places it with a model matrix. Models can also come
 /// from a Wavefront OBJ file with [`Mesh::from_obj_str`] or
-/// [`Mesh::from_obj_file`].
+/// [`Mesh::from_obj_file`]. For a whole glTF scene with materials, nodes and
+/// textures, use [`GltfModel`](super::GltfModel) and
+/// [`Renderer3D::create_gltf`](super::Renderer3D::create_gltf) instead.
 #[derive(Debug, Clone)]
 pub struct Mesh {
     pub vertices: Vec<Vertex>,

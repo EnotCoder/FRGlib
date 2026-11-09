@@ -511,4 +511,6 @@ cargo build --release --features bundled
 | `cargo run --example 2d_games-gallery` | Листалка картинок: выбор по индексу, круговой проход |
 | `cargo run --example 2d_games-space` | Симуляция Солнечной системы: Пример работы матрицы |
 | `cargo run --features wgpu --example wgpu-cube` | 3D на `wgpu`: куб, сетка, орбитальная камера |
+| `cargo run --features wgpu --example wgpu-model` | Модель из OBJ-файла с текстурой |
+| `cargo run --features wgpu --example wgpu-gltf` | Модель из glTF (`.gltf`/`.glb`) с материалом и текстурой |
 | `cargo run --features wgpu --example wgpu-hud` | 3D + 2D на `wgpu`: текст, кнопка, слайдер, текстуры и тайлмап поверх сцены |

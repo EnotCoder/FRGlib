@@ -35,7 +35,7 @@ cached-textures = ["sdl3/unsafe_textures"]
 # A second window flavour that hands the frame to `wgpu` instead of
 # `SDL_Renderer`. Opt-in: it pulls in a full GPU stack and the GPU API leaks
 # through `frglib::gpu`, so a default build stays as light as it was.
-wgpu = ["dep:wgpu", "dep:pollster", "dep:bytemuck", "dep:glam", "dep:fontdue"]
+wgpu = ["dep:wgpu", "dep:pollster", "dep:bytemuck", "dep:glam", "dep:fontdue", "dep:gltf"]
 
 [dependencies.sdl3]
 version = "0.20"
@@ -74,6 +74,17 @@ optional = true
 [dependencies.fontdue]
 version = "0.9"
 optional = true
+
+# glTF 2.0 models: JSON/GLB parsing, external buffers and embedded images.
+# `import` pulls in base64, `image` and `urlencoding`, so `GltfModel` can open
+# a file without the caller doing any of that; `KHR_materials_unlit` lets the
+# loader honour the common unlit extension. Optional with the rest of the GPU
+# stack: a plain `Window` has no use for 3D models.
+[dependencies.gltf]
+version = "1.4"
+optional = true
+default-features = false
+features = ["import", "utils", "KHR_materials_unlit", "KHR_texture_transform"]
 
 # Только для примеров, и в публикуемый пакет не попадает: так библиотека не
 # тянет за собой SDL3_ttf, а пример с текстом всё равно может им
@@ -197,6 +208,11 @@ required-features = ["wgpu"]
 [[example]]
 name = "wgpu-model"
 path = "examples/wgpu/model.rs"
+required-features = ["wgpu"]
+
+[[example]]
+name = "wgpu-gltf"
+path = "examples/wgpu/gltf.rs"
 required-features = ["wgpu"]
 
 [[example]]
