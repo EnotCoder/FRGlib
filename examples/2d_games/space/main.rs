@@ -231,7 +231,8 @@ fn main() -> Result<(), frglib::Error> {
             let _ = draw_cloud(d, &cloud_orte, elapsed, center);
 
             // Солнце.
-            let sun = Object::new(center, Vec2::new(120.0, 120.0));
+            let sun = Object::new(center, Vec2::new(120.0, 120.0))
+                .with_rotation(elapsed * 20.0);
 
             d.fill_textured_object(&sun, &sun_image)?;
 

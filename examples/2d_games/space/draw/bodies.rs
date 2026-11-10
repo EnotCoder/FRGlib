@@ -42,7 +42,8 @@ pub fn draw_bodies(
         }
 
         // Планета.
-        let planet_obj = Object::new(planet_pos, Vec2::new(planet.size, planet.size));
+        let planet_obj = Object::new(planet_pos, Vec2::new(planet.size, planet.size))
+            .with_rotation(elapsed * planet.speed * 80.0);
 
         if view_rect.intersects(planet_obj.rect()) {
             match &planet.texture {
