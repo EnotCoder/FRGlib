@@ -26,8 +26,21 @@ pub enum Material {
     Lit,
     /// The colour goes to the screen unchanged. Good for grids and debug lines.
     Unlit,
+    /// Unlit colour blended with alpha, without writing depth.
+    ///
+    /// The renderer draws these after every opaque draw and sorts them from
+    /// far to near, so a glow, a billboard or a fading particle cannot hide a
+    /// model behind it. Use it for anything whose colour carries transparency.
+    Transparent,
     /// A custom material created with [`Renderer3D::create_material`].
     Custom(u32),
+}
+
+impl Material {
+    /// Whether this material is alpha-blended and drawn after opaque geometry.
+    pub fn is_transparent(self) -> bool {
+        matches!(self, Material::Transparent)
+    }
 }
 
 /// Draws meshes with the built-in camera, light and sky setup.
@@ -88,6 +101,9 @@ pub struct Renderer3D {
     unlit_lines: wgpu::RenderPipeline,
     lit_textured: wgpu::RenderPipeline,
     unlit_textured: wgpu::RenderPipeline,
+    transparent_triangles: wgpu::RenderPipeline,
+    transparent_lines: wgpu::RenderPipeline,
+    transparent_textured: wgpu::RenderPipeline,
 
     custom_pipelines: Vec<CustomPipeline>,
 
@@ -332,6 +348,7 @@ impl Renderer3D {
             format,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            true,
             "fs_lit",
         );
         let unlit_triangles = create_pipeline(
@@ -341,6 +358,7 @@ impl Renderer3D {
             format,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            true,
             "fs_unlit",
         );
         let unlit_lines = create_pipeline(
@@ -350,6 +368,7 @@ impl Renderer3D {
             format,
             wgpu::PrimitiveTopology::LineList,
             None,
+            true,
             "fs_unlit",
         );
         let lit_textured = create_pipeline(
@@ -359,6 +378,7 @@ impl Renderer3D {
             format,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            true,
             "fs_lit_textured",
         );
         let unlit_textured = create_pipeline(
@@ -368,6 +388,40 @@ impl Renderer3D {
             format,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            true,
+            "fs_unlit_textured",
+        );
+
+        // Alpha-blended draws share the unlit shader, but skip depth writes so
+        // a glow cannot punch a hole in whatever stands behind it.
+        let transparent_triangles = create_pipeline(
+            &device,
+            &pipeline_layout,
+            &shader,
+            format,
+            wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
+            false,
+            "fs_unlit",
+        );
+        let transparent_lines = create_pipeline(
+            &device,
+            &pipeline_layout,
+            &shader,
+            format,
+            wgpu::PrimitiveTopology::LineList,
+            None,
+            false,
+            "fs_unlit",
+        );
+        let transparent_textured = create_pipeline(
+            &device,
+            &textured_pipeline_layout,
+            &shader,
+            format,
+            wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
+            false,
             "fs_unlit_textured",
         );
 
@@ -397,6 +451,9 @@ impl Renderer3D {
             unlit_lines,
             lit_textured,
             unlit_textured,
+            transparent_triangles,
+            transparent_lines,
+            transparent_textured,
             custom_pipelines: Vec::new(),
             texture_layout,
             sampler,
@@ -448,6 +505,7 @@ impl Renderer3D {
             self.format,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            true,
             "fs_main",
         );
 
@@ -458,6 +516,7 @@ impl Renderer3D {
             self.format,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            true,
             "fs_main_textured",
         );
 
@@ -899,6 +958,11 @@ impl Renderer3D {
             );
         }
 
+        // Opaque geometry first, then alpha-blended draws from far to near.
+        // The order is separate from the command indices because the uniform
+        // buffer is indexed by the original queue position.
+        let order = self.draw_order();
+
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("frglib 3d"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -931,7 +995,8 @@ impl Renderer3D {
             pass.draw(0..3, 0..1);
         }
 
-        for (index, command) in self.commands.iter().enumerate() {
+        for index in order {
+            let command = &self.commands[index];
             // A texture only makes sense on triangles; lines have no sampler
             // and their pipeline layout has no texture group.
             let textured = command.texture.is_some()
@@ -947,6 +1012,15 @@ impl Renderer3D {
                 }
                 (Material::Unlit, wgpu::PrimitiveTopology::TriangleList, false) => {
                     &self.unlit_triangles
+                }
+                (Material::Transparent, wgpu::PrimitiveTopology::TriangleList, true) => {
+                    &self.transparent_textured
+                }
+                (Material::Transparent, wgpu::PrimitiveTopology::TriangleList, false) => {
+                    &self.transparent_triangles
+                }
+                (Material::Transparent, wgpu::PrimitiveTopology::LineList, _) => {
+                    &self.transparent_lines
                 }
                 (Material::Custom(id), wgpu::PrimitiveTopology::TriangleList, true) => {
                     &self.custom_pipelines[id as usize].textured
@@ -984,6 +1058,42 @@ impl Renderer3D {
 
         drop(pass);
         self.commands.clear();
+    }
+
+    /// Indices of the queued draws in render order.
+    ///
+    /// Opaque draws keep their queue order; transparent ones go last and are
+    /// sorted by distance from the camera, farthest first.
+    fn draw_order(&self) -> Vec<usize> {
+        let camera = self.camera.position;
+        let mut order: Vec<usize> = (0..self.commands.len()).collect();
+
+        order.sort_by(|&a, &b| {
+            let first = &self.commands[a];
+            let second = &self.commands[b];
+            let first_transparent = first.material.is_transparent();
+            let second_transparent = second.material.is_transparent();
+
+            first_transparent
+                .cmp(&second_transparent)
+                .then_with(|| {
+                    if first_transparent {
+                        let first_distance =
+                            first.model.w_axis.truncate().distance_squared(camera);
+                        let second_distance =
+                            second.model.w_axis.truncate().distance_squared(camera);
+
+                        // Far to near: the farther draw comes first.
+                        second_distance
+                            .partial_cmp(&first_distance)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    } else {
+                        std::cmp::Ordering::Equal
+                    }
+                })
+        });
+
+        order
     }
 
     fn queue_mesh(
@@ -1069,6 +1179,7 @@ fn create_pipeline(
     format: wgpu::TextureFormat,
     topology: wgpu::PrimitiveTopology,
     cull: Option<wgpu::Face>,
+    depth_write: bool,
     fragment_entry: &str,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -1101,7 +1212,7 @@ fn create_pipeline(
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: super::DEPTH_FORMAT,
-            depth_write_enabled: Some(true),
+            depth_write_enabled: Some(depth_write),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
