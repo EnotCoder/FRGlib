@@ -76,6 +76,7 @@ src/gpu/
 ├── camera.rs         Camera3D
 ├── mesh.rs           Vertex, Mesh, GpuMesh
 ├── light.rs          Light, LightKind, MAX_LIGHTS
+├── skybox.rs         Skybox, SKYBOX_FACES
 ├── obj.rs            загрузка Wavefront OBJ
 ├── gltf.rs           загрузка glTF 2.0 (.gltf/.glb)
 ├── renderer.rs       Renderer3D, Material
@@ -95,7 +96,8 @@ src/gpu/
 | `camera.rs` | Перспективная 3D-камера | `Camera3D` |
 | `mesh.rs` | Геометрия на CPU и на GPU | `Vertex`, `Mesh`, `GpuMesh` |
 | `light.rs` | Направленные и точечные источники света | `Light`, `LightKind`, `MAX_LIGHTS` |
-| `Renderer3D` | 3D-рендерер с освещением и кастомными шейдерами | `Renderer3D`, `Material` |
+| `skybox.rs` | Кубическое небо из шести граней или панорамы | `Skybox`, `SKYBOX_FACES` |
+| `Renderer3D` | 3D-рендерер с освещением, небом и кастомными шейдерами | `Renderer3D`, `Material` |
 | `Renderer2D` | Батчевый 2D-рендерер | `Renderer2D`, `GpuTexture` |
 | `texture.rs` | Текстуры для 3D и общие GPU-изображения | `Texture` |
 | `obj.rs` | Загрузка моделей Wavefront OBJ | `ObjError` |
@@ -338,11 +340,91 @@ pub struct Vertex {
 из исходного `Mesh`, поэтому линии и треугольники рисуются разными
 пайплайнами автоматически.
 
+## skybox.rs: `Skybox`
+
+Кубическая текстура, которую [`Renderer3D`] рисует за сценой. Внутри — одна
+`wgpu`-текстура с шестью слоями и cube-view: все грани лежат в одной
+аллокации, а шейдер сэмплирует её как `texture_cube<f32>`.
+
+### Создание
+
+| Метод | Что делает |
+|---|---|
+| `from_equirectangular(&Gpu, &Image)` | Разворачивает панораму 2:1 в шесть граней на CPU |
+| `from_equirectangular_rgba8(&Gpu, w, h, &[u8])` | То же из сырых RGBA8-пикселей |
+| `from_faces(&Gpu, [&Image; 6])` | Берёт шесть готовых квадратных картинок |
+| `from_rgba8_faces(&Gpu, w, h, [&[u8]; 6])` | То же из сырых RGBA8-граней |
+| `face_size()` | Размер одной грани в пикселях |
+| `texture()`, `view()` | Нижние `wgpu`-ручки для своих bind group |
+
+Через рендерер удобнее, когда `Gpu` под рукой нет:
+
+```rust
+let panorama = Image::from_file("sky.png")?;
+let skybox = renderer.create_skybox(&panorama)?;
+renderer.set_skybox(skybox);
+```
+
+Напрямую, если панорама уже загружена или нарисована процедурно:
+
+```rust
+use frglib::gpu::Skybox;
+
+let (width, height, pixels) = my_panorama();
+let skybox = Skybox::from_equirectangular_rgba8(window.gpu(), width, height, &pixels)?;
+renderer.set_skybox(skybox);
+```
+
+### Панорама и порядок граней
+
+- Панорама трактуется как сферическая карта 2:1: `u = 0.5` смотрит вдоль
+  `+Z`, `u = 0` — вдоль `-Z`, верхний край — `+Y`, нижний — `-Y`.
+- Грани идут в порядке `+X`, `-X`, `+Y`, `-Y`, `+Z`, `-Z` (константа
+  `SKYBOX_FACES`).
+- Размер грани при развороте панорамы — четверть её ширины, зажатая в
+  `16..=1024` пикселя. Пиксели сэмплируются билинейно, по горизонтали с
+  заворотом, по вертикали с зажимом.
+- Исходные данные и результат загружаются как sRGB RGBA8, поэтому шейдер
+  получает уже линейный цвет.
+
+```rust
+// Готовые грани: размер и квадратность должны совпадать.
+let skybox = Skybox::from_faces(
+    window.gpu(),
+    [&px, &nx, &py, &ny, &pz, &nz],
+)?;
+```
+
+### Как это рисуется
+
+- Отдельный пайплайн и bind group 3: кубическая текстура и sampler с
+  `ClampToEdge`.
+- `vs_skybox` рисует один треугольник на весь экран без вершинного буфера;
+  `fs_skybox` восстанавливает направление луча из `inv_view_proj` и
+  сэмплирует куб.
+- Глубина: `LessEqual`, запись выключена. Небо стоит на дальней плоскости и
+  не перекрывает геометрию.
+- `Renderer3D::finish` рисует небо первым, сразу после очистки кадра.
+- `set_skybox` сохраняет небо между кадрами; `clear_skybox` возвращает
+  обычный `frame.background`.
+
+### Ограничения
+
+- Небо не вращается отдельно от камеры: учитывается только поворот, не
+  позиция. Смещение камеры по миру на небо не влияет.
+- Разворот панорамы происходит на CPU при создании и не обновляется каждый
+  кадр. Для часто меняющегося неба создавайте `Skybox` заново.
+- Mip-уровней нет: у грани одно разрешение. При сильном сжатии возможен
+  алиасинг.
+- Одновременно используется только один skybox.
+
+[`Renderer3D`]: #rendererrs-renderer3d
+
 ## renderer.rs: `Renderer3D`
 
 Высокоуровневый 3D-рендерер. Рисует меши, кубы, плоскости, сетки и
 отладочные линии с набором направленных и точечных источников света или без
-освещения.
+освещения. Фоном может служить [`Skybox`](#skyboxrs-skybox).
 
 ### Свет
 
@@ -379,6 +461,32 @@ renderer.set_ambient(Color::rgb(46, 46, 46));
 | `Material::Unlit` | Цвет или текстура уходят на экран без изменений. Для сеток, осей и ярких объектов |
 | `Material::Custom(id)` | Свой шейдер, созданный через `Renderer3D::create_material` |
 
+### Skybox
+
+`Skybox` — кубическая текстура, которую рендерер рисует за сценой. Её можно
+собрать из шести готовых граней или из одной панорамы 2:1:
+
+```rust
+use frglib::gpu::Skybox;
+use frglib::Image;
+
+// Панорама: u = 0.5 смотрит вдоль +Z, верхний край — +Y.
+let panorama = Image::from_file("sky.png")?;
+let skybox = Skybox::from_equirectangular(window.gpu(), &panorama)?;
+renderer.set_skybox(skybox);
+```
+
+```rust
+// Шесть граней: +X, -X, +Y, -Y, +Z, -Z. Размер должен совпадать.
+let faces = [
+    &px, &nx, &py, &ny, &pz, &nz,
+];
+let skybox = Skybox::from_faces(window.gpu(), faces)?;
+```
+
+Небо рисуется первым в `finish` и не пишет глубину, поэтому геометрия всегда
+оказывается поверх него. `clear_skybox` возвращает обычный фон кадра.
+
 ### Методы
 
 | Метод | Что делает |
@@ -387,6 +495,10 @@ renderer.set_ambient(Color::rgb(46, 46, 46));
 | `create_material(source) -> Material` | Компилирует WGSL-код в новый материал. Автоматически подставляет структуры `Camera`, `Draw`, `VertexInput` и `VertexOutput` |
 | `create_mesh(&Mesh) -> GpuMesh` | Загружает свою геометрию; handle можно хранить между кадрами |
 | `create_texture(&Image) -> Texture` | Загружает изображение на GPU для использования в 3D |
+| `create_skybox(&Image) -> Skybox` | Собирает кубическое небо из панорамы 2:1 |
+| `set_skybox(Skybox)` | Ставит небо за сценой |
+| `clear_skybox()` | Убирает небо, оставляя фон кадра |
+| `skybox() -> Option<&Skybox>` | Текущее небо |
 | `begin(&Camera3D)` | Начинает кадр с камерой и сбрасывает очередь |
 | `set_lights(impl IntoIterator<Item = Light>)` | Заменяет все источники света; лишние сверх `MAX_LIGHTS` отбрасываются |
 | `add_light(Light)` | Добавляет один источник к текущему набору |
@@ -409,15 +521,17 @@ renderer.set_ambient(Color::rgb(46, 46, 46));
 
 ### Как это устроено внутри
 
-- **Два bind group.** Group 0 — камера: `view_proj`, позиция камеры и массивы
-  источников света (до `MAX_LIGHTS`). Group 1 — конкретный draw: модельная
-  матрица и цвет.
+- **Bind group-ы.** Group 0 — камера: `view_proj`, обратная матрица для неба,
+  позиция камеры и массивы источников света (до `MAX_LIGHTS`). Group 1 —
+  конкретный draw: модельная матрица и цвет. Group 2 — альбедо-текстура, а
+  group 3 — кубическая текстура неба (её использует только skybox-пайплайн).
 - **Динамические offset-ы.** Все per-draw юниформы лежат в одном буфере;
   между draw-ами меняется только offset. Шаг выравнивается по
   `min_uniform_buffer_offset_alignment` устройства. Буфер стартует с 256
   записей и растёт вдвое, когда их не хватает.
-- **Три пайплайна.** Lit-треугольники, unlit-треугольники (оба с отсечением
-  задних граней) и unlit-линии (без отсечения).
+- **Пайплайны.** Lit- и unlit-треугольники (оба с отсечением задних граней),
+  их текстурированные варианты, unlit-линии без отсечения и отдельный
+  skybox-пайплайн, который пишет только цвет и не трогает глубину.
 - **Кеш сетки.** `draw_grid` с теми же `slices` и `spacing` переиспользует
   буферы; биты `f32` сравниваются напрямую.
 - **Линии.** `draw_line`/`draw_lines` не создают буфер на каждый вызов: за
@@ -646,6 +760,8 @@ println!("{} × {}", size.x, size.y);
 | `AtlasFull` | В атласе глифов кончилось место |
 | `EmptyTexture` | Текстуру просят с нулевой шириной или высотой |
 | `PixelData { expected, actual }` | Длина RGBA-среза не равна `width * height * 4` |
+| `SkyboxFaceSize { face, expected, actual }` | Грани skybox имеют разный размер |
+| `SkyboxNotSquare { width, height }` | Грань skybox не квадратная |
 
 `Display` даёт человекочитаемое сообщение, `source()` возвращает вложенную
 ошибку там, где она есть. `frglib::GpuError` — тот же тип под коротким
@@ -655,11 +771,15 @@ println!("{} × {}", size.x, size.y);
 
 ### `lit.wgsl`
 
-Один шейдер на все три 3D-пайплайна.
+Один шейдер на все встроенные 3D-пайплайны, включая небо.
 
-- Group 0 — камера: `view_proj`, `camera_pos`, `light_count` и массивы
-  `light_position`/`light_color`/`light_params` для `MAX_LIGHTS` источников.
+- Group 0 — камера: `view_proj`, `inv_view_proj`, `camera_pos`,
+  `light_count` и массивы `light_position`/`light_color`/`light_params` для
+  `MAX_LIGHTS` источников.
 - Group 1 — draw: `model`, `color`; с dynamic offset.
+- Group 3 — небо: кубическая текстура и sampler. `vs_skybox` рисует один
+  треугольник на весь экран, а `fs_skybox` восстанавливает направление луча
+  через `inv_view_proj` и сэмплирует куб.
 - `vs_main` умножает позицию на `model`, затем на `view_proj`; нормаль
   поворачивается модельной матрицей. Это предполагает равномерный масштаб —
   при растяжении нормали нужно было бы трансформировать обратной
@@ -769,6 +889,17 @@ fn main() -> Result<(), frglib::gpu::Error> {
     }
 }
 ```
+
+Небо ставится один раз и переживает кадры:
+
+```rust
+use frglib::Image;
+
+let panorama = Image::from_file("sky.png")?;
+scene.set_skybox(scene.create_skybox(&panorama)?);
+```
+
+Подробнее — в разделе [`skybox.rs`](#skyboxrs-skybox).
 
 ### 3D-сцена и 2D-HUD в одном кадре
 
@@ -1068,6 +1199,14 @@ scene.finish(&mut frame)      ui.finish(&mut frame)
   `measure_text`.
 - **Нормали 3D.** `lit.wgsl` поворачивает нормаль модельной матрицей, что
   верно для равномерного масштаба. При растяжении освещение будет неточным.
+- **Skybox не вращается сам.** Небо следует за поворотом камеры, но не за её
+  позицией, и не имеет отдельного угла поворота. Один skybox на рендерер.
+- **Грани skybox.** Все шесть граней должны быть одинакового квадратного
+  размера; порядок — `+X, -X, +Y, -Y, +Z, -Z`. Иначе `SkyboxFaceSize` или
+  `SkyboxNotSquare`.
+- **Панорама разворачивается на CPU.** `from_equirectangular` делает шесть
+  граней при создании, поэтому для больших панорам это разовая, но заметная
+  работа.
 - **`Renderer3D::finish` очищает кадр.** Всё, что должно быть под сценой,
   рисуйте до него; 2D поверх — только через `begin_overlay`.
 - **Пустой overlay бесплатен, пустой `begin` — нет.** `begin` обязан
@@ -1093,11 +1232,14 @@ cargo test --doc --features wgpu
 # Живые примеры.
 cargo run --features wgpu --example wgpu-cube
 cargo run --features wgpu --example wgpu-hud
+cargo run --features wgpu --example wgpu-gltf
+cargo run --features wgpu --example wgpu-skybox
 ```
 
 Юнит-тесты GPU-слоя не требуют видеокарты: они проверяют раскладку текста,
-аллокатор атласа, размеры вершин и юниформ, математику камеры и конвертацию
-цвета. Всё, что реально трогает `Device` или `Queue`, живёт в примерах.
+аллокатор атласа, размеры вершин и юниформ, математику камеры, конвертацию
+цвета, а также направления граней skybox и разворот панорамы. Всё, что реально
+трогает `Device` или `Queue`, живёт в примерах.
 
 ## Шпаргалка по API
 
@@ -1118,14 +1260,18 @@ Camera3D::{perspective, position, target, up, fov_y, clip, orbit, view, projecti
 Mesh::{cube, plane, grid, from_vertices, from_line_list, line, from_obj_str, from_obj_file}
 Vertex::{new, with_color}
 GltfModel::{from_file, from_slice}
-Renderer3D::{new, create_mesh, create_gltf, begin, set_lights, add_light, clear_lights, lights,
-             set_ambient, ambient,
+Renderer3D::{new, create_mesh, create_gltf, create_skybox, begin,
+             set_skybox, clear_skybox, skybox,
+             set_lights, add_light, clear_lights, lights, set_ambient, ambient,
              draw_mesh, draw_mesh_with, draw_gltf, draw_cube, draw_cube_model, draw_plane,
              draw_grid, draw_line, draw_lines, finish}
 Material::{Lit, Unlit}
 Light::{directional, point, with_intensity, with_range, direction, position}
 LightKind::{Directional, Point}
+Skybox::{from_equirectangular, from_equirectangular_rgba8, from_faces, from_rgba8_faces,
+         face_size, texture, view}
 MAX_LIGHTS
+SKYBOX_FACES
 ```
 
 ### 2D

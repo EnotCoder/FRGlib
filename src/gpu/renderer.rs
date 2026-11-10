@@ -10,6 +10,7 @@ use crate::gpu::error::Error;
 use crate::gpu::gltf::{GltfModel, GpuGltfModel, GpuGltfPrimitive};
 use crate::gpu::light::{Light, LightKind, MAX_LIGHTS};
 use crate::gpu::mesh::{GpuMesh, Mesh, Vertex};
+use crate::gpu::skybox::Skybox;
 use crate::gpu::texture::Texture;
 use crate::gpu::window::{Frame, Gpu};
 use crate::graphics::{Color, Image};
@@ -29,7 +30,7 @@ pub enum Material {
     Custom(u32),
 }
 
-/// Draws meshes with the built-in camera and light setup.
+/// Draws meshes with the built-in camera, light and sky setup.
 ///
 /// Call [`begin`](Self::begin), queue some draws, then [`finish`](Self::finish)
 /// to record them into the frame:
@@ -75,6 +76,12 @@ pub struct Renderer3D {
 
     pipeline_layout: wgpu::PipelineLayout,
     textured_pipeline_layout: wgpu::PipelineLayout,
+
+    skybox_layout: wgpu::BindGroupLayout,
+    skybox_pipeline: wgpu::RenderPipeline,
+    skybox_sampler: wgpu::Sampler,
+    skybox: Option<Skybox>,
+    skybox_bind_group: Option<wgpu::BindGroup>,
 
     lit_triangles: wgpu::RenderPipeline,
     unlit_triangles: wgpu::RenderPipeline,
@@ -123,6 +130,7 @@ struct DrawCommand {
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct CameraUniform {
     view_proj: [[f32; 4]; 4],
+    inv_view_proj: [[f32; 4]; 4],
     camera_pos: [f32; 4],
     /// `rgb` is linear colour, `a` is intensity.
     ambient: [f32; 4],
@@ -268,6 +276,55 @@ impl Renderer3D {
                 immediate_size: 0,
             });
 
+        let skybox_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("frglib skybox layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::Cube,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let skybox_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("frglib skybox sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 32.0,
+            compare: None,
+            anisotropy_clamp: 1,
+            border_color: None,
+        });
+
+        // The skybox binds group 0 (camera) and group 3 (cube map). Groups 1
+        // and 2 are the draw and albedo groups, which the skybox does not use.
+        let skybox_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("frglib skybox pipeline layout"),
+                bind_group_layouts: &[Some(&camera_layout), None, None, Some(&skybox_layout)],
+                immediate_size: 0,
+            });
+
+        let skybox_pipeline =
+            create_skybox_pipeline(&device, &skybox_pipeline_layout, &shader, format);
+
         let lit_triangles = create_pipeline(
             &device,
             &pipeline_layout,
@@ -330,6 +387,11 @@ impl Renderer3D {
             draw_stride,
             pipeline_layout,
             textured_pipeline_layout,
+            skybox_layout,
+            skybox_pipeline,
+            skybox_sampler,
+            skybox: None,
+            skybox_bind_group: None,
             lit_triangles,
             unlit_triangles,
             unlit_lines,
@@ -440,6 +502,17 @@ impl Renderer3D {
         Texture::upload(&self.device, &self.queue, width, height, pixels)
     }
 
+    /// Builds a skybox from an equirectangular panorama.
+    ///
+    /// This is the same as [`Skybox::from_equirectangular`], using the device
+    /// this renderer already holds. The result can be passed to
+    /// [`set_skybox`](Self::set_skybox).
+    pub fn create_skybox(&self, image: &Image) -> Result<Skybox, Error> {
+        let (width, height) = image.size();
+        let pixels = super::texture::image_rgba8(image)?;
+        Skybox::from_equirectangular_pixels(&self.device, &self.queue, width, height, &pixels)
+    }
+
     /// Uploads a whole [`GltfModel`] to the GPU.
     ///
     /// Every unique primitive becomes a mesh, every decoded image a texture.
@@ -527,6 +600,32 @@ impl Renderer3D {
     /// The current global ambient light colour.
     pub fn ambient(&self) -> Color {
         self.ambient
+    }
+
+    /// Sets the background cube map drawn behind the scene.
+    ///
+    /// The skybox is drawn first in every [`finish`](Self::finish), so it fills
+    /// whatever the frame's clear leaves and the scene is drawn on top. It
+    /// ignores the world position and only follows the camera's rotation.
+    pub fn set_skybox(&mut self, skybox: Skybox) {
+        self.skybox_bind_group = Some(create_skybox_bind_group(
+            &self.device,
+            &self.skybox_layout,
+            &self.skybox_sampler,
+            skybox.view(),
+        ));
+        self.skybox = Some(skybox);
+    }
+
+    /// Removes the skybox, leaving the frame's clear colour.
+    pub fn clear_skybox(&mut self) {
+        self.skybox = None;
+        self.skybox_bind_group = None;
+    }
+
+    /// The skybox currently drawn, if any.
+    pub fn skybox(&self) -> Option<&Skybox> {
+        self.skybox.as_ref()
     }
 
     /// Queues a lit mesh draw.
@@ -773,8 +872,11 @@ impl Renderer3D {
             light_color[index] = [color[0], color[1], color[2], light.intensity.max(0.0)];
         }
 
+        let view_proj = self.camera.view_projection(aspect);
+
         let camera_uniform = CameraUniform {
-            view_proj: self.camera.view_projection(aspect).to_cols_array_2d(),
+            view_proj: view_proj.to_cols_array_2d(),
+            inv_view_proj: view_proj.inverse().to_cols_array_2d(),
             camera_pos: self.camera.position.extend(1.0).to_array(),
             ambient: color_to_linear(self.ambient),
             light_count: [self.lights.len().min(MAX_LIGHTS) as u32, 0, 0, 0],
@@ -822,6 +924,12 @@ impl Renderer3D {
         });
 
         pass.set_bind_group(0, &self.camera_bind_group, &[]);
+
+        if let Some(skybox) = &self.skybox_bind_group {
+            pass.set_pipeline(&self.skybox_pipeline);
+            pass.set_bind_group(3, skybox, &[]);
+            pass.draw(0..3, 0..1);
+        }
 
         for (index, command) in self.commands.iter().enumerate() {
             // A texture only makes sense on triangles; lines have no sampler
@@ -1008,6 +1116,80 @@ fn create_pipeline(
     })
 }
 
+fn create_skybox_pipeline(
+    device: &wgpu::Device,
+    layout: &wgpu::PipelineLayout,
+    shader: &wgpu::ShaderModule,
+    format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("frglib skybox pipeline"),
+        layout: Some(layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: Some("vs_skybox"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: Some("fs_skybox"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: None,
+            unclipped_depth: false,
+            polygon_mode: wgpu::PolygonMode::Fill,
+            conservative: false,
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: super::DEPTH_FORMAT,
+            // The sky sits on the far plane and must not hide the scene.
+            depth_write_enabled: Some(false),
+            depth_compare: Some(wgpu::CompareFunction::LessEqual),
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }),
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
+fn create_skybox_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    view: &wgpu::TextureView,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("frglib skybox"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    })
+}
+
 fn create_texture_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
@@ -1088,9 +1270,9 @@ mod tests {
     }
 
     #[test]
-    fn the_camera_uniform_has_room_for_every_light() {
-        // mat4x4 (64) + camera vec4 (16) + ambient vec4 (16) + count vec4 (16)
-        // + three light arrays of MAX_LIGHTS vec4s.
-        assert_eq!(size_of::<CameraUniform>(), 112 + MAX_LIGHTS * 3 * 16);
+    fn the_camera_uniform_has_room_for_every_light_and_the_skybox() {
+        // view_proj (64) + inv_view_proj (64) + camera vec4 (16) + ambient
+        // vec4 (16) + count vec4 (16) + three light arrays of MAX_LIGHTS vec4s.
+        assert_eq!(size_of::<CameraUniform>(), 176 + MAX_LIGHTS * 3 * 16);
     }
 }

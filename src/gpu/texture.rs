@@ -174,7 +174,7 @@ pub(crate) fn image_rgba8(image: &Image) -> Result<Vec<u8>, Error> {
     }))
 }
 
-fn check_pixels(width: u32, height: u32, pixels: &[u8]) -> Result<(), Error> {
+pub(crate) fn check_pixels(width: u32, height: u32, pixels: &[u8]) -> Result<(), Error> {
     if width == 0 || height == 0 {
         return Err(Error::EmptyTexture);
     }

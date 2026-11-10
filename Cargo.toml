@@ -216,6 +216,11 @@ path = "examples/wgpu/gltf.rs"
 required-features = ["wgpu"]
 
 [[example]]
+name = "wgpu-skybox"
+path = "examples/wgpu/skybox.rs"
+required-features = ["wgpu"]
+
+[[example]]
 name = "3d_games-fgoty_run"
 path = "examples/3d_games/fgoty_run/main.rs"
 required-features = ["wgpu"]

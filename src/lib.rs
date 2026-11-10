@@ -63,8 +63,8 @@ pub use gpu::Error as GpuError;
 pub use gpu::{
     Camera3D, FontId, Frame, GltfError, GltfImage, GltfInstance, GltfMaterial, GltfModel,
     GltfPrimitive, Gpu, GpuGltfModel, GpuGltfPrimitive, GpuMesh, GpuTexture, Light, LightKind,
-    Material, Mesh, ObjError, Renderer2D, Renderer3D, TextAlign, Texture, Vertex, WgpuWindow,
-    WgpuWindowBuilder, MAX_LIGHTS,
+    Material, Mesh, ObjError, Renderer2D, Renderer3D, Skybox, TextAlign, Texture, Vertex,
+    WgpuWindow, WgpuWindowBuilder, MAX_LIGHTS, SKYBOX_FACES,
 };
 #[cfg(feature = "cached-textures")]
 pub use graphics::{Animation, Texture};

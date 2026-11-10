@@ -14,6 +14,7 @@ const MAX_LIGHTS: u32 = 8u;
 
 struct Camera {
     view_proj: mat4x4<f32>,
+    inv_view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>,
     // rgb is linear colour, a is intensity.
     ambient: vec4<f32>,
@@ -74,6 +75,35 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     return out;
 }
 
+struct SkyboxOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    // Normalised device coordinates; w is always 1 for this triangle.
+    @location(0) ndc: vec2<f32>,
+};
+
+@group(3) @binding(0)
+var skybox_texture: texture_cube<f32>;
+
+@group(3) @binding(1)
+var skybox_sampler: sampler;
+
+// One oversized triangle covers the viewport without a vertex buffer. The ray
+// is reconstructed per fragment so the interpolated NDC stays linear.
+@vertex
+fn vs_skybox(@builtin(vertex_index) index: u32) -> SkyboxOutput {
+    var positions = array<vec2<f32>, 3>(
+        vec2<f32>(-1.0, -1.0),
+        vec2<f32>(3.0, -1.0),
+        vec2<f32>(-1.0, 3.0),
+    );
+    let position = positions[index];
+
+    var out: SkyboxOutput;
+    out.clip_position = vec4<f32>(position, 1.0, 1.0);
+    out.ndc = position;
+    return out;
+}
+
 // Every light in the scene plus a little ambient and specular. A small ambient
 // term keeps the side facing away from all lights readable instead of black.
 fn shade(world_position: vec3<f32>, normal_in: vec3<f32>, base: vec4<f32>) -> vec4<f32> {
@@ -116,6 +146,13 @@ fn shade(world_position: vec3<f32>, normal_in: vec3<f32>, base: vec4<f32>) -> ve
         + specular;
 
     return vec4<f32>(lit, base.a);
+}
+
+@fragment
+fn fs_skybox(input: SkyboxOutput) -> @location(0) vec4<f32> {
+    let far = camera.inv_view_proj * vec4<f32>(input.ndc, 1.0, 1.0);
+    let direction = far.xyz / far.w - camera.camera_pos.xyz;
+    return textureSample(skybox_texture, skybox_sampler, normalize(direction));
 }
 
 @fragment

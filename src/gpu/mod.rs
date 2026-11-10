@@ -8,7 +8,7 @@
 //!
 //! Two levels are available on purpose:
 //!
-//! - ready-made pieces: [`Camera3D`], [`Mesh`], [`GltfModel`] and
+//! - ready-made pieces: [`Camera3D`], [`Mesh`], [`GltfModel`], [`Skybox`] and
 //!   [`Renderer3D`] draw 3D; [`Renderer2D`] draws 2D shapes, sprites,
 //!   [`crate::ui`] widgets and text, with its own [`Camera`](crate::Camera),
 //!   font atlas and GPU textures;
@@ -60,6 +60,7 @@ mod mesh;
 mod obj;
 mod renderer;
 mod renderer2d;
+mod skybox;
 mod texture;
 mod window;
 
@@ -76,6 +77,7 @@ pub use mesh::{GpuMesh, Mesh, Vertex};
 pub use obj::ObjError;
 pub use renderer::{Material, Renderer3D};
 pub use renderer2d::{GpuTexture, Renderer2D};
+pub use skybox::{Skybox, SKYBOX_FACES};
 pub use texture::Texture;
 pub use window::{Frame, Gpu, WgpuWindow};
 

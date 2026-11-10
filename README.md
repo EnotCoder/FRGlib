@@ -513,4 +513,5 @@ cargo build --release --features bundled
 | `cargo run --features wgpu --example wgpu-cube` | 3D на `wgpu`: куб, сетка, орбитальная камера |
 | `cargo run --features wgpu --example wgpu-model` | Модель из OBJ-файла с текстурой |
 | `cargo run --features wgpu --example wgpu-gltf` | Модель из glTF (`.gltf`/`.glb`) с материалом и текстурой |
+| `cargo run --features wgpu --example wgpu-skybox` | Кубическое небо из процедурной панорамы и сцена с орбитальной камерой |
 | `cargo run --features wgpu --example wgpu-hud` | 3D + 2D на `wgpu`: текст, кнопка, слайдер, текстуры и тайлмап поверх сцены |

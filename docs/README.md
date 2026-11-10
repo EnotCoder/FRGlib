@@ -93,6 +93,7 @@ FRGLib/
 │   │   ├── camera.rs
 │   │   ├── mesh.rs
 │   │   ├── light.rs    # Light, LightKind, MAX_LIGHTS
+│   │   ├── skybox.rs   # Skybox, SKYBOX_FACES
 │   │   ├── obj.rs      # Wavefront OBJ
 │   │   ├── gltf.rs     # glTF 2.0 (.gltf/.glb)
 │   │   └── shaders/

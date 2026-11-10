@@ -47,6 +47,22 @@ pub enum Error {
         /// Bytes actually supplied.
         actual: usize,
     },
+    /// A skybox face has a different size from the first one.
+    SkyboxFaceSize {
+        /// The face that differs, in `+X, -X, +Y, -Y, +Z, -Z` order.
+        face: usize,
+        /// The size the first face set.
+        expected: (u32, u32),
+        /// The size this face has.
+        actual: (u32, u32),
+    },
+    /// Cubemap faces must be square.
+    SkyboxNotSquare {
+        /// Face width in pixels.
+        width: u32,
+        /// Face height in pixels.
+        height: u32,
+    },
     /// A Wavefront OBJ model could not be read or parsed.
     Obj(super::ObjError),
     /// A glTF model could not be read or parsed.
@@ -74,6 +90,18 @@ impl fmt::Display for Error {
                 f,
                 "texture data is {actual} bytes, but the dimensions need {expected}"
             ),
+            Error::SkyboxFaceSize {
+                face,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "skybox face {face} is {}x{}, but the first face is {}x{}",
+                actual.0, actual.1, expected.0, expected.1
+            ),
+            Error::SkyboxNotSquare { width, height } => {
+                write!(f, "skybox faces must be square, but got {width}x{height}")
+            }
             Error::Obj(err) => write!(f, "OBJ model error: {err}"),
             Error::Gltf(err) => write!(f, "glTF model error: {err}"),
         }
@@ -97,7 +125,9 @@ impl StdError for Error {
             | Error::UnknownFont
             | Error::AtlasFull
             | Error::EmptyTexture
-            | Error::PixelData { .. } => None,
+            | Error::PixelData { .. }
+            | Error::SkyboxFaceSize { .. }
+            | Error::SkyboxNotSquare { .. } => None,
         }
     }
 }
