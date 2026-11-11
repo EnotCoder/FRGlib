@@ -1,8 +1,9 @@
-use frglib::{Color, Image};
+use frglib::{Color, Image, Mat3, Vec2};
 
 use super::moon::{get_moon, Moon};
 
 pub struct Planet {
+    pub name: &'static str,
     pub size: f32,
     pub color: Color,
     /// Спрайт планеты. `None` -- рисуем цветным кругом.
@@ -11,6 +12,23 @@ pub struct Planet {
     pub speed: f32,
     pub start_angle: f32,
     pub moons: Vec<Moon>,
+}
+
+impl Planet {
+    /// Где планета находится в данный момент.
+    pub fn position(&self, elapsed: f32, center: Vec2) -> Vec2 {
+        let angle = self.start_angle + elapsed * self.speed;
+
+        (Mat3::translation(center)
+            * Mat3::rotation(angle)
+            * Mat3::translation(Vec2::new(self.orbit_radius, 0.0)))
+        .transform_point(Vec2::ZERO)
+    }
+
+    /// Радиус планеты в мировых единицах.
+    pub fn radius(&self) -> f32 {
+        self.size * 0.5
+    }
 }
 
 pub fn get_planets(
@@ -29,6 +47,7 @@ pub fn get_planets(
     vec![
         // Меркурий.
         Planet {
+            name: "Mercury",
             size: 8.0,
             color: Color::rgb(160, 150, 140),
             texture: Some(mercury_texture),
@@ -39,6 +58,7 @@ pub fn get_planets(
         },
         // Венера.
         Planet {
+            name: "Venus",
             size: 14.0,
             color: Color::rgb(230, 190, 110),
             texture: Some(vinera_image),
@@ -49,6 +69,7 @@ pub fn get_planets(
         },
         // Земля.
         Planet {
+            name: "Earth",
             size: 16.0,
             color: Color::rgb(70, 140, 255),
             texture: Some(earth_image),
@@ -59,6 +80,7 @@ pub fn get_planets(
         },
         // Марс.
         Planet {
+            name: "Mars",
             size: 12.0,
             color: Color::rgb(220, 90, 60),
             texture: Some(mars_image),
@@ -69,6 +91,7 @@ pub fn get_planets(
         },
         // Юпитер.
         Planet {
+            name: "Jupiter",
             size: 70.0,
             color: Color::rgb(210, 160, 120),
             texture: Some(jupiter_image),
@@ -79,6 +102,7 @@ pub fn get_planets(
         },
         // Сатурн.
         Planet {
+            name: "Saturn",
             size: 60.0,
             color: Color::rgb(230, 205, 140),
             texture: Some(saturn_image),
@@ -89,6 +113,7 @@ pub fn get_planets(
         },
         // Уран.
         Planet {
+            name: "Uranus",
             size: 38.0,
             color: Color::rgb(140, 220, 230),
             texture: Some(uran_image),
@@ -99,6 +124,7 @@ pub fn get_planets(
         },
         // Нептун.
         Planet {
+            name: "Neptune",
             size: 40.0,
             color: Color::rgb(60, 90, 230),
             texture: Some(neptune_image),

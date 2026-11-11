@@ -1,7 +1,78 @@
-use frglib::{Color, Mat3, Object, Vec2};
+use frglib::{Color, Object, Vec2};
 use std::f32::consts::TAU;
 
 use crate::bodies::*;
+
+/// Количество сегментов в круге свечения.
+const GLOW_SEGMENTS: usize = 48;
+
+/// Рисует мягкое свечение вокруг тела: несколько вложенных кругов.
+///
+/// Свечение рисуется до самого тела, поэтому виден только ореол по краю.
+pub fn draw_glow(
+    d: &mut frglib::Draw,
+    center: Vec2,
+    radius: f32,
+    zoom: f32,
+    color: Color,
+) -> Result<(), frglib::Error> {
+    let margin = 4.0 / zoom.max(0.001);
+    let mut indices = Vec::with_capacity(GLOW_SEGMENTS * 3);
+
+    for i in 0..GLOW_SEGMENTS {
+        let next = (i + 1) % GLOW_SEGMENTS;
+        indices.extend_from_slice(&[0, 1 + i as i32, 1 + next as i32]);
+    }
+
+    // Внутренний круг самый яркий, внешние -- всё прозрачнее.
+    for (layer, factor) in [1.0f32, 1.45, 1.9].into_iter().enumerate() {
+        let glow_radius = radius + margin * factor;
+        let mut points = Vec::with_capacity(GLOW_SEGMENTS + 1);
+        points.push((center.x, center.y));
+
+        for i in 0..GLOW_SEGMENTS {
+            let angle = TAU * i as f32 / GLOW_SEGMENTS as f32;
+            points.push((
+                center.x + angle.cos() * glow_radius,
+                center.y + angle.sin() * glow_radius,
+            ));
+        }
+
+        let alpha = color.a as f32 / (1.0 + layer as f32 * 1.2);
+        let layer_color = Color::rgba(color.r, color.g, color.b, alpha as u8);
+
+        d.fill_object_polygon(
+            &Object::new(center, Vec2::ZERO),
+            &points,
+            &indices,
+            layer_color,
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Рисует тонкое кольцо вокруг тела.
+pub fn draw_ring(
+    d: &mut frglib::Draw,
+    center: Vec2,
+    radius: f32,
+    zoom: f32,
+    color: Color,
+) -> Result<(), frglib::Error> {
+    let ring_radius = radius + 3.0 / zoom.max(0.001);
+    let points = (0..GLOW_SEGMENTS)
+        .map(|i| {
+            let angle = TAU * i as f32 / GLOW_SEGMENTS as f32;
+            (
+                center.x + angle.cos() * ring_radius,
+                center.y + angle.sin() * ring_radius,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    d.draw_object_polygon(&Object::new(center, Vec2::ZERO), &points, color)
+}
 
 pub fn draw_bodies(
     d: &mut frglib::Draw,
@@ -14,13 +85,7 @@ pub fn draw_bodies(
     let view_rect = d.camera_rect();
 
     for planet in planets {
-        let angle = planet.start_angle + elapsed * planet.speed;
-
-        let planet_transform = Mat3::translation(center)
-            * Mat3::rotation(angle)
-            * Mat3::translation(Vec2::new(planet.orbit_radius, 0.0));
-
-        let planet_pos = planet_transform.transform_point(Vec2::ZERO);
+        let planet_pos = planet.position(elapsed, center);
 
         // Орбиты спутников
         for moon in &planet.moons {
@@ -54,12 +119,7 @@ pub fn draw_bodies(
 
         // Спутники.
         for moon in &planet.moons {
-            let moon_angle = moon.start_angle + elapsed * moon.speed;
-            let moon_transform = planet_transform
-                * Mat3::rotation(moon_angle)
-                * Mat3::translation(Vec2::new(moon.orbit_radius, 0.0));
-
-            let moon_pos = moon_transform.transform_point(Vec2::ZERO);
+            let moon_pos = moon.position(planet_pos, elapsed);
             let moon_obj = Object::new(moon_pos, Vec2::new(moon.size, moon.size));
 
             if view_rect.intersects(moon_obj.rect()) {
