@@ -3,7 +3,8 @@
 //! Модели лежат рядом с примером, в `examples/3d_games/assets/fgoty_run`.
 //! Путь строится от корня крейта, поэтому `cargo run --example` работает из
 //! любого каталога. `map.glb` — трава, `player.glb` — Феррис, `bot.glb` — бот,
-//! которого игра использует как врага.
+//! которого игра использует как врага, а `coin.glb` — золотая монета,
+//! которую игрок собирает.
 
 use std::f32::consts::{PI, TAU};
 use std::path::PathBuf;
@@ -28,7 +29,9 @@ pub struct Assets {
     pub player: GpuGltfModel,
     /// Бот-враг.
     pub bot: GpuGltfModel,
-    /// Золотой кристалл, который собирает игрок.
+    /// Золотая монета, которую собирает игрок.
+    pub coin: GpuGltfModel,
+    /// Октаэдр для огоньков на факелах.
     pub crystal: GpuMesh,
     /// Единичный квадрат в XZ: тени и световые пятна на земле.
     pub plane: GpuMesh,
@@ -57,6 +60,9 @@ impl Assets {
         let map = load_model(renderer, "map.glb", [0.5, 0.7, 0.5])?;
         let player = load_model(renderer, "player.glb", [1.12, 1.08, 1.08])?;
         let bot = load_model(renderer, "bot.glb", [1.0, 1.0, 1.03])?;
+        // Материалы монеты тёмно-золотые; лёгкое усиление возвращает им
+        // солнечный блеск, не теряя контраст между гранями.
+        let coin = load_model(renderer, "coin.glb", [1.28, 1.2, 1.08])?;
 
         let crystal = renderer.create_mesh(&crystal_mesh());
         let plane = renderer.create_mesh(&Mesh::plane(1.0, 1.0));
@@ -71,6 +77,7 @@ impl Assets {
             map,
             player,
             bot,
+            coin,
             crystal,
             plane,
             billboard,

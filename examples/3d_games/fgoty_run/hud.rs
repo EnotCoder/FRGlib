@@ -39,7 +39,7 @@ pub fn draw(
     Ok(())
 }
 
-/// Маленькая карта в углу: Феррис (голубой), враги (красные), кристаллы (золотые).
+/// Маленькая карта в углу: Феррис (голубой), враги (красные), монеты (золотые).
 fn draw_minimap(ui: &mut Renderer2D, game: &Game, width: f32, height: f32) {
     use crate::game::ARENA;
 
@@ -54,7 +54,7 @@ fn draw_minimap(ui: &mut Renderer2D, game: &Game, width: f32, height: f32) {
     let scale = size / (ARENA * 2.15);
     let center = Vec2::new(rect.x + size / 2.0, rect.y + size / 2.0);
 
-    // Сначала кристаллы (самые маленькие точки)
+    // Сначала монеты (самые маленькие точки)
     for coin in &game.coins {
         ui.fill_circle(
             center + Vec2::new(coin.pos.x, coin.pos.z) * scale,
@@ -176,7 +176,7 @@ fn draw_wave_panel(
 
     ui.draw_text(
         font,
-        "КРИСТАЛЛЫ",
+        "МОНЕТЫ",
         width - 230.0,
         30.0,
         13.0,
@@ -220,7 +220,7 @@ fn draw_banner(
     )?;
     ui.draw_text_centered(
         font,
-        "собери все кристаллы",
+        "собери все монеты",
         width / 2.0,
         height * 0.30 + 38.0,
         17.0,
@@ -238,7 +238,7 @@ fn draw_hint(
 ) -> Result<(), frglib::gpu::Error> {
     ui.draw_text_centered(
         font,
-        "WASD / стрелки — движение · собирай кристаллы · R — заново",
+        "WASD / стрелки — движение · собирай монеты · R — заново",
         width / 2.0,
         height - 30.0,
         15.0,

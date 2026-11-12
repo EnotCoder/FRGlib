@@ -19,6 +19,8 @@ const PLAYER_LIFT: f32 = 0.20 * PLAYER_SCALE;
 const BOT_SCALE: f32 = 1.3;
 /// Бот ниже краба, но заметно выше него; подъём ставит его на землю.
 const BOT_LIFT: f32 = 0.365 * BOT_SCALE;
+/// Монета заметного размера: её видно с высоты камеры.
+const COIN_SCALE: f32 = 0.9;
 
 const WALL_HEIGHT: f32 = 0.72;
 const WALL_THICKNESS: f32 = 0.32;
@@ -227,7 +229,7 @@ fn draw_sun(scene: &mut Renderer3D, assets: &Assets, camera: &Camera3D) {
     );
 }
 
-/// Мягкие тени и световые пятна под игроком, кристаллами и ботами.
+/// Мягкие тени и световые пятна под игроком, монетами и ботами.
 fn draw_ground_glows(game: &Game, scene: &mut Renderer3D, assets: &Assets) {
     // Сначала тени: они прижимают модели к траве и дают сцене глубину.
     ground_glow(
@@ -283,17 +285,14 @@ fn draw_coin(scene: &mut Renderer3D, assets: &Assets, time: f32, coin: &crate::g
     let spin = time * 2.2 + coin.phase;
     let position = coin.pos + Vec3::Y * (0.65 + bob);
 
+    // Монета стоит вертикально и вращается вокруг Y. Небольшой наклон к
+    // камере не даёт ей превратиться в тонкую полоску на ребре.
     let model = Mat4::from_translation(position)
+        * Mat4::from_rotation_x(-0.25)
         * Mat4::from_rotation_y(spin)
-        * Mat4::from_rotation_z(0.22 * spin.sin())
-        * Mat4::from_scale(Vec3::splat(0.52));
+        * Mat4::from_scale(Vec3::splat(COIN_SCALE));
 
-    scene.draw_mesh_with(
-        &assets.crystal,
-        model,
-        Material::Unlit,
-        Color::rgb(255, 205, 92),
-    );
+    scene.draw_gltf_with(&assets.coin, model, Material::Unlit);
 }
 
 fn draw_coin_glow(
