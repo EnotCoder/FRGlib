@@ -510,9 +510,13 @@ let skybox = Skybox::from_faces(window.gpu(), faces)?;
 | `draw_mesh_textured(&GpuMesh, &Texture, Mat4, Color)` | Рисует меш с текстурой и освещением |
 | `draw_mesh_with(&GpuMesh, Mat4, Material, Color)` | То же с явным материалом |
 | `draw_mesh_textured_with(...)` | Текстурированный меш с кастомным материалом |
+| `draw_gltf(&GpuGltfModel, Mat4)` | Все инстансы glTF; lit/unlit берётся из материалов модели |
+| `draw_gltf_with(&GpuGltfModel, Mat4, Material)` | Все инстансы glTF с принудительным материалом |
 | `draw_cube(center, size, Color)` | Куб, сдвинутый и растянутый; внутри `translation * scale` |
+| `draw_cube_with(center, size, Material, Color)` | Куб с явным материалом |
 | `draw_cube_textured(center, size, &Texture, Color)` | Текстурированный куб |
 | `draw_cube_model(Mat4, Color)` | Единичный куб с произвольной матрицей — для поворотов |
+| `draw_cube_model_with(Mat4, Material, Color)` | То же с явным материалом |
 | `draw_plane(center, size, Color)` | Плоский quad в XZ |
 | `draw_grid(slices, spacing, Color)` | Проволочная сетка; меш кешируется по `(slices, spacing)` |
 | `draw_line(from, to, Color)` | Один отрезок; копится в общий буфер кадра |

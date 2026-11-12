@@ -50,8 +50,11 @@ impl Assets {
         renderer: &Renderer3D,
         gpu: &Gpu,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        // Трава в модели очень яркая, для вечерней сцены её стоит притушить.
-        let map = load_model(renderer, "map.glb", [0.06, 0.09, 0.08])?;
+        // Трава в модели очень яркая, а ветки — тёмные. Лёгкое притушивание
+        // задаёт вечерний тон, но оставляет и траву, и ветки различимыми:
+        // модель рисуется через `Material::Unlit`, поэтому свет её больше
+        // не подсвечивает.
+        let map = load_model(renderer, "map.glb", [0.5, 0.7, 0.5])?;
         let player = load_model(renderer, "player.glb", [1.12, 1.08, 1.08])?;
         let bot = load_model(renderer, "bot.glb", [1.0, 1.0, 1.03])?;
 

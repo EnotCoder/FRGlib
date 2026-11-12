@@ -753,6 +753,25 @@ impl Renderer3D {
     /// # }
     /// ```
     pub fn draw_gltf(&mut self, model: &GpuGltfModel, transform: Mat4) {
+        self.queue_gltf(model, transform, None);
+    }
+
+    /// Queues every instance of a [`GpuGltfModel`] with an explicit [`Material`].
+    ///
+    /// Unlike [`draw_gltf`](Self::draw_gltf), the material stored in the file is
+    /// ignored: every primitive uses `material`. The base-colour factor and
+    /// texture of each primitive are still applied, so forcing
+    /// [`Material::Unlit`] only changes how the model is lit.
+    pub fn draw_gltf_with(&mut self, model: &GpuGltfModel, transform: Mat4, material: Material) {
+        self.queue_gltf(model, transform, Some(material));
+    }
+
+    fn queue_gltf(
+        &mut self,
+        model: &GpuGltfModel,
+        transform: Mat4,
+        material_override: Option<Material>,
+    ) {
         for instance in &model.instances {
             let Some(primitive) = model.primitives.get(instance.primitive) else {
                 continue;
@@ -777,6 +796,7 @@ impl Renderer3D {
                 ),
                 None => ([1.0; 4], Material::Lit, None),
             };
+            let material = material_override.unwrap_or(material);
 
             match texture {
                 Some(texture) => {
@@ -823,14 +843,25 @@ impl Renderer3D {
 
     /// Queues a unit cube moved and scaled into place.
     pub fn draw_cube(&mut self, center: Vec3, size: Vec3, color: Color) {
+        self.draw_cube_with(center, size, Material::Lit, color);
+    }
+
+    /// Queues a unit cube with an explicit [`Material`].
+    pub fn draw_cube_with(&mut self, center: Vec3, size: Vec3, material: Material, color: Color) {
         let model = Mat4::from_translation(center) * Mat4::from_scale(size);
-        self.draw_cube_model(model, color);
+        self.draw_cube_model_with(model, material, color);
     }
 
     /// Queues the unit cube with an arbitrary model matrix, for rotation.
     pub fn draw_cube_model(&mut self, model: Mat4, color: Color) {
+        self.draw_cube_model_with(model, Material::Lit, color);
+    }
+
+    /// Queues the unit cube with an arbitrary model matrix and explicit
+    /// [`Material`], for rotation.
+    pub fn draw_cube_model_with(&mut self, model: Mat4, material: Material, color: Color) {
         let cube = self.cube.clone();
-        self.draw_mesh(&cube, model, color);
+        self.draw_mesh_with(&cube, model, material, color);
     }
 
     /// Queues a flat XZ quad, scaled by `size`.

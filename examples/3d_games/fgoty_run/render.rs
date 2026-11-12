@@ -1,11 +1,13 @@
-//! Отрисовка 3D-сцены: арена, модели, свет и эффекты.
+//! Отрисовка 3D-сцены: арена, модели и эффекты.
 //!
 //! `Renderer3D` рисует всё в один проход. Модели берутся из `Assets`, а
 //! процедурные меши и радиальная текстура дают тени, свечение и частицы без
-//! единого лишнего файла.
+//! единого лишнего файла. Непрозрачные объекты намеренно рисуются через
+//! `Material::Unlit`: сцена не зависит от источников света, а цвета моделей
+//! остаются ровно такими, как в glTF.
 
 use frglib::gpu::glam::{Mat4, Vec3};
-use frglib::gpu::{Camera3D, Light, Material, Renderer3D};
+use frglib::gpu::{Camera3D, Material, Renderer3D};
 use frglib::Color;
 
 use crate::assets::Assets;
@@ -54,10 +56,12 @@ impl CameraRig {
 
 /// Рисует всю сцену: небо, арену, модели и эффекты.
 pub fn draw_scene(game: &Game, scene: &mut Renderer3D, assets: &Assets, camera: &Camera3D) {
-    setup_lights(game, scene);
-
     // Карта — это земля. Растягиваем её ровно под размер арены.
-    scene.draw_gltf(&assets.map, Mat4::from_scale(Vec3::splat(crate::assets::MAP_SCALE)));
+    scene.draw_gltf_with(
+        &assets.map,
+        Mat4::from_scale(Vec3::splat(crate::assets::MAP_SCALE)),
+        Material::Unlit,
+    );
 
     draw_arena(scene, assets, camera, game.time);
     draw_sun(scene, assets, camera);
@@ -87,47 +91,6 @@ pub fn draw_scene(game: &Game, scene: &mut Renderer3D, assets: &Assets, camera: 
     draw_fireflies(game, scene, assets, camera);
 }
 
-/// Солнце, холодная подсветка, четыре факела и огонёк игрока.
-fn setup_lights(game: &Game, scene: &mut Renderer3D) {
-    let mut lights = vec![
-        Light::directional(Vec3::new(-0.35, -1.0, -0.25), Color::rgb(255, 214, 160))
-            .with_intensity(1.15),
-        Light::directional(Vec3::new(0.6, -0.4, -0.5), Color::rgb(90, 130, 220))
-            .with_intensity(0.45),
-    ];
-
-    for position in torch_positions() {
-        lights.push(
-            Light::point(position + Vec3::Y * 2.08, Color::rgb(255, 148, 62))
-                .with_range(6.5)
-                .with_intensity(1.15),
-        );
-    }
-
-    lights.push(
-        Light::point(game.player + Vec3::Y * 0.8, Color::rgb(80, 190, 255))
-            .with_range(4.2)
-            .with_intensity(0.55),
-    );
-
-    if !game.enemies.is_empty() {
-        let center = game
-            .enemies
-            .iter()
-            .fold(Vec3::ZERO, |sum, enemy| sum + enemy.pos)
-            / game.enemies.len() as f32;
-
-        lights.push(
-            Light::point(center + Vec3::Y * 0.7, Color::rgb(255, 58, 48))
-                .with_range(6.5)
-                .with_intensity(0.7),
-        );
-    }
-
-    scene.set_lights(lights);
-    scene.set_ambient(Color::rgb(18, 24, 44));
-}
-
 fn torch_positions() -> [Vec3; 4] {
     let edge = ARENA - 0.45;
     [
@@ -141,32 +104,35 @@ fn torch_positions() -> [Vec3; 4] {
 /// Низкие стены, угловые колонны и факелы на них.
 fn draw_arena(scene: &mut Renderer3D, assets: &Assets, camera: &Camera3D, time: f32) {
     let wall = Color::rgb(43, 49, 68);
-    let cap = Color::rgb(69, 80, 108);
     let long = ARENA * 2.0 + WALL_THICKNESS;
 
     for z in [-ARENA, ARENA] {
-        scene.draw_cube(
+        scene.draw_cube_with(
             Vec3::new(0.0, WALL_HEIGHT * 0.5, z),
             Vec3::new(long, WALL_HEIGHT, WALL_THICKNESS),
+            Material::Unlit,
             wall,
         );
-        scene.draw_cube(
+        scene.draw_cube_with(
             Vec3::new(0.0, WALL_HEIGHT + 0.03, z),
             Vec3::new(long, 0.06, WALL_THICKNESS + 0.08),
-            cap,
+            Material::Unlit,
+            wall,
         );
     }
 
     for x in [-ARENA, ARENA] {
-        scene.draw_cube(
+        scene.draw_cube_with(
             Vec3::new(x, WALL_HEIGHT * 0.5, 0.0),
             Vec3::new(WALL_THICKNESS, WALL_HEIGHT, long),
+            Material::Unlit,
             wall,
         );
-        scene.draw_cube(
+        scene.draw_cube_with(
             Vec3::new(x, WALL_HEIGHT + 0.03, 0.0),
             Vec3::new(WALL_THICKNESS + 0.08, 0.06, long),
-            cap,
+            Material::Unlit,
+            wall,
         );
     }
 
@@ -198,14 +164,16 @@ fn draw_arena(scene: &mut Renderer3D, assets: &Assets, camera: &Camera3D, time: 
         let phase = index as f32 * 1.7;
         let flicker = 1.0 + (time * 9.0 + phase).sin() * 0.08;
 
-        scene.draw_cube(
+        scene.draw_cube_with(
             *position + Vec3::Y * 0.95,
             Vec3::new(0.16, 1.9, 0.16),
+            Material::Unlit,
             Color::rgb(57, 51, 66),
         );
-        scene.draw_cube(
+        scene.draw_cube_with(
             *position + Vec3::Y * 1.9,
             Vec3::new(0.34, 0.12, 0.34),
+            Material::Unlit,
             Color::rgb(82, 73, 92),
         );
 
@@ -320,7 +288,12 @@ fn draw_coin(scene: &mut Renderer3D, assets: &Assets, time: f32, coin: &crate::g
         * Mat4::from_rotation_z(0.22 * spin.sin())
         * Mat4::from_scale(Vec3::splat(0.52));
 
-    scene.draw_mesh(&assets.crystal, model, Color::rgb(255, 205, 92));
+    scene.draw_mesh_with(
+        &assets.crystal,
+        model,
+        Material::Unlit,
+        Color::rgb(255, 205, 92),
+    );
 }
 
 fn draw_coin_glow(
@@ -354,7 +327,7 @@ fn draw_enemy(
         * Mat4::from_rotation_y(enemy.facing)
         * Mat4::from_scale(Vec3::splat(BOT_SCALE));
 
-    scene.draw_gltf(&assets.bot, model);
+    scene.draw_gltf_with(&assets.bot, model, Material::Unlit);
 }
 
 fn draw_enemy_glow(
@@ -402,7 +375,7 @@ fn draw_player(game: &Game, scene: &mut Renderer3D, assets: &Assets) {
             * Mat4::from_rotation_y(game.facing)
             * Mat4::from_scale(Vec3::splat(PLAYER_SCALE));
 
-        scene.draw_gltf(&assets.player, model);
+        scene.draw_gltf_with(&assets.player, model, Material::Unlit);
     }
 
     if game.invulnerable > 0.0 || game.grace > 0.0 {
