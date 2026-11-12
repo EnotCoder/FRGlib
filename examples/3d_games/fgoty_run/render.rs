@@ -11,7 +11,7 @@ use frglib::gpu::{Camera3D, Material, Renderer3D};
 use frglib::Color;
 
 use crate::assets::Assets;
-use crate::game::{Game, ARENA};
+use crate::game::Game;
 
 const PLAYER_SCALE: f32 = 1.7;
 /// Насколько поднять Ферриса, чтобы лапы стояли на траве.
@@ -21,9 +21,6 @@ const BOT_SCALE: f32 = 1.3;
 const BOT_LIFT: f32 = 0.365 * BOT_SCALE;
 /// Монета заметного размера: её видно с высоты камеры.
 const COIN_SCALE: f32 = 0.9;
-
-const WALL_HEIGHT: f32 = 0.72;
-const WALL_THICKNESS: f32 = 0.32;
 
 /// Мягкая камера, которая догоняет игрока и трясётся от ударов.
 pub struct CameraRig {
@@ -65,8 +62,6 @@ pub fn draw_scene(game: &Game, scene: &mut Renderer3D, assets: &Assets, camera: 
         Material::Unlit,
     );
 
-    draw_arena(scene, assets, camera, game.time);
-    draw_sun(scene, assets, camera);
     draw_ground_glows(game, scene, assets);
 
     // Сначала свечение, потом сами объекты: билборды остаются позади модели
@@ -91,142 +86,6 @@ pub fn draw_scene(game: &Game, scene: &mut Renderer3D, assets: &Assets, camera: 
 
     draw_particles(game, scene, assets);
     draw_fireflies(game, scene, assets, camera);
-}
-
-fn torch_positions() -> [Vec3; 4] {
-    let edge = ARENA - 0.45;
-    [
-        Vec3::new(-edge, 0.0, -edge),
-        Vec3::new(edge, 0.0, -edge),
-        Vec3::new(-edge, 0.0, edge),
-        Vec3::new(edge, 0.0, edge),
-    ]
-}
-
-/// Низкие стены, угловые колонны и факелы на них.
-fn draw_arena(scene: &mut Renderer3D, assets: &Assets, camera: &Camera3D, time: f32) {
-    let wall = Color::rgb(43, 49, 68);
-    let long = ARENA * 2.0 + WALL_THICKNESS;
-
-    for z in [-ARENA, ARENA] {
-        scene.draw_cube_with(
-            Vec3::new(0.0, WALL_HEIGHT * 0.5, z),
-            Vec3::new(long, WALL_HEIGHT, WALL_THICKNESS),
-            Material::Unlit,
-            wall,
-        );
-        scene.draw_cube_with(
-            Vec3::new(0.0, WALL_HEIGHT + 0.03, z),
-            Vec3::new(long, 0.06, WALL_THICKNESS + 0.08),
-            Material::Unlit,
-            wall,
-        );
-    }
-
-    for x in [-ARENA, ARENA] {
-        scene.draw_cube_with(
-            Vec3::new(x, WALL_HEIGHT * 0.5, 0.0),
-            Vec3::new(WALL_THICKNESS, WALL_HEIGHT, long),
-            Material::Unlit,
-            wall,
-        );
-        scene.draw_cube_with(
-            Vec3::new(x, WALL_HEIGHT + 0.03, 0.0),
-            Vec3::new(WALL_THICKNESS + 0.08, 0.06, long),
-            Material::Unlit,
-            wall,
-        );
-    }
-
-    // Тонкая холодная линия по краю: граница арены читается даже в темноте.
-    let edge = WALL_HEIGHT + 0.08;
-    let line = Color::rgba(82, 196, 255, 120);
-    scene.draw_line(
-        Vec3::new(-ARENA, edge, -ARENA),
-        Vec3::new(ARENA, edge, -ARENA),
-        line,
-    );
-    scene.draw_line(
-        Vec3::new(-ARENA, edge, ARENA),
-        Vec3::new(ARENA, edge, ARENA),
-        line,
-    );
-    scene.draw_line(
-        Vec3::new(-ARENA, edge, -ARENA),
-        Vec3::new(-ARENA, edge, ARENA),
-        line,
-    );
-    scene.draw_line(
-        Vec3::new(ARENA, edge, -ARENA),
-        Vec3::new(ARENA, edge, ARENA),
-        line,
-    );
-
-    for (index, position) in torch_positions().iter().enumerate() {
-        let phase = index as f32 * 1.7;
-        let flicker = 1.0 + (time * 9.0 + phase).sin() * 0.08;
-
-        scene.draw_cube_with(
-            *position + Vec3::Y * 0.95,
-            Vec3::new(0.16, 1.9, 0.16),
-            Material::Unlit,
-            Color::rgb(57, 51, 66),
-        );
-        scene.draw_cube_with(
-            *position + Vec3::Y * 1.9,
-            Vec3::new(0.34, 0.12, 0.34),
-            Material::Unlit,
-            Color::rgb(82, 73, 92),
-        );
-
-        let flame = *position + Vec3::Y * 2.08;
-        let model = Mat4::from_translation(flame)
-            * Mat4::from_rotation_y(time * 2.0 + phase)
-            * Mat4::from_scale(Vec3::splat(0.22 * flicker));
-        scene.draw_mesh_with(&assets.crystal, model, Material::Unlit, Color::rgb(255, 158, 58));
-
-        billboard_glow(
-            scene,
-            assets,
-            camera,
-            flame,
-            Color::rgba(255, 150, 60, 120),
-            1.35 * flicker,
-        );
-    }
-}
-
-/// Закатное солнце за дальним краем арены.
-///
-/// Это не настоящий источник света, а два мягких билборда: они добавляют
-/// тёплое пятно над стеной, даже когда камера смотрит вниз и небо почти не
-/// попадает в кадр.
-fn draw_sun(scene: &mut Renderer3D, assets: &Assets, camera: &Camera3D) {
-    let position = Vec3::new(0.0, 3.2, -13.5);
-    billboard_glow(
-        scene,
-        assets,
-        camera,
-        position,
-        Color::rgba(255, 146, 66, 58),
-        7.0,
-    );
-    billboard_glow(
-        scene,
-        assets,
-        camera,
-        position,
-        Color::rgba(255, 222, 160, 120),
-        3.2,
-    );
-    billboard_glow(
-        scene,
-        assets,
-        camera,
-        position,
-        Color::rgba(255, 244, 214, 210),
-        1.15,
-    );
 }
 
 /// Мягкие тени и световые пятна под игроком, монетами и ботами.

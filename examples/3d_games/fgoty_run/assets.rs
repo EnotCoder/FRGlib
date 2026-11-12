@@ -31,8 +31,6 @@ pub struct Assets {
     pub bot: GpuGltfModel,
     /// Золотая монета, которую собирает игрок.
     pub coin: GpuGltfModel,
-    /// Октаэдр для огоньков на факелах.
-    pub crystal: GpuMesh,
     /// Единичный квадрат в XZ: тени и световые пятна на земле.
     pub plane: GpuMesh,
     /// Единичный квадрат в XY: светящиеся билборды.
@@ -64,7 +62,6 @@ impl Assets {
         // солнечный блеск, не теряя контраст между гранями.
         let coin = load_model(renderer, "coin.glb", [1.28, 1.2, 1.08])?;
 
-        let crystal = renderer.create_mesh(&crystal_mesh());
         let plane = renderer.create_mesh(&Mesh::plane(1.0, 1.0));
         let billboard = renderer.create_mesh(&billboard_mesh());
         let ring = renderer.create_mesh(&ring_mesh());
@@ -78,7 +75,6 @@ impl Assets {
             player,
             bot,
             coin,
-            crystal,
             plane,
             billboard,
             ring,
@@ -116,53 +112,6 @@ fn tint_materials(model: &mut GltfModel, tint: [f32; 3]) {
         material.base_color[1] *= tint[1];
         material.base_color[2] *= tint[2];
     }
-}
-
-/// Октаэдр: дешёвый кристалл, который красиво ловит свет гранями.
-fn crystal_mesh() -> Mesh {
-    let top = Vec3::new(0.0, 0.62, 0.0);
-    let bottom = Vec3::new(0.0, -0.62, 0.0);
-    let ring = [
-        Vec3::new(0.34, 0.0, 0.0),
-        Vec3::new(0.0, 0.0, 0.34),
-        Vec3::new(-0.34, 0.0, 0.0),
-        Vec3::new(0.0, 0.0, -0.34),
-    ];
-
-    let mut vertices = Vec::with_capacity(24);
-    let mut indices = Vec::with_capacity(24);
-
-    for i in 0..4 {
-        let a = ring[i];
-        let b = ring[(i + 1) % 4];
-        push_triangle(&mut vertices, &mut indices, top, a, b);
-        push_triangle(&mut vertices, &mut indices, bottom, b, a);
-    }
-
-    Mesh::from_vertices(vertices, indices)
-}
-
-/// Добавляет треугольник с плоской нормалью, разворачивая его наружу.
-fn push_triangle(
-    vertices: &mut Vec<Vertex>,
-    indices: &mut Vec<u32>,
-    a: Vec3,
-    mut b: Vec3,
-    mut c: Vec3,
-) {
-    let mut normal = (b - a).cross(c - a).normalize_or_zero();
-
-    // Нормаль должна смотреть от центра фигуры, иначе грань вывернута.
-    if normal.dot(a + b + c) < 0.0 {
-        std::mem::swap(&mut b, &mut c);
-        normal = -normal;
-    }
-
-    let base = vertices.len() as u32;
-    for point in [a, b, c] {
-        vertices.push(Vertex::new(point.to_array(), normal.to_array()));
-    }
-    indices.extend_from_slice(&[base, base + 1, base + 2]);
 }
 
 /// Плоское кольцо в XZ для щита вокруг игрока.
