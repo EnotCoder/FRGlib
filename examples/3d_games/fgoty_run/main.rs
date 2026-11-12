@@ -24,7 +24,7 @@ use game::{seed, Game, Keys};
 use render::CameraRig;
 
 /// Шрифт HUD из примеров интерфейса.
-const FONT: &[u8] = include_bytes!("../assets/font.otf");
+const FONT: &[u8] = include_bytes!("../assets/font.ttf");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut window = WgpuWindow::builder("FRGLib 3D — Феррис против ботов")
