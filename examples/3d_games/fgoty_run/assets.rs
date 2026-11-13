@@ -6,10 +6,9 @@
 //! которого игра использует как врага, а `coin.glb` — золотая монета,
 //! которую игрок собирает.
 
-use std::f32::consts::{PI, TAU};
+use std::f32::consts::TAU;
 use std::path::PathBuf;
 
-use frglib::gpu::glam::Vec3;
 use frglib::gpu::{
     GltfModel, Gpu, GpuGltfModel, GpuMesh, Mesh, Renderer3D, Skybox, Texture, Vertex,
 };
@@ -41,7 +40,7 @@ pub struct Assets {
     pub cube: GpuMesh,
     /// Мягкое радиальное свечение.
     pub glow: Texture,
-    /// Градиентное небо с солнцем и звёздами.
+    /// Ровное светло-голубое небо.
     pub skybox: Skybox,
 }
 
@@ -192,97 +191,15 @@ fn glow_pixels(size: u32) -> Vec<u8> {
     pixels
 }
 
-/// Экваториальная панорама вечернего неба.
-///
-/// Верх — глубокий индиго, горизонт — тёплый закат, у солнца яркое пятно,
-/// а выше горизонта разбросаны редкие звёзды.
+/// Цвет неба: светло-голубой `#d3e6f7`.
+const SKY_COLOR: [u8; 3] = [0xd3, 0xe6, 0xf7];
+
+/// Ровная панорама неба без градиента, солнца и звёзд.
 fn sky_pixels(width: u32, height: u32) -> Vec<u8> {
-    let mut pixels = vec![0u8; (width * height * 4) as usize];
-    // Солнце садится за дальним краем арены: камера по умолчанию смотрит
-    // туда же, поэтому закат виден прямо над ботами.
-    let sun = Vec3::new(0.35, 0.20, -0.92).normalize();
-
-    for y in 0..height {
-        let v = (y as f32 + 0.5) / height as f32;
-        let elevation = (0.5 - v) * PI;
-
-        for x in 0..width {
-            let u = (x as f32 + 0.5) / width as f32;
-            let azimuth = (u - 0.5) * TAU;
-            let direction = Vec3::new(
-                elevation.cos() * azimuth.sin(),
-                elevation.sin(),
-                elevation.cos() * azimuth.cos(),
-            );
-
-            let mut color = sky_color(elevation, direction, sun);
-
-            // Звёзды только над горизонтом и подальше от солнца.
-            let sun_dot = direction.dot(sun).max(0.0);
-            if elevation > 0.18 && sun_dot < 0.92 {
-                let hash = hash2(x, y);
-                if hash > 0.9976 {
-                    let brightness = ((hash - 0.9976) / 0.0024).powf(2.0) * 220.0;
-                    color[0] += brightness;
-                    color[1] += brightness * 0.96;
-                    color[2] += brightness * 0.86;
-                }
-            }
-
-            let index = ((y * width + x) * 4) as usize;
-            pixels[index] = color[0].clamp(0.0, 255.0) as u8;
-            pixels[index + 1] = color[1].clamp(0.0, 255.0) as u8;
-            pixels[index + 2] = color[2].clamp(0.0, 255.0) as u8;
-            pixels[index + 3] = 255;
-        }
+    let [r, g, b] = SKY_COLOR;
+    let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+    for _ in 0..width * height {
+        pixels.extend_from_slice(&[r, g, b, 255]);
     }
-
     pixels
-}
-
-fn sky_color(elevation: f32, direction: Vec3, sun: Vec3) -> [f32; 3] {
-    let horizon = [232.0, 118.0, 72.0];
-    let zenith = [7.0, 11.0, 30.0];
-    let below = [7.0, 10.0, 26.0];
-
-    let mut color = if elevation >= 0.0 {
-        let t = (elevation / (PI * 0.5)).powf(0.55);
-        lerp3(horizon, zenith, t)
-    } else {
-        // Ниже горизонта небо быстро уходит в тёмно-синий: камера смотрит
-        // вниз, и коричневая полоса у края экрана только мешала бы.
-        let t = (-elevation / (PI * 0.5)).powf(0.02);
-        lerp3(horizon, below, t)
-    };
-
-    let sun_dot = direction.dot(sun).max(0.0);
-    let halo = sun_dot.powf(6.0) * 0.35 + sun_dot.powf(64.0) * 0.9;
-    color[0] += 255.0 * halo;
-    color[1] += 168.0 * halo;
-    color[2] += 86.0 * halo;
-
-    // Тёплая полоса прямо над горизонтом, сильнее всего у солнца.
-    let band = (-elevation.abs() * 7.0).exp() * (0.22 + 0.78 * sun_dot);
-    color[0] += 56.0 * band;
-    color[1] += 20.0 * band;
-    color[2] += 6.0 * band;
-
-    color
-}
-
-fn lerp3(from: [f32; 3], to: [f32; 3], t: f32) -> [f32; 3] {
-    [
-        from[0] + (to[0] - from[0]) * t,
-        from[1] + (to[1] - from[1]) * t,
-        from[2] + (to[2] - from[2]) * t,
-    ]
-}
-
-/// Детерминированный шум для звёзд: один и тот же кадр при каждом запуске.
-fn hash2(x: u32, y: u32) -> f32 {
-    let mut h = x
-        .wrapping_mul(374_761_393)
-        .wrapping_add(y.wrapping_mul(668_265_263));
-    h = (h ^ (h >> 13)).wrapping_mul(1_274_126_177);
-    ((h ^ (h >> 16)) & 0xffff) as f32 / 65_535.0
 }

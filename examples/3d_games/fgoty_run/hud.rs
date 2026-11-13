@@ -16,8 +16,6 @@ pub fn draw(
 ) -> Result<(), frglib::gpu::Error> {
     let (width, height) = (size.0 as f32, size.1 as f32);
 
-    draw_vignette(ui, width, height);
-
     if game.flash > 0.0 {
         ui.fill_rect(
             Rect::new(0.0, 0.0, width, height),
@@ -27,7 +25,6 @@ pub fn draw(
 
     draw_stats(ui, font, game)?;
     draw_wave_panel(ui, font, game, width)?;
-    draw_minimap(ui, game, width, height);
 
     if game.over {
         draw_game_over(ui, font, game, width, height)?;
@@ -37,72 +34,6 @@ pub fn draw(
     }
 
     Ok(())
-}
-
-/// Маленькая карта в углу: Феррис (голубой), враги (красные), монеты (золотые).
-fn draw_minimap(ui: &mut Renderer2D, game: &Game, width: f32, height: f32) {
-    use crate::game::ARENA;
-
-    let size = 130.0;
-    let margin = 25.0;
-    let rect = Rect::new(width - size - margin, height - size - margin, size, size);
-
-    ui.fill_rect(rect, Color::rgba(10, 15, 28, 200));
-    ui.draw_rect(rect, 1.0, Color::rgba(88, 138, 210, 120));
-
-    // Масштабируем так, чтобы вся арена + небольшой запас влезли в квадрат.
-    let scale = size / (ARENA * 2.15);
-    let center = Vec2::new(rect.x + size / 2.0, rect.y + size / 2.0);
-
-    // Сначала монеты (самые маленькие точки)
-    for coin in &game.coins {
-        ui.fill_circle(
-            center + Vec2::new(coin.pos.x, coin.pos.z) * scale,
-            1.6,
-            Color::rgb(255, 200, 100),
-        );
-    }
-
-    // Затем враги
-    for enemy in &game.enemies {
-        ui.fill_circle(
-            center + Vec2::new(enemy.pos.x, enemy.pos.z) * scale,
-            2.8,
-            Color::rgb(255, 70, 70),
-        );
-    }
-
-    // Игрок поверх всех
-    ui.fill_circle(
-        center + Vec2::new(game.player.x, game.player.z) * scale,
-        3.5,
-        Color::rgb(100, 210, 255),
-    );
-}
-
-/// Тёмные края кадра: сцена выглядит глубже, а HUD читается лучше.
-fn draw_vignette(ui: &mut Renderer2D, width: f32, height: f32) {
-    ui.fill_rect(
-        Rect::new(0.0, 0.0, width, height),
-        Color::rgba(4, 8, 20, 28),
-    );
-
-    const STEPS: usize = 14;
-    const BAND: f32 = 14.0;
-
-    for i in 0..STEPS {
-        let t = i as f32 / STEPS as f32;
-        let alpha = ((1.0 - t) * 46.0) as u8;
-        let inset = i as f32 * BAND;
-        let color = Color::rgba(2, 4, 12, alpha);
-        let span = width - inset * 2.0;
-        let tall = height - inset * 2.0;
-
-        ui.fill_rect(Rect::new(inset, inset, span, BAND), color);
-        ui.fill_rect(Rect::new(inset, height - inset - BAND, span, BAND), color);
-        ui.fill_rect(Rect::new(inset, inset, BAND, tall), color);
-        ui.fill_rect(Rect::new(width - inset - BAND, inset, BAND, tall), color);
-    }
 }
 
 fn draw_stats(ui: &mut Renderer2D, font: FontId, game: &Game) -> Result<(), frglib::gpu::Error> {
@@ -116,7 +47,7 @@ fn draw_stats(ui: &mut Renderer2D, font: FontId, game: &Game) -> Result<(), frgl
         36.0,
         30.0,
         13.0,
-        Color::rgb(126, 158, 208),
+        Color::rgb(255, 255, 255),
     )?;
     ui.draw_text(
         font,
@@ -133,7 +64,7 @@ fn draw_stats(ui: &mut Renderer2D, font: FontId, game: &Game) -> Result<(), frgl
         192.0,
         30.0,
         13.0,
-        Color::rgb(126, 158, 208),
+        Color::rgb(255, 255, 255),
     )?;
 
     for i in 0..3 {
@@ -180,7 +111,7 @@ fn draw_wave_panel(
         width - 230.0,
         30.0,
         13.0,
-        Color::rgb(126, 158, 208),
+        Color::rgb(255, 255, 255),
     )?;
     ui.draw_text(
         font,
@@ -216,7 +147,7 @@ fn draw_banner(
         width / 2.0,
         height * 0.30,
         44.0,
-        Color::rgba(255, 220, 150, alpha),
+        Color::rgba(255, 255, 255, alpha),
     )?;
     ui.draw_text_centered(
         font,
@@ -224,7 +155,7 @@ fn draw_banner(
         width / 2.0,
         height * 0.30 + 38.0,
         17.0,
-        Color::rgba(180, 205, 235, alpha),
+        Color::rgba(255, 255, 255, alpha),
     )?;
 
     Ok(())
@@ -242,7 +173,7 @@ fn draw_hint(
         width / 2.0,
         height - 30.0,
         15.0,
-        Color::rgba(190, 205, 225, 205),
+        Color::rgba(255, 255, 255, 205),
     )?;
 
     Ok(())
