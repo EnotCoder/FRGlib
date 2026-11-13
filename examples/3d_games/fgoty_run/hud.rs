@@ -41,7 +41,8 @@ fn draw_stats(ui: &mut Renderer2D, font: FontId, game: &Game) -> Result<(), frgl
     ui.fill_rect(panel, Color::rgba(7, 11, 22, 218));
     ui.draw_rect(panel, 1.0, Color::rgba(88, 138, 210, 150));
 
-    ui.draw_text(
+    draw_text(
+        ui,
         font,
         "СЧЁТ",
         36.0,
@@ -49,7 +50,8 @@ fn draw_stats(ui: &mut Renderer2D, font: FontId, game: &Game) -> Result<(), frgl
         13.0,
         Color::rgb(255, 255, 255),
     )?;
-    ui.draw_text(
+    draw_text_thin(
+        ui,
         font,
         &format!("{}", game.score),
         36.0,
@@ -58,7 +60,8 @@ fn draw_stats(ui: &mut Renderer2D, font: FontId, game: &Game) -> Result<(), frgl
         Color::WHITE,
     )?;
 
-    ui.draw_text(
+    draw_text(
+        ui,
         font,
         "ЖИЗНИ",
         192.0,
@@ -83,7 +86,8 @@ fn draw_stats(ui: &mut Renderer2D, font: FontId, game: &Game) -> Result<(), frgl
         }
     }
 
-    ui.draw_text(
+    draw_text(
+        ui,
         font,
         &format!("ВОЛНА {}", game.wave),
         36.0,
@@ -105,7 +109,8 @@ fn draw_wave_panel(
     ui.fill_rect(panel, Color::rgba(7, 11, 22, 218));
     ui.draw_rect(panel, 1.0, Color::rgba(88, 138, 210, 150));
 
-    ui.draw_text(
+    draw_text(
+        ui,
         font,
         "МОНЕТЫ",
         width - 230.0,
@@ -113,7 +118,8 @@ fn draw_wave_panel(
         13.0,
         Color::rgb(255, 255, 255),
     )?;
-    ui.draw_text(
+    draw_text(
+        ui,
         font,
         &format!("{} / {}", game.coins.len(), COINS),
         width - 230.0,
@@ -141,7 +147,8 @@ fn draw_banner(
     let fade_out = (game.banner / 0.6).clamp(0.0, 1.0);
     let alpha = (fade_in * fade_out * 255.0) as u8;
 
-    ui.draw_text_centered(
+    draw_text_centered_thin(
+        ui,
         font,
         &format!("ВОЛНА {}", game.wave),
         width / 2.0,
@@ -149,7 +156,8 @@ fn draw_banner(
         44.0,
         Color::rgba(255, 255, 255, alpha),
     )?;
-    ui.draw_text_centered(
+    draw_text_centered(
+        ui,
         font,
         "собери все монеты",
         width / 2.0,
@@ -167,7 +175,8 @@ fn draw_hint(
     width: f32,
     height: f32,
 ) -> Result<(), frglib::gpu::Error> {
-    ui.draw_text_centered(
+    draw_text_centered(
+        ui,
         font,
         "WASD / стрелки — движение · собирай монеты · R — заново",
         width / 2.0,
@@ -193,7 +202,8 @@ fn draw_game_over(
 
     let pulse = 0.65 + 0.35 * (game.time * 3.0).sin();
 
-    ui.draw_text_centered(
+    draw_text_centered(
+        ui,
         font,
         "ИГРА ОКОНЧЕНА",
         width / 2.0,
@@ -201,7 +211,8 @@ fn draw_game_over(
         46.0,
         Color::WHITE,
     )?;
-    ui.draw_text_centered(
+    draw_text_centered_thin(
+        ui,
         font,
         &format!("Счёт: {}", game.score),
         width / 2.0,
@@ -209,7 +220,8 @@ fn draw_game_over(
         28.0,
         Color::rgb(255, 206, 112),
     )?;
-    ui.draw_text_centered(
+    draw_text_centered(
+        ui,
         font,
         &format!("Волна: {}", game.wave),
         width / 2.0,
@@ -217,7 +229,8 @@ fn draw_game_over(
         18.0,
         Color::rgb(150, 180, 220),
     )?;
-    ui.draw_text_centered(
+    draw_text_centered(
+        ui,
         font,
         "R или пробел — заново",
         width / 2.0,
@@ -225,6 +238,106 @@ fn draw_game_over(
         18.0,
         Color::rgba(190, 205, 225, (205.0 * pulse) as u8),
     )?;
+
+    Ok(())
+}
+
+/// Во сколько раз тоньше обводка у избранных надписей.
+const THIN_OUTLINE: f32 = 0.5;
+
+/// Рисует текст с чёрной обводкой, выровненный по левому краю.
+fn draw_text(
+    ui: &mut Renderer2D,
+    font: FontId,
+    text: &str,
+    x: f32,
+    y: f32,
+    size: f32,
+    color: Color,
+) -> Result<(), frglib::gpu::Error> {
+    draw_outline(ui, font, text, x, y, size, color.a, false, 1.0)?;
+    ui.draw_text(font, text, x, y, size, color)
+}
+
+/// Рисует текст с чёрной обводкой, центрированный по обоим осям.
+fn draw_text_centered(
+    ui: &mut Renderer2D,
+    font: FontId,
+    text: &str,
+    x: f32,
+    y: f32,
+    size: f32,
+    color: Color,
+) -> Result<(), frglib::gpu::Error> {
+    draw_outline(ui, font, text, x, y, size, color.a, true, 1.0)?;
+    ui.draw_text_centered(font, text, x, y, size, color)
+}
+
+/// Как [`draw_text`], но с более тонкой обводкой.
+fn draw_text_thin(
+    ui: &mut Renderer2D,
+    font: FontId,
+    text: &str,
+    x: f32,
+    y: f32,
+    size: f32,
+    color: Color,
+) -> Result<(), frglib::gpu::Error> {
+    draw_outline(ui, font, text, x, y, size, color.a, false, THIN_OUTLINE)?;
+    ui.draw_text(font, text, x, y, size, color)
+}
+
+/// Как [`draw_text_centered`], но с более тонкой обводкой.
+fn draw_text_centered_thin(
+    ui: &mut Renderer2D,
+    font: FontId,
+    text: &str,
+    x: f32,
+    y: f32,
+    size: f32,
+    color: Color,
+) -> Result<(), frglib::gpu::Error> {
+    draw_outline(ui, font, text, x, y, size, color.a, true, THIN_OUTLINE)?;
+    ui.draw_text_centered(font, text, x, y, size, color)
+}
+
+/// Подкладывает под текст чёрные копии со смещением по восьми направлениям.
+///
+/// Прозрачность копий повторяет прозрачность самого текста, поэтому
+/// исчезающие надписи теряют и обводку.
+#[allow(clippy::too_many_arguments)]
+fn draw_outline(
+    ui: &mut Renderer2D,
+    font: FontId,
+    text: &str,
+    x: f32,
+    y: f32,
+    size: f32,
+    alpha: u8,
+    centered: bool,
+    width_scale: f32,
+) -> Result<(), frglib::gpu::Error> {
+    let outline = Color::rgba(0, 0, 0, alpha);
+    // Обводка толще у крупных надписей, но и мелкий текст не тонет в фоне.
+    let offset = ((size * 0.1).clamp(1.5, 4.5) * width_scale).max(1.0);
+    let offsets = [
+        (-offset, 0.0),
+        (offset, 0.0),
+        (0.0, -offset),
+        (0.0, offset),
+        (-offset, -offset),
+        (offset, -offset),
+        (-offset, offset),
+        (offset, offset),
+    ];
+
+    for (dx, dy) in offsets {
+        if centered {
+            ui.draw_text_centered(font, text, x + dx, y + dy, size, outline)?;
+        } else {
+            ui.draw_text(font, text, x + dx, y + dy, size, outline)?;
+        }
+    }
 
     Ok(())
 }
