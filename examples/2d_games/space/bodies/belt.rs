@@ -1,127 +1,91 @@
 use frglib::Color;
 use std::f32::consts::TAU;
 
+use super::Random;
+
 /// Один небольшой объект в поясе.
 pub struct BeltParticle {
     pub orbit_radius: f32,
     pub size: f32,
     pub speed: f32,
     pub start_angle: f32,
-    pub color: Color,
+    /// Оттенок частицы, 0..[`SHADES`]. Частицы одного оттенка рисуются
+    /// одним вызовом, поэтому пояс стоит несколько вызовов, а не тысячи.
+    pub shade: u8,
 }
 
-/// Пояс астероидов или пояс Койпера.
+/// Пояс астероидов, пояс Койпера или облако Оорта.
 pub struct Belt {
     pub particles: Vec<BeltParticle>,
+    pub base_color: Color,
 }
 
-/// Простой линейный генератор случайных чисел:
-/// пояс должен выглядеть одинаково при каждом запуске.
-struct Random {
+/// Сколько оттенков у частиц пояса.
+pub const SHADES: u8 = 4;
+
+/// Множитель яркости для каждого оттенка: от тусклого к яркому.
+pub const SHADE_BRIGHTNESS: [f32; SHADES as usize] = [0.55, 0.70, 0.85, 1.0];
+
+fn make_belt(
     seed: u32,
-}
+    count: usize,
+    radius: (f32, f32),
+    speed_base: f32,
+    base_color: Color,
+) -> Belt {
+    let mut random = Random::new(seed);
+    let mut particles = Vec::with_capacity(count);
 
-impl Random {
-    fn new(seed: u32) -> Self {
-        Self { seed }
-    }
-
-    /// Следующее число в диапазоне `0.0..1.0`.
-    fn next(&mut self) -> f32 {
-        self.seed = self.seed.wrapping_mul(1664525).wrapping_add(1013904223);
-
-        (self.seed >> 8) as f32 / 16_777_216.0
-    }
-
-    fn range(&mut self, min: f32, max: f32) -> f32 {
-        min + self.next() * (max - min)
-    }
-}
-
-/// Пояс астероидов -- между Марсом и Юпитером.
-pub fn get_asteroid_belt() -> Belt {
-    let mut random = Random::new(0xA57E_2019);
-    let mut particles = Vec::with_capacity(250);
-
-    for _ in 0..250 {
-        let orbit_radius = random.range(300.0, 400.0);
+    for _ in 0..count {
+        let orbit_radius = random.range(radius.0, radius.1);
 
         // Чем дальше от Солнца, тем медленнее движение по орбите.
-        let speed = 0.60 * (190.0 / orbit_radius).sqrt();
-
-        let brightness = random.range(0.65, 1.0);
-        let color = Color::rgb(
-            (135.0 * brightness) as u8,
-            (125.0 * brightness) as u8,
-            (115.0 * brightness) as u8,
-        );
+        let speed = speed_base * (190.0 / orbit_radius).sqrt();
 
         particles.push(BeltParticle {
             orbit_radius,
             size: random.range(2.0, 3.6),
             speed,
             start_angle: random.range(0.0, TAU),
-            color,
+            shade: (random.next() * SHADES as f32) as u8,
         });
     }
 
-    Belt { particles }
+    Belt {
+        particles,
+        base_color,
+    }
+}
+
+/// Пояс астероидов -- между Марсом и Юпитером.
+pub fn get_asteroid_belt() -> Belt {
+    make_belt(
+        0xA57E_2019,
+        240,
+        (300.0, 400.0),
+        0.60,
+        Color::rgb(135, 125, 115),
+    )
 }
 
 /// Пояс Койпера -- за Нептуном.
 pub fn get_kuiper_belt() -> Belt {
-    let mut random = Random::new(0xC01D_2E4D);
-    let mut particles = Vec::with_capacity(600);
-
-    for _ in 0..600 {
-        let orbit_radius = random.range(900.0, 1050.0);
-
-        let speed = 0.16 * (425.0 / orbit_radius).sqrt();
-
-        let brightness = random.range(0.65, 1.0);
-        let color = Color::rgb(
-            (135.0 * brightness) as u8,
-            (125.0 * brightness) as u8,
-            (115.0 * brightness) as u8,
-        );
-
-        particles.push(BeltParticle {
-            orbit_radius,
-            size: random.range(2.5, 3.5),
-            speed,
-            start_angle: random.range(0.0, TAU),
-            color,
-        });
-    }
-
-    Belt { particles }
+    make_belt(
+        0xC01D_2E4D,
+        520,
+        (900.0, 1050.0),
+        0.16,
+        Color::rgb(135, 125, 115),
+    )
 }
 
-/// Облоко Орта -- за Поясом Койпера.
+/// Облако Оорта -- за Поясом Койпера.
 pub fn get_orte_belt() -> Belt {
-    let mut random = Random::new(0xC01D_2E4D);
-    let mut particles = Vec::with_capacity(3000);
-
-    for _ in 0..3000 {
-        let orbit_radius = random.range(1200.0, 1900.0);
-
-        let speed = 0.05 * (425.0 / orbit_radius).sqrt();
-
-        let brightness = random.range(0.65, 1.0);
-        let color = Color::rgb(
-            (100.0 * brightness) as u8,
-            (120.0 * brightness) as u8,
-            (150.0 * brightness) as u8,
-        );
-
-        particles.push(BeltParticle {
-            orbit_radius,
-            size: random.range(2.4, 3.4),
-            speed,
-            start_angle: random.range(0.0, TAU),
-            color,
-        });
-    }
-
-    Belt { particles }
+    make_belt(
+        0x0A17_0BEE,
+        2200,
+        (1200.0, 1900.0),
+        0.05,
+        Color::rgb(100, 120, 150),
+    )
 }

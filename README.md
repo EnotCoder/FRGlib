@@ -509,7 +509,7 @@ cargo build --release --features bundled
 | `cargo run --features cached-textures --example 2d_games-fgoty` | RPG на тайловой карте: `TileMap`, нарезка атласа, камера, коллизии |
 | `cargo run --features cached-textures --example 2d_games-fgoty-dash` | Dash: физика прыжка, вращение куба, уровень строкой |
 | `cargo run --example 2d_games-gallery` | Листалка картинок: выбор по индексу, круговой проход |
-| `cargo run --example 2d_games-space` | Симуляция Солнечной системы: Пример работы матрицы |
+| `cargo run --example 2d_games-space` | Солнечная система: наклонные орбиты, корона и тени, follow-камера, управление временем |
 | `cargo run --features wgpu --example wgpu-cube` | 3D на `wgpu`: куб, сетка, орбитальная камера |
 | `cargo run --features wgpu --example wgpu-model` | Модель из OBJ-файла с текстурой |
 | `cargo run --features wgpu --example wgpu-gltf` | Модель из glTF (`.gltf`/`.glb`) с материалом и текстурой |

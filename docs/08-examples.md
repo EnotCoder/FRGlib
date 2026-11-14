@@ -72,7 +72,7 @@ required-features = ["cached-textures"]
 | `2d_games-fgoty` | `examples/2d_games/fgoty/main.rs` | `cached-textures` | RPG на `TileMap`, нарезка атласа, камера, коллизии |
 | `2d_games-fgoty-dash` | `examples/2d_games/dash/main.rs` | `cached-textures` | Прыжковая физика, вращение куба, уровень строкой, меню |
 | `2d_games-gallery` | `examples/2d_games/gallery.rs` | — | Листалка картинок по индексу, круговой проход |
-| `2d_games-space` | `examples/2d_games/space/main.rs` | — | Солнечная система: орбиты, зум, перетаскивание, пояса |
+| `2d_games-space` | `examples/2d_games/space/main.rs` | — | Солнечная система: наклонные орбиты, корона Солнца, кольца Сатурна, параллакс-звёзды, тени, follow-камера и управление временем |
 
 ## Запуск
 

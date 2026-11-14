@@ -1,5 +1,7 @@
 use frglib::{Color, Image, Vec2};
 
+use super::ORBIT_TILT;
+
 pub struct Moon {
     pub name: &'static str,
     pub size: f32,
@@ -8,6 +10,13 @@ pub struct Moon {
     pub orbit_radius: f32,
     pub speed: f32,
     pub start_angle: f32,
+
+    /// Настоящий радиус, км.
+    pub radius_km: f32,
+    /// Расстояние от планеты, км.
+    pub orbit_km: f32,
+    /// Период обращения, земные сутки.
+    pub period_days: f32,
 }
 
 impl Moon {
@@ -18,7 +27,7 @@ impl Moon {
         planet_position
             + Vec2::new(
                 angle.cos() * self.orbit_radius,
-                angle.sin() * self.orbit_radius,
+                angle.sin() * self.orbit_radius * ORBIT_TILT,
             )
     }
 
@@ -42,6 +51,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
             orbit_radius: 18.0,
             speed: 2.5,
             start_angle: 0.0,
+            radius_km: 1_737.0,
+            orbit_km: 384_400.0,
+            period_days: 27.3,
         }],
         4 => vec![
             Moon {
@@ -52,6 +64,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 orbit_radius: 13.0,
                 speed: 3.0,
                 start_angle: 0.0,
+                radius_km: 11.0,
+                orbit_km: 9_376.0,
+                period_days: 0.32,
             },
             Moon {
                 name: "Deimos",
@@ -61,6 +76,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 orbit_radius: 21.0,
                 speed: 1.8,
                 start_angle: 2.0,
+                radius_km: 6.0,
+                orbit_km: 23_463.0,
+                period_days: 1.26,
             },
         ],
         5 => vec![
@@ -72,6 +90,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 orbit_radius: 45.0,
                 speed: 2.5,
                 start_angle: 0.0,
+                radius_km: 1_822.0,
+                orbit_km: 421_700.0,
+                period_days: 1.77,
             },
             Moon {
                 name: "Callisto",
@@ -81,6 +102,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 orbit_radius: 60.0,
                 speed: 1.7,
                 start_angle: 2.0,
+                radius_km: 2_410.0,
+                orbit_km: 1_882_700.0,
+                period_days: 16.7,
             },
             Moon {
                 name: "Ganymede",
@@ -90,6 +114,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 orbit_radius: 75.0,
                 speed: 1.2,
                 start_angle: 4.0,
+                radius_km: 2_634.0,
+                orbit_km: 1_070_400.0,
+                period_days: 7.15,
             },
         ],
         6 => vec![
@@ -101,6 +128,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 orbit_radius: 35.0,
                 speed: 1.8,
                 start_angle: 1.0,
+                radius_km: 2_575.0,
+                orbit_km: 1_221_870.0,
+                period_days: 15.9,
             },
             Moon {
                 name: "Rhea",
@@ -110,6 +140,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
                 orbit_radius: 48.0,
                 speed: 1.1,
                 start_angle: 3.0,
+                radius_km: 764.0,
+                orbit_km: 527_108.0,
+                period_days: 4.5,
             },
         ],
         7 => vec![Moon {
@@ -120,6 +153,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
             orbit_radius: 35.0,
             speed: 1.7,
             start_angle: 0.0,
+            radius_km: 789.0,
+            orbit_km: 435_910.0,
+            period_days: 8.7,
         }],
         8 => vec![Moon {
             name: "Triton",
@@ -129,6 +165,9 @@ pub fn get_moon(planet_number: u32, moon_textures: &[Option<Image>]) -> Vec<Moon
             orbit_radius: 35.0,
             speed: -1.5,
             start_angle: 0.0,
+            radius_km: 1_353.0,
+            orbit_km: 354_759.0,
+            period_days: 5.9,
         }],
         _ => vec![],
     }
