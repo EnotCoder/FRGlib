@@ -37,13 +37,10 @@ R reset view   ESC back   Q quit";
 struct BodyInfo {
     name: &'static str,
     kind: &'static str,
-    /// Радиус в мировых единицах -- для кольца выделения.
-    radius: f32,
     radius_km: f32,
     distance_km: Option<f32>,
     period_days: Option<f32>,
     moon_count: u32,
-    position: Vec2,
 }
 
 impl BodyInfo {
@@ -103,60 +100,36 @@ fn format_period(days: f32) -> String {
     }
 }
 
-fn planet_info(planet: &Planet, position: Vec2) -> BodyInfo {
+fn planet_info(planet: &Planet) -> BodyInfo {
     BodyInfo {
         name: planet.name,
         kind: "planet",
-        radius: planet.radius(),
         radius_km: planet.radius_km,
         distance_km: Some(planet.distance_km),
         period_days: Some(planet.year_days),
         moon_count: planet.moon_count,
-        position,
     }
 }
 
-fn moon_info(moon: &Moon, position: Vec2) -> BodyInfo {
+fn moon_info(moon: &Moon) -> BodyInfo {
     BodyInfo {
         name: moon.name,
         kind: "moon",
-        radius: moon.radius(),
         radius_km: moon.radius_km,
         distance_km: Some(moon.orbit_km),
         period_days: Some(moon.period_days),
         moon_count: 0,
-        position,
     }
 }
 
-fn sun_info(center: Vec2) -> BodyInfo {
+fn sun_info() -> BodyInfo {
     BodyInfo {
         name: "Sun",
         kind: "star",
-        radius: SUN_SIZE * 0.5,
         radius_km: 696_340.0,
         distance_km: None,
         period_days: None,
         moon_count: 0,
-        position: center,
-    }
-}
-
-/// Цвет свечения тела: обычное, выбранное или подсвеченное курсором.
-fn body_glow(
-    name: &str,
-    hovered: Option<&BodyInfo>,
-    selected: Option<&BodyInfo>,
-    elapsed: f32,
-) -> Color {
-    if hovered.is_some_and(|body| body.name == name) {
-        let pulse = (elapsed * 6.0).sin() * 0.5 + 0.5;
-
-        Color::rgba(185, 225, 255, (150.0 + pulse * 70.0) as u8)
-    } else if selected.is_some_and(|body| body.name == name) {
-        Color::rgba(155, 210, 255, 110)
-    } else {
-        Color::rgba(130, 175, 255, 40)
     }
 }
 
@@ -214,18 +187,18 @@ fn pick_body(
             consider(
                 (*moon_position - world).length(),
                 moon.radius(),
-                moon_info(moon, *moon_position),
+                moon_info(moon),
             );
         }
 
         consider(
             (pose.position - world).length(),
             planet.radius(),
-            planet_info(planet, pose.position),
+            planet_info(planet),
         );
     }
 
-    consider((center - world).length(), SUN_SIZE * 0.5, sun_info(center));
+    consider((center - world).length(), SUN_SIZE * 0.5, sun_info());
 
     best.map(|(_, info)| info)
 }
@@ -491,17 +464,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     Keycode::_0 => {
-                        selected = Some(sun_info(center));
+                        selected = Some(sun_info());
                         follow = Some("Sun");
                     }
-                    Keycode::_1 => select_planet(&planets, 0, &poses, &mut selected, &mut follow),
-                    Keycode::_2 => select_planet(&planets, 1, &poses, &mut selected, &mut follow),
-                    Keycode::_3 => select_planet(&planets, 2, &poses, &mut selected, &mut follow),
-                    Keycode::_4 => select_planet(&planets, 3, &poses, &mut selected, &mut follow),
-                    Keycode::_5 => select_planet(&planets, 4, &poses, &mut selected, &mut follow),
-                    Keycode::_6 => select_planet(&planets, 5, &poses, &mut selected, &mut follow),
-                    Keycode::_7 => select_planet(&planets, 6, &poses, &mut selected, &mut follow),
-                    Keycode::_8 => select_planet(&planets, 7, &poses, &mut selected, &mut follow),
+                    Keycode::_1 => select_planet(&planets, 0, &mut selected, &mut follow),
+                    Keycode::_2 => select_planet(&planets, 1, &mut selected, &mut follow),
+                    Keycode::_3 => select_planet(&planets, 2, &mut selected, &mut follow),
+                    Keycode::_4 => select_planet(&planets, 3, &mut selected, &mut follow),
+                    Keycode::_5 => select_planet(&planets, 4, &mut selected, &mut follow),
+                    Keycode::_6 => select_planet(&planets, 5, &mut selected, &mut follow),
+                    Keycode::_7 => select_planet(&planets, 6, &mut selected, &mut follow),
+                    Keycode::_8 => select_planet(&planets, 7, &mut selected, &mut follow),
 
                     _ => {}
                 },
@@ -619,12 +592,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             pick_body(&planets, &poses.planets, world, center, camera.zoom)
         });
 
-        if let Some(body) = &mut selected {
-            if let Some(position) = body_position(&planets, &poses.planets, body.name, center) {
-                body.position = position;
-            }
-        }
-
         // Тексты панелей. HUD-строки меняются редко, поэтому кэш не растёт:
         // вариантов ограниченное число.
         let info_text = selected.map(|body| body.text());
@@ -680,60 +647,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 draw_belt(d, &cloud_orte, elapsed, center, camera.zoom)?;
             }
 
-            // Солнце: корона и лучи до спрайта.
-            draw_sun(d, center, SUN_SIZE * 0.5, elapsed)?;
-
-            let sun =
-                Object::new(center, Vec2::new(SUN_SIZE, SUN_SIZE)).with_rotation(elapsed * 20.0);
-
-            d.fill_textured_object(&sun, &sun_image)?;
-
-            // Свечение под телами: подсказывает, что по ним можно кликнуть.
-            for (planet, pose) in planets.iter().zip(&poses.planets) {
-                draw_glow(
-                    d,
-                    pose.position,
-                    planet.radius(),
-                    camera.zoom,
-                    body_glow(planet.name, hovered.as_ref(), selected.as_ref(), elapsed),
-                )?;
-
-                for (moon, moon_position) in planet.moons.iter().zip(&pose.moons) {
-                    draw_glow(
-                        d,
-                        *moon_position,
-                        moon.radius(),
-                        camera.zoom,
-                        body_glow(moon.name, hovered.as_ref(), selected.as_ref(), elapsed),
-                    )?;
-                }
-            }
-
-            draw_bodies(d, &planets, &poses.planets, elapsed, center)?;
-
-            // Выбранное тело остаётся обведённым, а тело под курсором
-            // подсвечивается ярче и пульсирует.
-            if let Some(body) = &selected {
-                draw_ring(
-                    d,
-                    body.position,
-                    body.radius,
-                    camera.zoom,
-                    Color::rgba(155, 210, 255, 170),
-                )?;
-            }
-
-            if let Some(body) = &hovered {
-                let pulse = (elapsed * 6.0).sin() * 0.5 + 0.5;
-
-                draw_ring(
-                    d,
-                    body.position,
-                    body.radius,
-                    camera.zoom,
-                    Color::rgba(205, 235, 255, (150.0 + pulse * 80.0) as u8),
-                )?;
-            }
+            // Все тела -- включая Солнце -- рисуются одной сценой,
+            // отсортированной по глубине: дальние перекрываются ближними.
+            draw_bodies(
+                d,
+                &planets,
+                &poses.planets,
+                elapsed,
+                center,
+                camera.zoom,
+                SUN_SIZE,
+                &sun_image,
+                show_moons,
+                hovered.as_ref().map(|body| body.name),
+                selected.as_ref().map(|body| body.name),
+            )?;
 
             // Подписи планет (и лун на близком зуме).
             for label in &name_labels {
@@ -837,12 +765,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn select_planet(
     planets: &[Planet],
     index: usize,
-    poses: &SystemPose,
     selected: &mut Option<BodyInfo>,
     follow: &mut Option<&'static str>,
 ) {
-    if let (Some(planet), Some(pose)) = (planets.get(index), poses.planets.get(index)) {
-        *selected = Some(planet_info(planet, pose.position));
+    if let Some(planet) = planets.get(index) {
+        *selected = Some(planet_info(planet));
         *follow = Some(planet.name);
     }
 }

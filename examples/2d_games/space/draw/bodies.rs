@@ -1,9 +1,10 @@
-use frglib::{Color, Draw, Object, Rect, Vec2};
+use frglib::{Color, Draw, Image, Object, Rect, Vec2};
 use std::f32::consts::{PI, TAU};
 
 use crate::bodies::{Moon, Planet, PlanetPose, ORBIT_TILT};
 
 use super::poly::{fill_disc, fill_ellipse_ring_half, fill_night_side, stroke_ellipse_arc};
+use super::sun::draw_sun;
 
 /// Цвета орбит: дальняя половина тусклее, ближняя ярче -- так эллипс
 /// читается как наклонённый круг, а не как плоская линия.
@@ -43,7 +44,7 @@ fn body_visible(view_rect: Rect, position: Vec2, radius: f32) -> bool {
 ///
 /// Слои идут от большого и прозрачного к маленькому и яркому. Раньше было
 /// наоборот, и внешние круги гасили внутренние.
-pub fn draw_glow(
+fn draw_glow(
     d: &mut Draw,
     center: Vec2,
     radius: f32,
@@ -74,7 +75,7 @@ pub fn draw_glow(
 }
 
 /// Рисует тонкое кольцо вокруг тела.
-pub fn draw_ring(
+fn draw_ring(
     d: &mut Draw,
     center: Vec2,
     radius: f32,
@@ -204,81 +205,175 @@ fn draw_saturn_rings(
     )
 }
 
-/// Тела: сортировка по `y`, тень на ночной стороне, кольца Сатурна,
-/// спутники вокруг своих планет.
-pub fn draw_bodies(
+/// Цвет свечения тела: обычное, выбранное или подсвеченное курсором.
+fn glow_color(name: &str, hovered: Option<&str>, selected: Option<&str>, elapsed: f32) -> Color {
+    if hovered == Some(name) {
+        let pulse = (elapsed * 6.0).sin() * 0.5 + 0.5;
+
+        Color::rgba(185, 225, 255, (150.0 + pulse * 70.0) as u8)
+    } else if selected == Some(name) {
+        Color::rgba(155, 210, 255, 110)
+    } else {
+        Color::rgba(130, 175, 255, 40)
+    }
+}
+
+/// Элемент сцены. Все тела сортируются по `y`: чем меньше `y`, тем дальше
+/// тело и тем раньше оно рисуется. Поэтому Солнце закрывает планеты на
+/// дальней стороне орбиты, а планета -- спутники, ушедшие за её диск.
+#[derive(Clone, Copy)]
+enum SceneItem {
+    Sun,
+    Planet(usize),
+    Moon(usize, usize),
+}
+
+/// Обводка выбранного и подсвеченного тела. Рисуется сразу после самого
+/// тела, поэтому более близкие объекты естественно перекрывают её.
+#[allow(clippy::too_many_arguments)]
+fn draw_marker_rings(
     d: &mut Draw,
-    planets: &[Planet],
-    poses: &[PlanetPose],
+    name: &str,
+    position: Vec2,
+    radius: f32,
+    zoom: f32,
+    hovered: Option<&str>,
+    selected: Option<&str>,
     elapsed: f32,
-    center: Vec2,
 ) -> Result<(), frglib::Error> {
-    let view_rect = d.camera_rect();
+    if selected == Some(name) {
+        draw_ring(d, position, radius, zoom, Color::rgba(155, 210, 255, 170))?;
+    }
 
-    let mut order = (0..planets.len()).collect::<Vec<_>>();
-    order.sort_by(|a, b| {
-        poses[*a]
-            .position
-            .y
-            .partial_cmp(&poses[*b].position.y)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    if hovered == Some(name) {
+        let pulse = (elapsed * 6.0).sin() * 0.5 + 0.5;
 
-    for index in order {
-        let planet = &planets[index];
-        let pose = &poses[index];
-
-        if !body_visible(view_rect, pose.position, planet.radius()) {
-            continue;
-        }
-
-        let is_saturn = planet.name == "Saturn";
-
-        if is_saturn {
-            draw_saturn_rings(d, pose.position, planet.radius(), false)?;
-        }
-
-        // Спутники на дальней стороне рисуются до планеты и ею закрываются.
-        for (moon, moon_position) in planet.moons.iter().zip(&pose.moons) {
-            if moon_position.y < pose.position.y {
-                draw_moon(d, moon, *moon_position, center, view_rect)?;
-            }
-        }
-
-        let planet_object = Object::new(pose.position, Vec2::new(planet.size, planet.size))
-            .with_rotation(elapsed * planet.speed * 80.0);
-
-        match &planet.texture {
-            Some(image) => d.fill_textured_object(&planet_object, image)?,
-            None => d.fill_object(&planet_object, planet.color)?,
-        }
-
-        draw_night_side(d, center, pose.position, planet.radius())?;
-
-        if is_saturn {
-            draw_saturn_rings(d, pose.position, planet.radius(), true)?;
-        }
-
-        for (moon, moon_position) in planet.moons.iter().zip(&pose.moons) {
-            if moon_position.y >= pose.position.y {
-                draw_moon(d, moon, *moon_position, center, view_rect)?;
-            }
-        }
+        draw_ring(
+            d,
+            position,
+            radius,
+            zoom,
+            Color::rgba(205, 235, 255, (150.0 + pulse * 80.0) as u8),
+        )?;
     }
 
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn draw_sun_body(
+    d: &mut Draw,
+    center: Vec2,
+    sun_size: f32,
+    elapsed: f32,
+    zoom: f32,
+    sun_image: &Image,
+    hovered: Option<&str>,
+    selected: Option<&str>,
+    view_rect: Rect,
+) -> Result<(), frglib::Error> {
+    let radius = sun_size * 0.5;
+
+    if !body_visible(view_rect, center, radius) {
+        return Ok(());
+    }
+
+    // Ореол и лучи, затем непрозрачное ядро: оно должно закрывать тела,
+    // которые находятся за Солнцем.
+    draw_sun(d, center, radius, elapsed)?;
+    fill_disc(d, center, radius * 0.99, Color::rgba(255, 224, 150, 255))?;
+
+    let object = Object::new(center, Vec2::new(sun_size, sun_size)).with_rotation(elapsed * 20.0);
+
+    d.fill_textured_object(&object, sun_image)?;
+
+    draw_marker_rings(d, "Sun", center, radius, zoom, hovered, selected, elapsed)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_planet(
+    d: &mut Draw,
+    planet: &Planet,
+    pose: &PlanetPose,
+    elapsed: f32,
+    center: Vec2,
+    zoom: f32,
+    view_rect: Rect,
+    hovered: Option<&str>,
+    selected: Option<&str>,
+) -> Result<(), frglib::Error> {
+    let radius = planet.radius();
+
+    if !body_visible(view_rect, pose.position, radius) {
+        return Ok(());
+    }
+
+    let is_saturn = planet.name == "Saturn";
+
+    // Задняя половина колец -- до планеты, передняя -- после.
+    if is_saturn {
+        draw_saturn_rings(d, pose.position, radius, false)?;
+    }
+
+    draw_glow(
+        d,
+        pose.position,
+        radius,
+        zoom,
+        glow_color(planet.name, hovered, selected, elapsed),
+    )?;
+
+    let object = Object::new(pose.position, Vec2::new(planet.size, planet.size))
+        .with_rotation(elapsed * planet.speed * 80.0);
+
+    match &planet.texture {
+        Some(image) => d.fill_textured_object(&object, image)?,
+        None => d.fill_object(&object, planet.color)?,
+    }
+
+    draw_night_side(d, center, pose.position, radius)?;
+
+    if is_saturn {
+        draw_saturn_rings(d, pose.position, radius, true)?;
+    }
+
+    draw_marker_rings(
+        d,
+        planet.name,
+        pose.position,
+        radius,
+        zoom,
+        hovered,
+        selected,
+        elapsed,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
 fn draw_moon(
     d: &mut Draw,
     moon: &Moon,
     position: Vec2,
     sun: Vec2,
+    zoom: f32,
     view_rect: Rect,
+    hovered: Option<&str>,
+    selected: Option<&str>,
+    elapsed: f32,
 ) -> Result<(), frglib::Error> {
-    if !body_visible(view_rect, position, moon.radius()) {
+    let radius = moon.radius();
+
+    if !body_visible(view_rect, position, radius) {
         return Ok(());
     }
+
+    draw_glow(
+        d,
+        position,
+        radius,
+        zoom,
+        glow_color(moon.name, hovered, selected, elapsed),
+    )?;
 
     let moon_object = Object::new(position, Vec2::new(moon.size, moon.size));
 
@@ -287,7 +382,95 @@ fn draw_moon(
         None => d.fill_object(&moon_object, moon.color)?,
     }
 
-    draw_night_side(d, sun, position, moon.radius())
+    draw_night_side(d, sun, position, radius)?;
+
+    draw_marker_rings(
+        d, moon.name, position, radius, zoom, hovered, selected, elapsed,
+    )
+}
+
+/// Рисует все тела одной сценой, отсортированной по глубине.
+///
+/// Свечение и обводка каждого тела рисуются в том же проходе, что и само
+/// тело. Поэтому близкий объект перекрывает и диск, и ореол, и кольцо
+/// дальнего -- именно это даёт окклюзию без отдельных проходов.
+#[allow(clippy::too_many_arguments)]
+pub fn draw_bodies(
+    d: &mut Draw,
+    planets: &[Planet],
+    poses: &[PlanetPose],
+    elapsed: f32,
+    center: Vec2,
+    zoom: f32,
+    sun_size: f32,
+    sun_image: &Image,
+    show_moons: bool,
+    hovered: Option<&str>,
+    selected: Option<&str>,
+) -> Result<(), frglib::Error> {
+    let view_rect = d.camera_rect();
+
+    // Солнце в списке первым, планеты -- раньше своих спутников. Стабильная
+    // сортировка сохраняет этот порядок при равной глубине, поэтому спутник
+    // сбоку от планеты остаётся поверх её диска.
+    let mut scene = Vec::with_capacity(1 + planets.len() * 2);
+    scene.push(SceneItem::Sun);
+
+    for (planet_index, planet) in planets.iter().enumerate() {
+        scene.push(SceneItem::Planet(planet_index));
+
+        if show_moons {
+            for moon_index in 0..planet.moons.len() {
+                scene.push(SceneItem::Moon(planet_index, moon_index));
+            }
+        }
+    }
+
+    let depth = |item: SceneItem| -> f32 {
+        match item {
+            SceneItem::Sun => center.y,
+            SceneItem::Planet(index) => poses[index].position.y,
+            SceneItem::Moon(planet, moon) => poses[planet].moons[moon].y,
+        }
+    };
+
+    scene.sort_by(|a, b| {
+        depth(*a)
+            .partial_cmp(&depth(*b))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    for item in scene {
+        match item {
+            SceneItem::Sun => draw_sun_body(
+                d, center, sun_size, elapsed, zoom, sun_image, hovered, selected, view_rect,
+            )?,
+            SceneItem::Planet(index) => draw_planet(
+                d,
+                &planets[index],
+                &poses[index],
+                elapsed,
+                center,
+                zoom,
+                view_rect,
+                hovered,
+                selected,
+            )?,
+            SceneItem::Moon(planet_index, moon_index) => draw_moon(
+                d,
+                &planets[planet_index].moons[moon_index],
+                poses[planet_index].moons[moon_index],
+                center,
+                zoom,
+                view_rect,
+                hovered,
+                selected,
+                elapsed,
+            )?,
+        }
+    }
+
+    Ok(())
 }
 
 /// Затемняет половину диска, отвёрнутую от Солнца.
