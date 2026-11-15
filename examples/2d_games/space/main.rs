@@ -64,6 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut show_belts = true;
     let mut show_labels = true;
     let mut show_moons = true;
+    let mut help_open = false;
 
     let asteroid_belt = get_asteroid_belt();
     let kuiper_belt = get_kuiper_belt();
@@ -129,8 +130,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 Event::KeyDown { key, .. } => match key {
                     Keycode::Escape => {
-                        // Первый Esc снимает выбор, второй выходит.
-                        if selected.is_some() || follow.is_some() {
+                        // Первый Esc закрывает помощь, затем снимает выбор,
+                        // и только последний выходит из игры.
+                        if help_open {
+                            help_open = false;
+                        } else if selected.is_some() || follow.is_some() {
                             selected = None;
                             follow = None;
                         } else {
@@ -170,6 +174,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Keycode::B => show_belts = !show_belts,
                     Keycode::L => show_labels = !show_labels,
                     Keycode::M => show_moons = !show_moons,
+                    Keycode::H => help_open = !help_open,
 
                     Keycode::F => {
                         follow = if follow.is_some() {
@@ -317,14 +322,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Тексты панелей. HUD-строки меняются редко, поэтому кэш не растёт:
         // вариантов ограниченное число.
-        let info_text = selected.map(|body| body.text());
-        if let Some(info) = &info_text {
+        if let Some(info) = &selected {
             ui.keep_info(info)?;
         }
 
         let hud_state = HudState {
             paused,
             speed: TIME_SPEEDS[speed_index],
+            zoom: camera.zoom,
             show_orbits,
             show_belts,
             show_labels,
@@ -383,15 +388,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ui.draw_labels(d, &name_labels, camera, window_size)?;
 
             // Панель с информацией о выбранном теле.
-            if let Some(info) = &info_text {
-                ui.draw_info_card(d, info)?;
+            if let Some(info) = &selected {
+                ui.draw_info_card(d, info, follow.is_some())?;
             }
 
             // HUD в правом верхнем углу.
             ui.draw_hud(d, &hud_texts, window_size)?;
 
+            // FPS и зум в правом нижнем углу.
+            ui.draw_stats(d, &hud_texts, window_size)?;
+
             // Подсказка по управлению в левом нижнем углу.
-            ui.draw_controls(d, window_size)?;
+            ui.draw_controls(d, window_size, help_open)?;
 
             Ok(())
         })?;

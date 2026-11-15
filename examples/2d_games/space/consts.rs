@@ -43,12 +43,8 @@ pub const DOUBLE_CLICK_RADIUS: f32 = 24.0;
 pub const TIME_SPEEDS: [f32; 6] = [0.25, 0.5, 1.0, 2.0, 5.0, 10.0];
 pub const DEFAULT_SPEED: usize = 2;
 
-pub const CONTROLS: &str = "LMB select   double-click follow\n\
-MMB drag   wheel zoom   arrows move\n\
-1-8 planet   0 sun   F follow\n\
-SPACE pause   +/- speed\n\
-O orbits   B belts   L labels   M moons\n\
-R reset view   ESC back   Q quit";
+/// Свёрнутая подсказка: одна строка вместо шести, полный список -- по `H`.
+pub const CONTROLS: &str = "H help   LMB select   MMB pan   wheel zoom   SPACE pause   R reset";
 
 // --- Окно ---------------------------------------------------------------
 
@@ -58,23 +54,96 @@ pub const WINDOW_BACKGROUND: Color = Color::rgb(7, 9, 20);
 
 // --- Интерфейс ----------------------------------------------------------
 
+/// Общая палитра панелей: один фон, одна рамка и один акцентный цвет.
+pub const PANEL_BG: Color = Color::rgba(9, 12, 22, 224);
+pub const PANEL_BORDER: Color = Color::rgba(92, 124, 178, 84);
+pub const PANEL_SEPARATOR: Color = Color::rgba(92, 124, 178, 58);
+pub const PANEL_ACCENT: Color = Color::rgba(120, 176, 255, 210);
+pub const PANEL_ACCENT_WIDTH: f32 = 3.0;
+
+/// Цвета текста. Текст кэшируется вместе с цветом, поэтому их несколько.
+pub const TEXT_TITLE: Color = Color::rgba(236, 242, 252, 255);
+pub const TEXT_BODY: Color = Color::rgba(190, 201, 220, 255);
+pub const TEXT_BRIGHT: Color = Color::rgba(242, 246, 252, 255);
+pub const TEXT_DIM: Color = Color::rgba(132, 146, 172, 255);
+pub const TEXT_ACCENT: Color = Color::rgba(126, 180, 255, 255);
+pub const TEXT_GOOD: Color = Color::rgba(124, 226, 154, 255);
+pub const TEXT_WARN: Color = Color::rgba(255, 193, 104, 255);
+pub const TEXT_SHADOW: Color = Color::rgba(4, 6, 12, 255);
+
+/// Акцент карточки зависит от типа тела: звезда, планета или спутник.
+pub const ACCENT_STAR: Color = Color::rgba(255, 197, 112, 255);
+pub const ACCENT_PLANET: Color = Color::rgba(128, 184, 255, 255);
+pub const ACCENT_MOON: Color = Color::rgba(190, 202, 222, 255);
+
+// Карточка тела в левом верхнем углу.
 pub const INFO_PANEL_ORIGIN: Vec2 = Vec2::new(24.0, 24.0);
-pub const INFO_PANEL_PADDING: f32 = 12.0;
-pub const INFO_PANEL_BG: Color = Color::rgba(12, 14, 22, 228);
-pub const INFO_PANEL_BORDER: Color = Color::rgba(90, 120, 170, 90);
+pub const INFO_PANEL_WIDTH: f32 = 268.0;
+pub const INFO_PANEL_PADDING: f32 = 14.0;
+pub const INFO_TITLE_GAP: f32 = 10.0;
+pub const INFO_ROW_HEIGHT: f32 = 20.0;
+pub const INFO_SECTION_GAP: f32 = 10.0;
+pub const INFO_FOOTER_GAP: f32 = 8.0;
 
-pub const HUD_PANEL_SIZE: Vec2 = Vec2::new(220.0, 100.0);
+// HUD в правом верхнем углу.
+pub const HUD_PANEL_SIZE: Vec2 = Vec2::new(232.0, 192.0);
 pub const HUD_PANEL_MARGIN: Vec2 = Vec2::new(18.0, 18.0);
-pub const HUD_PANEL_BG: Color = Color::rgba(12, 14, 22, 200);
-pub const HUD_PANEL_BORDER: Color = Color::rgba(90, 120, 170, 70);
-pub const HUD_TEXT_X: f32 = 12.0;
-pub const HUD_TIME_Y: f32 = 10.0;
-pub const HUD_LAYERS_Y: f32 = 32.0;
-pub const HUD_FPS_Y: f32 = 74.0;
+pub const HUD_TEXT_X: f32 = 15.0;
+pub const HUD_HEADER_Y: f32 = 12.0;
+pub const HUD_SEPARATOR_1_Y: f32 = 36.0;
+pub const HUD_SPEED_Y: f32 = 48.0;
+pub const HUD_SEPARATOR_2_Y: f32 = 74.0;
+pub const HUD_TOGGLES_Y: f32 = 86.0;
+pub const HUD_ROW_HEIGHT: f32 = 24.0;
 
+// Компактная строка состояния в правом нижнем углу.
+pub const STATS_MARGIN: Vec2 = Vec2::new(18.0, 18.0);
+pub const STATS_PADDING: Vec2 = Vec2::new(12.0, 8.0);
+pub const STATS_GAP: f32 = 8.0;
+pub const STATS_BLOCK_GAP: f32 = 18.0;
+
+// Подсказка и полный список управления в левом нижнем углу.
 pub const CONTROLS_MARGIN: Vec2 = Vec2::new(18.0, 18.0);
-pub const CONTROLS_PADDING: Vec2 = Vec2::new(10.0, 10.0);
-pub const CONTROLS_BG: Color = Color::rgba(12, 14, 22, 190);
+pub const CONTROLS_PADDING: Vec2 = Vec2::new(10.0, 8.0);
+
+pub const HELP_TITLE: &str = "CONTROLS";
+pub const HELP_PANEL_WIDTH: f32 = 392.0;
+pub const HELP_PANEL_PADDING: f32 = 14.0;
+pub const HELP_TITLE_GAP: f32 = 10.0;
+pub const HELP_SECTION_HEIGHT: f32 = 22.0;
+pub const HELP_SECTION_GAP: f32 = 10.0;
+pub const HELP_ROW_HEIGHT: f32 = 20.0;
+pub const HELP_KEY_X: f32 = 4.0;
+pub const HELP_DESC_X: f32 = 152.0;
+
+const VIEW_ROWS: &[(&str, &str)] = &[
+    ("MMB drag", "pan camera"),
+    ("arrows", "pan camera"),
+    ("wheel", "zoom to cursor"),
+    ("R", "reset view"),
+];
+
+const SELECT_ROWS: &[(&str, &str)] = &[
+    ("LMB", "inspect a body"),
+    ("double-click", "follow a body"),
+    ("1-8 / 0", "planet / sun"),
+    ("F", "follow selection"),
+];
+
+const TIME_ROWS: &[(&str, &str)] = &[
+    ("SPACE", "pause / resume"),
+    ("+ / -", "time speed"),
+    ("O / B / L / M", "orbits / belts / labels / moons"),
+];
+
+const APP_ROWS: &[(&str, &str)] = &[("H", "hide this panel"), ("ESC", "back"), ("Q", "quit")];
+
+pub const HELP_SECTIONS: &[(&str, &[(&str, &str)])] = &[
+    ("VIEW", VIEW_ROWS),
+    ("SELECT", SELECT_ROWS),
+    ("TIME", TIME_ROWS),
+    ("APP", APP_ROWS),
+];
 
 pub const LABEL_GAP: f32 = 6.0;
 pub const LABEL_CULL_X: f32 = 80.0;

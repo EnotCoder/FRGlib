@@ -1,10 +1,18 @@
 //! Данные и карточка выбранного тела.
 
-use frglib::{Anchor, Draw, Label, Object};
+use std::error::Error;
 
-use super::Ui;
+use frglib::{Anchor, Color, Draw, Label};
+
+use super::{draw_panel, draw_separator, Ui};
 use crate::bodies::{Moon, Planet};
-use crate::consts::{INFO_PANEL_BG, INFO_PANEL_BORDER, INFO_PANEL_ORIGIN, INFO_PANEL_PADDING};
+use crate::consts::{
+    ACCENT_MOON, ACCENT_PLANET, ACCENT_STAR, INFO_FOOTER_GAP, INFO_PANEL_ORIGIN,
+    INFO_PANEL_PADDING, INFO_PANEL_WIDTH, INFO_ROW_HEIGHT, INFO_SECTION_GAP, INFO_TITLE_GAP,
+};
+
+const FOOTER_IDLE: &str = "F follow    ESC close";
+const FOOTER_FOLLOW: &str = "following    F unlock    ESC close";
 
 /// То, что показываем в панели после клика по телу.
 #[derive(Clone, Copy)]
@@ -18,35 +26,51 @@ pub struct BodyInfo {
 }
 
 impl BodyInfo {
-    /// Текст карточки. Форматируется один раз и кладётся в кэш.
-    pub fn text(&self) -> String {
-        let mut text = format!(
-            "{}\n{}\nRadius: {} km",
-            self.name,
-            self.kind,
-            group_digits(self.radius_km)
-        );
+    /// Тип тела: по нему выбирается цвет акцентной полосы.
+    pub fn accent(&self) -> Color {
+        match self.kind {
+            "Star" => ACCENT_STAR,
+            "Moon" => ACCENT_MOON,
+            _ => ACCENT_PLANET,
+        }
+    }
+
+    /// Подпись типа в правом верхнем углу карточки.
+    pub fn kind(&self) -> &'static str {
+        self.kind
+    }
+
+    /// Строки карточки: название характеристики и готовое значение.
+    /// Форматирование одно и то же, поэтому заголовки выровнены по колонкам.
+    pub fn rows(&self) -> Vec<(&'static str, String)> {
+        let mut rows = Vec::with_capacity(4);
+        rows.push(("Radius", format!("{} km", group_digits(self.radius_km))));
 
         if let Some(distance) = self.distance_km {
-            text.push_str(&format!("\nDistance: {}", format_distance(distance)));
+            let key = if self.kind == "Moon" {
+                "Orbit"
+            } else {
+                "Distance"
+            };
+            rows.push((key, format_distance(distance)));
         }
 
         if let Some(period) = self.period_days {
-            text.push_str(&format!("\nPeriod: {}", format_period(period)));
+            rows.push(("Period", format_period(period)));
         }
 
         if self.moon_count > 0 {
-            text.push_str(&format!("\nMoons: {}", self.moon_count));
+            rows.push(("Moons", self.moon_count.to_string()));
         }
 
-        text
+        rows
     }
 }
 
 pub fn planet_info(planet: &Planet) -> BodyInfo {
     BodyInfo {
         name: planet.name,
-        kind: "planet",
+        kind: "Planet",
         radius_km: planet.radius_km,
         distance_km: Some(planet.distance_km),
         period_days: Some(planet.year_days),
@@ -57,7 +81,7 @@ pub fn planet_info(planet: &Planet) -> BodyInfo {
 pub fn moon_info(moon: &Moon) -> BodyInfo {
     BodyInfo {
         name: moon.name,
-        kind: "moon",
+        kind: "Moon",
         radius_km: moon.radius_km,
         distance_km: Some(moon.orbit_km),
         period_days: Some(moon.period_days),
@@ -68,7 +92,7 @@ pub fn moon_info(moon: &Moon) -> BodyInfo {
 pub fn sun_info() -> BodyInfo {
     BodyInfo {
         name: "Sun",
-        kind: "star",
+        kind: "Star",
         radius_km: 696_340.0,
         distance_km: None,
         period_days: None,
@@ -77,23 +101,92 @@ pub fn sun_info() -> BodyInfo {
 }
 
 impl Ui<'_> {
+    /// Готовит карточку выбранного тела к отрисовке в этом кадре.
+    pub fn keep_info(&mut self, info: &BodyInfo) -> Result<(), Box<dyn Error>> {
+        self.title.keep(info.name)?;
+        self.dim.keep(info.kind())?;
+
+        for (key, value) in info.rows() {
+            self.dim.keep(key)?;
+            self.value.keep(&value)?;
+        }
+
+        self.dim.keep(FOOTER_IDLE)?;
+        self.dim.keep(FOOTER_FOLLOW)?;
+
+        Ok(())
+    }
+
     /// Панель с информацией о выбранном теле в левом верхнем углу.
-    pub fn draw_info_card(&self, d: &mut Draw, text: &str) -> Result<(), frglib::Error> {
-        let label = Label::new(self.info.get(text))
-            .at(INFO_PANEL_ORIGIN.x, INFO_PANEL_ORIGIN.y)
-            .anchored(Anchor::TopLeft);
-        let rect = label.rect();
-        let panel = Object::from_xywh(
-            rect.x + rect.w / 2.0,
-            rect.y + rect.h / 2.0,
-            rect.w + INFO_PANEL_PADDING * 2.0,
-            rect.h + INFO_PANEL_PADDING * 2.0,
-        );
+    pub fn draw_info_card(
+        &self,
+        d: &mut Draw,
+        info: &BodyInfo,
+        following: bool,
+    ) -> Result<(), frglib::Error> {
+        let rows = info.rows();
+        let footer_text = if following {
+            FOOTER_FOLLOW
+        } else {
+            FOOTER_IDLE
+        };
+
+        let title_height = self.title.get(info.name).size().1 as f32;
+        let footer_height = self.dim.get(footer_text).size().1 as f32;
+
+        let x = INFO_PANEL_ORIGIN.x;
+        let y = INFO_PANEL_ORIGIN.y;
+        let padding = INFO_PANEL_PADDING;
+        let content_x = x + padding;
+        let content_right = x + INFO_PANEL_WIDTH - padding;
+
+        let title_y = y + padding;
+        let separator_1 = title_y + title_height + INFO_TITLE_GAP;
+        let rows_y = separator_1 + 1.0 + INFO_SECTION_GAP;
+        let rows_bottom = rows_y + rows.len() as f32 * INFO_ROW_HEIGHT;
+        let separator_2 = rows_bottom + INFO_FOOTER_GAP;
+        let footer_y = separator_2 + 1.0 + INFO_FOOTER_GAP;
+        let height = footer_y + footer_height + padding - y;
 
         d.screen_space(|d| {
-            d.fill_object(&panel, INFO_PANEL_BG)?;
-            d.draw_object(&panel, INFO_PANEL_BORDER)?;
-            label.draw(d)
+            draw_panel(d, x, y, INFO_PANEL_WIDTH, height, Some(info.accent()))?;
+
+            Label::new(self.title.get(info.name))
+                .at(content_x, title_y)
+                .anchored(Anchor::TopLeft)
+                .draw(d)?;
+
+            // Тип тела прижат к нижнему краю заголовка -- так он читается
+            // как подпись, а не как вторая строка названия.
+            Label::new(self.dim.get(info.kind()))
+                .at(content_right, title_y + title_height)
+                .anchored(Anchor::BottomRight)
+                .draw(d)?;
+
+            draw_separator(d, content_x, separator_1, content_right - content_x)?;
+
+            for (index, (key, value)) in rows.iter().enumerate() {
+                let row_y = rows_y + index as f32 * INFO_ROW_HEIGHT;
+
+                Label::new(self.dim.get(key))
+                    .at(content_x, row_y)
+                    .anchored(Anchor::TopLeft)
+                    .draw(d)?;
+
+                Label::new(self.value.get(value))
+                    .at(content_right, row_y)
+                    .anchored(Anchor::TopRight)
+                    .draw(d)?;
+            }
+
+            draw_separator(d, content_x, separator_2, content_right - content_x)?;
+
+            Label::new(self.dim.get(footer_text))
+                .at(content_x, footer_y)
+                .anchored(Anchor::TopLeft)
+                .draw(d)?;
+
+            Ok(())
         })
     }
 }

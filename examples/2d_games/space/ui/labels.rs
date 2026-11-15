@@ -90,7 +90,14 @@ impl Ui<'_> {
                 continue;
             }
 
-            Label::new(self.hud.get(label.name))
+            // Тень на пиксель вниз-вправо: подпись не теряется на светлом
+            // диске планеты и на ярких кольцах Сатурна.
+            Label::new(self.shadow.get(label.name))
+                .at(position.x + 1.0, y + 1.0)
+                .anchored(Anchor::Bottom)
+                .draw(d)?;
+
+            Label::new(self.value.get(label.name))
                 .at(position.x, y)
                 .anchored(Anchor::Bottom)
                 .draw(d)?;
