@@ -28,6 +28,12 @@ cargo build
 cargo run --example basic-window
 ```
 
+## Примеры
+
+![Пример](img/cube_example.png)
+![Пример](img/fgoty_run_example.png)
+![Пример](img/space_example.png)
+
 ## Использование
 
 ```rust
