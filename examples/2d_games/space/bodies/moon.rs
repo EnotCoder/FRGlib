@@ -1,6 +1,6 @@
 use frglib::{Color, Image, Vec2};
 
-use super::ORBIT_TILT;
+use crate::consts::ORBIT_TILT;
 
 pub struct Moon {
     pub name: &'static str,

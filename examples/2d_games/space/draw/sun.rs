@@ -1,18 +1,18 @@
-use frglib::{Color, Draw, Object, Vec2};
+//! Солнце: корона, лучи, ядро и спрайт.
+
 use std::f32::consts::TAU;
 
+use frglib::{Color, Draw, Image, Object, Rect, Vec2};
+
+use super::cull::body_visible;
+use super::glow::draw_marker_rings;
 use super::poly::fill_disc;
 
 /// Корона Солнца: несколько мягких слоёв и медленно вращающиеся лучи.
 ///
 /// Непрозрачное ядро рисуется отдельно, уже в отсортированной сцене: так
 /// Солнце может закрывать планеты, ушедшие за него.
-pub fn draw_sun(
-    d: &mut Draw,
-    center: Vec2,
-    radius: f32,
-    elapsed: f32,
-) -> Result<(), frglib::Error> {
+fn draw_corona(d: &mut Draw, center: Vec2, radius: f32, elapsed: f32) -> Result<(), frglib::Error> {
     let pulse = (elapsed * 1.6).sin() * 0.5 + 0.5;
 
     // От большого и почти прозрачного к маленькому и яркому. Раньше было
@@ -68,4 +68,35 @@ pub fn draw_sun(
         &indices,
         ray_color,
     )
+}
+
+/// Солнце в отсортированной сцене: ореол, непрозрачное ядро и спрайт.
+#[allow(clippy::too_many_arguments)]
+pub fn draw_sun_body(
+    d: &mut Draw,
+    center: Vec2,
+    sun_size: f32,
+    elapsed: f32,
+    zoom: f32,
+    sun_image: &Image,
+    hovered: Option<&str>,
+    selected: Option<&str>,
+    view_rect: Rect,
+) -> Result<(), frglib::Error> {
+    let radius = sun_size * 0.5;
+
+    if !body_visible(view_rect, center, radius) {
+        return Ok(());
+    }
+
+    // Ореол и лучи, затем непрозрачное ядро: оно должно закрывать тела,
+    // которые находятся за Солнцем.
+    draw_corona(d, center, radius, elapsed)?;
+    fill_disc(d, center, radius * 0.99, Color::rgba(255, 224, 150, 255))?;
+
+    let object = Object::new(center, Vec2::new(sun_size, sun_size)).with_rotation(elapsed * 20.0);
+
+    d.fill_textured_object(&object, sun_image)?;
+
+    draw_marker_rings(d, "Sun", center, radius, zoom, hovered, selected, elapsed)
 }

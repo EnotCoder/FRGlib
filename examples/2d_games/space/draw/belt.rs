@@ -1,6 +1,7 @@
 use frglib::{Color, Draw, Vec2};
 
-use crate::bodies::{Belt, ORBIT_TILT, SHADES, SHADE_BRIGHTNESS};
+use crate::bodies::{Belt, SHADES, SHADE_BRIGHTNESS};
+use crate::consts::ORBIT_TILT;
 
 use super::poly::fill_quads;
 

@@ -1,7 +1,8 @@
 use frglib::{Color, Image, Vec2};
 
+use crate::consts::ORBIT_TILT;
+
 use super::moon::{get_moon, Moon};
-use super::ORBIT_TILT;
 
 pub struct Planet {
     pub name: &'static str,
