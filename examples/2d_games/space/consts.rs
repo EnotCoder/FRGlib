@@ -54,6 +54,10 @@ pub const WINDOW_BACKGROUND: Color = Color::rgb(7, 9, 20);
 
 // --- Интерфейс ----------------------------------------------------------
 
+/// Размеры шрифтов: заголовок карточки крупнее остального текста.
+pub const FONT_TITLE: f32 = 24.0;
+pub const FONT_HUD: f32 = 18.0;
+
 /// Общая палитра панелей: один фон, одна рамка и один акцентный цвет.
 pub const PANEL_BG: Color = Color::rgba(9, 12, 22, 224);
 pub const PANEL_BORDER: Color = Color::rgba(92, 124, 178, 84);
@@ -78,43 +82,43 @@ pub const ACCENT_MOON: Color = Color::rgba(190, 202, 222, 255);
 
 // Карточка тела в левом верхнем углу.
 pub const INFO_PANEL_ORIGIN: Vec2 = Vec2::new(24.0, 24.0);
-pub const INFO_PANEL_WIDTH: f32 = 268.0;
-pub const INFO_PANEL_PADDING: f32 = 14.0;
-pub const INFO_TITLE_GAP: f32 = 10.0;
-pub const INFO_ROW_HEIGHT: f32 = 20.0;
-pub const INFO_SECTION_GAP: f32 = 10.0;
-pub const INFO_FOOTER_GAP: f32 = 8.0;
+pub const INFO_PANEL_WIDTH: f32 = 320.0;
+pub const INFO_PANEL_PADDING: f32 = 16.0;
+pub const INFO_TITLE_GAP: f32 = 12.0;
+pub const INFO_ROW_HEIGHT: f32 = 24.0;
+pub const INFO_SECTION_GAP: f32 = 12.0;
+pub const INFO_FOOTER_GAP: f32 = 10.0;
 
 // HUD в правом верхнем углу.
-pub const HUD_PANEL_SIZE: Vec2 = Vec2::new(232.0, 192.0);
+pub const HUD_PANEL_SIZE: Vec2 = Vec2::new(272.0, 216.0);
 pub const HUD_PANEL_MARGIN: Vec2 = Vec2::new(18.0, 18.0);
-pub const HUD_TEXT_X: f32 = 15.0;
-pub const HUD_HEADER_Y: f32 = 12.0;
-pub const HUD_SEPARATOR_1_Y: f32 = 36.0;
-pub const HUD_SPEED_Y: f32 = 48.0;
-pub const HUD_SEPARATOR_2_Y: f32 = 74.0;
-pub const HUD_TOGGLES_Y: f32 = 86.0;
-pub const HUD_ROW_HEIGHT: f32 = 24.0;
+pub const HUD_TEXT_X: f32 = 18.0;
+pub const HUD_HEADER_Y: f32 = 14.0;
+pub const HUD_SEPARATOR_1_Y: f32 = 44.0;
+pub const HUD_SPEED_Y: f32 = 58.0;
+pub const HUD_SEPARATOR_2_Y: f32 = 88.0;
+pub const HUD_TOGGLES_Y: f32 = 102.0;
+pub const HUD_ROW_HEIGHT: f32 = 28.0;
 
 // Компактная строка состояния в правом нижнем углу.
 pub const STATS_MARGIN: Vec2 = Vec2::new(18.0, 18.0);
-pub const STATS_PADDING: Vec2 = Vec2::new(12.0, 8.0);
-pub const STATS_GAP: f32 = 8.0;
-pub const STATS_BLOCK_GAP: f32 = 18.0;
+pub const STATS_PADDING: Vec2 = Vec2::new(14.0, 10.0);
+pub const STATS_GAP: f32 = 9.0;
+pub const STATS_BLOCK_GAP: f32 = 22.0;
 
 // Подсказка и полный список управления в левом нижнем углу.
 pub const CONTROLS_MARGIN: Vec2 = Vec2::new(18.0, 18.0);
-pub const CONTROLS_PADDING: Vec2 = Vec2::new(10.0, 8.0);
+pub const CONTROLS_PADDING: Vec2 = Vec2::new(12.0, 10.0);
 
 pub const HELP_TITLE: &str = "CONTROLS";
-pub const HELP_PANEL_WIDTH: f32 = 392.0;
-pub const HELP_PANEL_PADDING: f32 = 14.0;
-pub const HELP_TITLE_GAP: f32 = 10.0;
-pub const HELP_SECTION_HEIGHT: f32 = 22.0;
-pub const HELP_SECTION_GAP: f32 = 10.0;
-pub const HELP_ROW_HEIGHT: f32 = 20.0;
-pub const HELP_KEY_X: f32 = 4.0;
-pub const HELP_DESC_X: f32 = 152.0;
+pub const HELP_PANEL_WIDTH: f32 = 420.0;
+pub const HELP_PANEL_PADDING: f32 = 16.0;
+pub const HELP_TITLE_GAP: f32 = 12.0;
+pub const HELP_SECTION_HEIGHT: f32 = 26.0;
+pub const HELP_SECTION_GAP: f32 = 12.0;
+pub const HELP_ROW_HEIGHT: f32 = 24.0;
+pub const HELP_KEY_X: f32 = 5.0;
+pub const HELP_DESC_X: f32 = 170.0;
 
 const VIEW_ROWS: &[(&str, &str)] = &[
     ("MMB drag", "pan camera"),

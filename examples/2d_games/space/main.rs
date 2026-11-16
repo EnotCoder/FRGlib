@@ -28,10 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .background(WINDOW_BACKGROUND)
         .build()?;
 
-    // Шрифты: крупный для карточки, мелкий для HUD и подписей.
+    // Шрифты: крупный для карточки, помельче для HUD и подписей.
     let ttf = sdl3::ttf::init()?;
-    let font = ttf.load_font(font_path(), 20.0)?;
-    let small_font = ttf.load_font(font_path(), 14.0)?;
+    let font = ttf.load_font(font_path(), FONT_TITLE)?;
+    let small_font = ttf.load_font(font_path(), FONT_HUD)?;
 
     let mut ui = Ui::new(font, small_font);
 
