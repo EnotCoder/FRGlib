@@ -12,3 +12,13 @@
 *.swp
 *.swo
 *~
+
+# Android: всё, что генерирует build.sh
+/android/local.properties
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/src/main/jniLibs/*
+!/android/app/src/main/jniLibs/.gitkeep
+/android/app/src/main/assets/*
+!/android/app/src/main/assets/.gitkeep

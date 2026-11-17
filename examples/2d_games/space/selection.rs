@@ -3,7 +3,7 @@
 use frglib::Vec2;
 
 use crate::bodies::{Planet, PlanetPose};
-use crate::consts::{MIN_HIT_RADIUS, SUN_SIZE};
+use crate::consts::SUN_SIZE;
 use crate::ui::{moon_info, planet_info, sun_info, BodyInfo};
 
 /// Текущее положение тела по имени. Выбранное тело движется вместе с орбитой.
@@ -34,17 +34,20 @@ pub fn body_position(
 
 /// Ищет тело под курсором. Из нескольких попаданий выбирает то, чей край
 /// ближе всего к точке клика.
+///
+/// `min_hit_radius` -- минимальный радиус попадания в пикселях экрана: мелкие
+/// спутники иначе невозможно поймать ни мышью, ни пальцем.
 pub fn pick_body(
     planets: &[Planet],
     poses: &[PlanetPose],
     world: Vec2,
     center: Vec2,
     zoom: f32,
+    min_hit_radius: f32,
 ) -> Option<BodyInfo> {
     let mut best: Option<(f32, BodyInfo)> = None;
     let mut consider = |distance: f32, radius: f32, info: BodyInfo| {
-        // Мелкие спутники иначе почти невозможно поймать мышью.
-        let hit_radius = radius.max(MIN_HIT_RADIUS / zoom.max(0.001));
+        let hit_radius = radius.max(min_hit_radius / zoom.max(0.001));
 
         if distance <= hit_radius {
             let offset = distance / hit_radius;

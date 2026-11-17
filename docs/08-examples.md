@@ -74,6 +74,11 @@ required-features = ["cached-textures"]
 | `2d_games-gallery` | `examples/2d_games/gallery.rs` | — | Листалка картинок по индексу, круговой проход |
 | `2d_games-space` | `examples/2d_games/space/main.rs` | — | Солнечная система: наклонные орбиты, корона Солнца, кольца Сатурна, параллакс-звёзды, тени, follow-камера и управление временем |
 
+У `space` есть Android-сборка: `examples/2d_games/space_android` подключает те
+же модули через `#[path]` и экспортирует `SDL_main`. Это не отдельный
+`[[example]]` — её собирает `./android/build.sh`, см.
+[11-android.md](11-android.md).
+
 ## Запуск
 
 ```bash

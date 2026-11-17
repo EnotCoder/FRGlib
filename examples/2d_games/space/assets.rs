@@ -11,18 +11,32 @@ pub fn font_path() -> PathBuf {
     shared_asset("font.otf")
 }
 
+/// Корень папки с ассетами.
+///
+/// На десктопе это `examples/2d_games/assets`, поэтому путь можно открыть
+/// обычными средствами ОС. На Android `build.sh` кладёт ту же папку в APK,
+/// и SDL открывает относительные пути через `AAssetManager`; абсолютный путь
+/// хоста там не существует.
+fn assets_root() -> PathBuf {
+    #[cfg(target_os = "android")]
+    {
+        PathBuf::new()
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/2d_games/assets")
+    }
+}
+
 /// Картинка из папки ассетов этого примера.
 fn asset(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/2d_games/assets/space")
-        .join(name)
+    assets_root().join("space").join(name)
 }
 
 /// Ассет, общий для примеров: шрифт лежит один на всех.
 fn shared_asset(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/2d_games/assets")
-        .join(name)
+    assets_root().join(name)
 }
 
 /// Загружает спрайт Солнца и собирает планеты с их спутниками.

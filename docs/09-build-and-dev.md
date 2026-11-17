@@ -125,11 +125,31 @@ cargo run --example basic-window
 cargo run --features cached-textures --example basic-cached
 ```
 
+## Android
+
+Игры собираются общим Gradle-проектом в `android/`. Нужны `cargo-ndk`,
+Android SDK, NDK r28+ и JDK 17:
+
+```bash
+rustup target add aarch64-linux-android x86_64-linux-android
+cargo install cargo-ndk
+
+./android/build.sh --install          # игра из android/game.properties
+./android/build.sh --template         # smoke-тест всей цепочки
+./android/build.sh --abi x86_64       # только эмулятор
+```
+
+`game.properties` задаёт крейт, ассеты, `applicationId`, ориентацию и ABI.
+Скрипт сам находит SDK/NDK, собирает cdylib через `cargo ndk`, копирует
+`libSDL3.so` и `libSDL3_ttf.so` в `jniLibs/<abi>/`, ассеты — в `assets/`, и
+запускает Gradle. Полное руководство, включая касания, DPI и `SDL_main`:
+[11-android.md](11-android.md).
+
 ## Тесты
 
 На момент написания документации:
 
-- `cargo test --lib` — **143 теста**, все проходят;
+- `cargo test --lib` — **149 тестов**, все проходят;
 - `cargo test --lib --features cached-textures` — **163 теста** (добавляются
   20 тестов `Animation`);
 - `cargo test --doc` — **14 doctest'ов**, все проходят.

@@ -29,6 +29,8 @@ pub struct WindowBuilder {
     resizable: bool,
     vulkan: bool,
     background: Color,
+    touch_as_mouse: bool,
+    high_pixel_density: bool,
     // Stored as the SDL scale mode rather than the boolean the caller gives us:
     // applying it at the three places a texture is created is then a single
     // unconditional call instead of a branch in each.
@@ -44,6 +46,8 @@ impl WindowBuilder {
             resizable: true,
             vulkan: false,
             background: Color::GREEN,
+            touch_as_mouse: true,
+            high_pixel_density: false,
             scale: ScaleMode::Linear,
         }
     }
@@ -107,8 +111,41 @@ impl WindowBuilder {
         self
     }
 
+    /// Whether a touch is also reported as a mouse click. Defaults to true.
+    ///
+    /// SDL synthesizes a left button press and motion from every finger, which
+    /// is why a game written for a mouse mostly works on a phone without any
+    /// changes. Turn it off when the game reads [`Event::FingerDown`] and
+    /// friends directly, so the same tap does not arrive twice.
+    ///
+    /// [`Event::FingerDown`]: crate::event::Event::FingerDown
+    pub fn touch_as_mouse(mut self, touch_as_mouse: bool) -> Self {
+        self.touch_as_mouse = touch_as_mouse;
+        self
+    }
+
+    /// Whether the window may have more physical pixels than its logical size.
+    /// Defaults to false, leaving the platform's own choice alone.
+    ///
+    /// On Android and iOS this is already the case. On macOS and some Wayland
+    /// setups it is opt-in, and without it [`Window::pixel_density`] stays at
+    /// `1.0` and text looks blocky next to native windows.
+    ///
+    /// [`Window::pixel_density`]: crate::window::Window::pixel_density
+    pub fn high_pixel_density(mut self, high_pixel_density: bool) -> Self {
+        self.high_pixel_density = high_pixel_density;
+        self
+    }
+
     /// Opens the window.
     pub fn build(self) -> Result<Window, Error> {
+        // Hints are read when events are processed, but setting this before the
+        // window exists keeps the very first touch from taking the wrong path.
+        sdl3::hint::set(
+            "SDL_TOUCH_MOUSE_EVENTS",
+            if self.touch_as_mouse { "1" } else { "0" },
+        );
+
         Window::create(
             self.title,
             self.width,
@@ -116,6 +153,7 @@ impl WindowBuilder {
             self.resizable,
             self.vulkan,
             self.background,
+            self.high_pixel_density,
             self.scale,
         )
     }
@@ -156,5 +194,30 @@ mod tests {
         assert_eq!(builder.height, 600);
         assert!(builder.resizable);
         assert!(!builder.vulkan);
+    }
+
+    /// Mouse-first games keep working on a phone without touching this switch.
+    #[test]
+    fn touches_are_mouse_clicks_by_default() {
+        assert!(WindowBuilder::new("demo").touch_as_mouse);
+    }
+
+    #[test]
+    fn touch_as_mouse_can_be_turned_off() {
+        assert!(
+            !WindowBuilder::new("demo")
+                .touch_as_mouse(false)
+                .touch_as_mouse
+        );
+    }
+
+    #[test]
+    fn high_pixel_density_is_opt_in() {
+        assert!(!WindowBuilder::new("demo").high_pixel_density);
+        assert!(
+            WindowBuilder::new("demo")
+                .high_pixel_density(true)
+                .high_pixel_density
+        );
     }
 }

@@ -65,6 +65,40 @@ pub enum Event {
         y: f32,
         direction: MouseWheelDirection,
     },
+
+    // --- touch ---
+    //
+    // SDL reports fingers in normalized `0..1` coordinates; these are already
+    // multiplied by the window size, so `x`/`y` share the mouse's coordinate
+    // space. A finger is identified by `id`, which stays the same for as long
+    // as that finger touches the screen.
+    FingerDown {
+        id: u64,
+        x: f32,
+        y: f32,
+        pressure: f32,
+    },
+    FingerMotion {
+        id: u64,
+        x: f32,
+        y: f32,
+        dx: f32,
+        dy: f32,
+        pressure: f32,
+    },
+    FingerUp {
+        id: u64,
+        x: f32,
+        y: f32,
+        pressure: f32,
+    },
+    /// The system took the touch away: a notification, a gesture, or the app
+    /// losing focus. Treat it like [`Event::FingerUp`] without a click.
+    FingerCanceled {
+        id: u64,
+        x: f32,
+        y: f32,
+    },
 }
 
 impl Event {
@@ -80,8 +114,20 @@ impl Event {
 /// without this, one window would receive another's mouse and key events.
 /// `Event::Quit` is the exception, as it belongs to the process rather than to
 /// any window.
-pub(crate) fn translate(sdl: sdl3::event::Event, window_id: u32) -> Option<Event> {
+///
+/// `width` and `height` are the window size in the same units as mouse events.
+/// SDL normalizes finger coordinates to `0..1`, so the size is what turns them
+/// back into a position a caller can compare with `MouseMotion`.
+pub(crate) fn translate(
+    sdl: sdl3::event::Event,
+    window_id: u32,
+    width: u32,
+    height: u32,
+) -> Option<Event> {
     use sdl3::event::{Event as Sdl, WindowEvent};
+
+    let w = width as f32;
+    let h = height as f32;
 
     match sdl {
         Sdl::Quit { .. } => Some(Event::Quit),
@@ -176,6 +222,138 @@ pub(crate) fn translate(sdl: sdl3::event::Event, window_id: u32) -> Option<Event
             ..
         } if id == window_id => Some(Event::MouseWheel { x, y, direction }),
 
+        Sdl::FingerDown {
+            window_id: id,
+            finger_id,
+            x,
+            y,
+            pressure,
+            ..
+        } if id == window_id => Some(Event::FingerDown {
+            id: finger_id,
+            x: x * w,
+            y: y * h,
+            pressure,
+        }),
+
+        Sdl::FingerMotion {
+            window_id: id,
+            finger_id,
+            x,
+            y,
+            dx,
+            dy,
+            pressure,
+            ..
+        } if id == window_id => Some(Event::FingerMotion {
+            id: finger_id,
+            x: x * w,
+            y: y * h,
+            dx: dx * w,
+            dy: dy * h,
+            pressure,
+        }),
+
+        Sdl::FingerUp {
+            window_id: id,
+            finger_id,
+            x,
+            y,
+            pressure,
+            ..
+        } if id == window_id => Some(Event::FingerUp {
+            id: finger_id,
+            x: x * w,
+            y: y * h,
+            pressure,
+        }),
+
+        Sdl::FingerCanceled {
+            window_id: id,
+            finger_id,
+            x,
+            y,
+            ..
+        } if id == window_id => Some(Event::FingerCanceled {
+            id: finger_id,
+            x: x * w,
+            y: y * h,
+        }),
+
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finger_coordinates_are_scaled_to_the_window() {
+        let sdl = sdl3::event::Event::FingerDown {
+            timestamp: 0,
+            touch_id: 1,
+            finger_id: 7,
+            x: 0.5,
+            y: 0.25,
+            dx: 0.0,
+            dy: 0.0,
+            pressure: 1.0,
+            window_id: 3,
+        };
+
+        assert_eq!(
+            translate(sdl, 3, 800, 600),
+            Some(Event::FingerDown {
+                id: 7,
+                x: 400.0,
+                y: 150.0,
+                pressure: 1.0,
+            })
+        );
+    }
+
+    #[test]
+    fn finger_motion_scales_the_delta_too() {
+        let sdl = sdl3::event::Event::FingerMotion {
+            timestamp: 0,
+            touch_id: 1,
+            finger_id: 7,
+            x: 0.75,
+            y: 0.5,
+            dx: 0.25,
+            dy: -0.5,
+            pressure: 0.5,
+            window_id: 3,
+        };
+
+        assert_eq!(
+            translate(sdl, 3, 800, 600),
+            Some(Event::FingerMotion {
+                id: 7,
+                x: 600.0,
+                y: 300.0,
+                dx: 200.0,
+                dy: -300.0,
+                pressure: 0.5,
+            })
+        );
+    }
+
+    #[test]
+    fn fingers_from_another_window_are_dropped() {
+        let sdl = sdl3::event::Event::FingerUp {
+            timestamp: 0,
+            touch_id: 1,
+            finger_id: 7,
+            x: 0.5,
+            y: 0.5,
+            dx: 0.0,
+            dy: 0.0,
+            pressure: 0.0,
+            window_id: 4,
+        };
+
+        assert_eq!(translate(sdl, 3, 800, 600), None);
     }
 }

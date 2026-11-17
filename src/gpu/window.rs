@@ -172,11 +172,14 @@ impl WgpuWindow {
     /// so events are filtered by this window's id.
     pub fn poll(&mut self) -> Result<Vec<Event>, Error> {
         let window_id = self.window.id();
+        // Window units rather than physical pixels: mouse coordinates come in
+        // the same space, and finger events have to be comparable with them.
+        let (width, height) = self.window.size();
 
         with_pump(&self._sdl, |pump| {
             let mut events = Vec::new();
             while let Some(event) = pump.poll_event() {
-                if let Some(event) = crate::event::translate(event, window_id) {
+                if let Some(event) = crate::event::translate(event, window_id, width, height) {
                     events.push(event);
                 }
             }

@@ -28,6 +28,10 @@ pub enum Event {
     MouseButtonDown { button: MouseButton, x: f32, y: f32, clicks: u8 },
     MouseButtonUp { button: MouseButton, x: f32, y: f32, clicks: u8 },
     MouseWheel { x: f32, y: f32, direction: MouseWheelDirection },
+    FingerDown { id: u64, x: f32, y: f32, pressure: f32 },
+    FingerMotion { id: u64, x: f32, y: f32, dx: f32, dy: f32, pressure: f32 },
+    FingerUp { id: u64, x: f32, y: f32, pressure: f32 },
+    FingerCanceled { id: u64, x: f32, y: f32 },
 }
 ```
 
@@ -62,6 +66,7 @@ pub enum Event {
 | `MouseMotion` | `Event::MouseMotion` |
 | `MouseButtonDown` / `Up` | `Event::MouseButtonDown` / `Up` |
 | `MouseWheel` | `Event::MouseWheel` |
+| `FingerDown` / `Motion` / `Up` / `Canceled` | Соответствующий `Finger*`; нормализованные координаты умножаются на размер окна |
 | Всё остальное | `None` (отбрасывается) |
 
 ### Фильтрация по окну
@@ -90,6 +95,21 @@ for event in window.poll()? {
 `relative_mouse()` — отдельный метод, не событие: он читает накопленное
 SDL-смещение мыши. Это не позиция, а дельта; подробнее в
 [02-window.md](02-window.md).
+
+### Касания
+
+SDL отдаёт координаты пальцев в `0..1`; `translate` умножает их на размер
+окна, поэтому `Finger*` и `Mouse*` используют одну систему координат.
+
+- `id` не меняется, пока палец на экране;
+- `FingerMotion` дополнительно несёт смещение `dx`/`dy`;
+- `FingerCanceled` — системный жест, уведомление или потеря фокуса; это
+  отпускание без клика.
+
+По умолчанию SDL синтезирует из касаний мышь. Если обрабатывать `Finger*`
+самостоятельно, синтез стоит выключить через
+`WindowBuilder::touch_as_mouse(false)`, иначе тап придёт дважды. Подробнее об
+Android — в [11-android.md](11-android.md).
 
 ## `FrameClock`
 

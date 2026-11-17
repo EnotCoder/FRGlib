@@ -1,0 +1,25 @@
+// Top-level build file for the shared FRGLib Android project.
+//
+// The game is selected by `game.properties`; `app/build.gradle` reads it and
+// turns it into an application id, label and ABI list.
+
+buildscript {
+    repositories {
+        mavenCentral()
+        google()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.3'
+    }
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+        google()
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
+}

@@ -39,6 +39,7 @@ impl Window {
     }
 
     /// Opens the window. Called by [`WindowBuilder::build`].
+    #[allow(clippy::too_many_arguments)]
     fn create(
         title: String,
         width: u32,
@@ -46,6 +47,7 @@ impl Window {
         resizable: bool,
         vulkan: bool,
         background: Color,
+        high_pixel_density: bool,
         scale: ScaleMode,
     ) -> Result<Self, Error> {
         // SDL3 asks the X11 compositor to bypass our window by default, which
@@ -71,6 +73,9 @@ impl Window {
         // context is attached to it, so setting it here keeps the flag and the
         // backend that `create_renderer` below is about to choose in agreement.
         builder.opengl();
+        if high_pixel_density {
+            builder.high_pixel_density();
+        }
         let window = builder.build()?;
 
         // `create_renderer` takes the window by value and hands back a Result,
@@ -99,12 +104,15 @@ impl Window {
     /// Use [`crate::Event::should_close`] to decide whether to keep looping.
     pub fn poll(&mut self) -> Result<Vec<crate::event::Event>, Error> {
         let window_id = self.canvas.window().id();
+        // Finger events arrive normalized; the window size turns them into the
+        // same coordinate space as mouse events.
+        let (width, height) = self.canvas.window().size();
         let sdl = &self._sdl;
 
         with_pump(sdl, |pump| {
             let mut events = Vec::new();
             while let Some(event) = pump.poll_event() {
-                if let Some(event) = crate::event::translate(event, window_id) {
+                if let Some(event) = crate::event::translate(event, window_id, width, height) {
                     events.push(event);
                 }
             }
@@ -147,6 +155,32 @@ impl Window {
     /// Current drawable size, as `(width, height)`.
     pub fn size(&self) -> (u32, u32) {
         self.canvas.window().size()
+    }
+
+    /// How many physical pixels back one unit of window coordinates.
+    ///
+    /// On a desktop this is usually `1.0`; on a scaled display it is `2.0` or
+    /// more. Android is the exception: its drawable and window sizes match, so
+    /// this returns `1.0` even on a high-density screen. Prefer
+    /// [`display_scale`](Self::display_scale) when scaling a UI.
+    ///
+    /// Coordinates in [`Event`](crate::event::Event) stay in window units, so
+    /// never multiply a mouse or finger position by this.
+    pub fn pixel_density(&self) -> f32 {
+        self.canvas.window().pixel_density()
+    }
+
+    /// Scale the compositor expects for this window.
+    ///
+    /// This combines the pixel density with the platform content scale and is
+    /// the value to grow fonts, paddings and icons by. On Android it reflects
+    /// the screen density reported by the system, which [`pixel_density`]
+    /// cannot see. It is usually close to `1.0` on an unscaled desktop display
+    /// and larger on phones and HiDPI screens.
+    ///
+    /// [`pixel_density`]: Self::pixel_density
+    pub fn display_scale(&self) -> f32 {
+        self.canvas.window().display_scale()
     }
 
     /// Whether textures on this window keep hard pixel edges when scaled.

@@ -1,0 +1,86 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Everything game-specific lives in android/game.properties. Keeping it out of
+// this file lets the same Gradle project build the bundled template, a space
+// example, or any other game that has a Rust cdylib with an exported SDL_main.
+def gameProperties = new Properties()
+def gamePropertiesFile = rootProject.file('game.properties')
+if (!gamePropertiesFile.exists()) {
+    throw new GradleException('android/game.properties is missing')
+}
+gamePropertiesFile.withInputStream { gameProperties.load(it) }
+
+// -P properties let build.sh override the identity for the bundled template
+// without rewriting game.properties.
+def appId = (project.findProperty('frglibPackage')
+    ?: gameProperties.getProperty('package', 'org.frglib.game')).trim()
+def appName = (project.findProperty('frglibAppName')
+    ?: gameProperties.getProperty('app_name', 'FRGLib Game')).trim()
+def orientation = (project.findProperty('frglibOrientation')
+    ?: gameProperties.getProperty('orientation', 'landscape')).trim()
+def minSdkLevel = gameProperties.getProperty('min_sdk', '24').trim().toInteger()
+def abis = (project.findProperty('frglibAbis')
+    ?: gameProperties.getProperty('abis', 'arm64-v8a,x86_64'))
+    .split(',')
+    .collect { it.trim() }
+    .findAll { !it.isEmpty() }
+def ndkFromProperties = gameProperties.getProperty('ndk_version', 'auto').trim()
+def resolvedNdk = project.findProperty('frglibNdkVersion')
+    ?: (ndkFromProperties == 'auto' || ndkFromProperties.isEmpty() ? null : ndkFromProperties)
+
+android {
+    namespace = 'org.libsdl.app'
+    compileSdk = 35
+
+    if (resolvedNdk) {
+        ndkVersion = resolvedNdk
+    }
+
+    defaultConfig {
+        applicationId = appId
+        minSdk = minSdkLevel
+        targetSdk = 35
+        versionCode = 1
+        versionName = '1.0'
+
+        ndk {
+            abiFilters.addAll(abis)
+        }
+
+        manifestPlaceholders = [
+            appName: appName,
+            orientation: orientation,
+        ]
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    sourceSets {
+        main {
+            // build.sh puts libmain.so, libSDL3.so and (when the game uses text)
+            // libSDL3_ttf.so here, one subdirectory per ABI.
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    lint {
+        abortOnError = false
+    }
+}
+
+dependencies {
+    // SDL's Java glue is checked in under src/main/java, so there is nothing to
+    // pull from Maven.
+}

@@ -16,7 +16,7 @@ pub use labels::collect_name_labels;
 use std::error::Error;
 use std::rc::Rc;
 
-use frglib::{Color, Draw, Image, Object, TextCache};
+use frglib::{Color, Draw, Image, Object, TextCache, Vec2};
 
 use crate::bodies::Planet;
 use crate::consts::{
@@ -38,13 +38,19 @@ pub struct Ui<'a> {
     warn: Cache<'a>,
     dim: Cache<'a>,
     shadow: Cache<'a>,
+    /// Множитель для всех размеров интерфейса. Равен плотности пикселей окна:
+    /// на телефоне и HiDPI-мониторе панели и отступы растут вместе со шрифтом.
+    scale: f32,
 }
 
 impl<'a> Ui<'a> {
     /// Создаёт кэши текста: крупный шрифт для заголовка карточки и меньший
     /// для всего остального. Цвет входит в кэш, поэтому на каждый цвет --
     /// свой шрифт, но сам файл шрифта читается один раз.
-    pub fn new(info_font: sdl3::ttf::Font<'a>, hud_font: sdl3::ttf::Font<'a>) -> Self {
+    ///
+    /// `scale` -- плотность пикселей окна; шрифты уже должны быть загружены
+    /// с её учётом, а здесь она растягивает отступы и панели.
+    pub fn new(info_font: sdl3::ttf::Font<'a>, hud_font: sdl3::ttf::Font<'a>, scale: f32) -> Self {
         let info_font = Rc::new(info_font);
         let hud_font = Rc::new(hud_font);
 
@@ -65,7 +71,18 @@ impl<'a> Ui<'a> {
             warn: cache(Rc::clone(&hud_font), TEXT_WARN),
             dim: cache(Rc::clone(&hud_font), TEXT_DIM),
             shadow: cache(Rc::clone(&hud_font), TEXT_SHADOW),
+            scale: scale.max(1.0),
         }
+    }
+
+    /// Размер из `consts.rs` в пикселях экрана.
+    pub(super) fn px(&self, value: f32) -> f32 {
+        value * self.scale
+    }
+
+    /// То же для парных размеров: отступов, полей и размеров панелей.
+    pub(super) fn size(&self, value: Vec2) -> Vec2 {
+        value * self.scale
     }
 
     /// Имена тел не меняются -- кэшируем их один раз при запуске.
@@ -90,6 +107,10 @@ impl<'a> Ui<'a> {
 }
 
 /// Фон, рамка и акцентная полоса панели. Координаты -- экранные.
+///
+/// `scale` -- плотность пикселей: ширина акцентной полосы задана в тех же
+/// условных единицах, что и остальная раскладка.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_panel(
     d: &mut Draw,
     x: f32,
@@ -97,6 +118,7 @@ pub(super) fn draw_panel(
     width: f32,
     height: f32,
     accent: Option<Color>,
+    scale: f32,
 ) -> Result<(), frglib::Error> {
     let panel = Object::from_xywh(x + width * 0.5, y + height * 0.5, width, height);
 
@@ -104,12 +126,8 @@ pub(super) fn draw_panel(
     d.draw_object(&panel, PANEL_BORDER)?;
 
     if let Some(color) = accent {
-        let bar = Object::from_xywh(
-            x + PANEL_ACCENT_WIDTH * 0.5,
-            y + height * 0.5,
-            PANEL_ACCENT_WIDTH,
-            height,
-        );
+        let bar_width = PANEL_ACCENT_WIDTH * scale;
+        let bar = Object::from_xywh(x + bar_width * 0.5, y + height * 0.5, bar_width, height);
 
         d.fill_object(&bar, color)?;
     }
@@ -123,9 +141,10 @@ pub(super) fn draw_separator(
     x: f32,
     y: f32,
     width: f32,
+    scale: f32,
 ) -> Result<(), frglib::Error> {
     d.fill_object(
-        &Object::from_xywh(x + width * 0.5, y + 0.5, width, 1.0),
+        &Object::from_xywh(x + width * 0.5, y + 0.5, width, scale.max(1.0)),
         PANEL_SEPARATOR,
     )
 }

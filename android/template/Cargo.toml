@@ -1,0 +1,27 @@
+[package]
+name = "frglib-android-template"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Smallest possible FRGLib-shaped Android app: proves the Rust + SDL3 + Gradle chain"
+
+[lib]
+# Java's SDLActivity loads `libmain.so` and looks up `SDL_main` inside it, so
+# both the library name and the exported symbol are dictated by SDL.
+name = "main"
+crate-type = ["cdylib"]
+
+[dependencies]
+# Shared SDL3: Java calls System.loadLibrary("SDL3") before it gets to us.
+# `build-from-source` also builds SDL3_ttf if the `ttf` feature is on, so the
+# same switch works for real games.
+sdl3 = { version = "0.20", features = ["build-from-source"] }
+
+# Pinned so the C library matches the Java glue in android/app/src/main/java
+# (SDL 3.4.20). SDLActivity refuses to start when the two versions differ, and
+# a floating sdl3-sys would silently move one without the other.
+sdl3-sys = "=0.7.3"
+
+[profile.release]
+# A panic must not unwind across the C boundary that SDL called us through.
+panic = "abort"

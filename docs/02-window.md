@@ -35,6 +35,8 @@ src/window/
 | `relative_mouse() -> Result<Vec2, Error>` | Смещение мыши с прошлого вызова в пикселях |
 | `size() -> (u32, u32)` | Текущий drawable-размер окна |
 | `pixel_art() -> bool` | Был ли включён `Nearest` при создании |
+| `pixel_density() -> f32` | Сколько физических пикселей на единицу окна; на Android всегда `1.0` |
+| `display_scale() -> f32` | Масштаб композитора/плотность экрана; этим масштабируют UI |
 | `set_background(Color)` | Меняет цвет фона на лету |
 | `background() -> Color` | Текущий цвет фона |
 | `frame() -> Result<(), Error>` | Залить фон и показать кадр |
@@ -65,6 +67,8 @@ src/window/
 | `.vulkan(bool)` | `false` | Флаг `SDL_WINDOW_VULKAN` |
 | `.background(Color)` | `Color::GREEN` | Цвет фона |
 | `.pixel_art(bool)` | `false` | `Nearest` вместо `Linear` |
+| `.touch_as_mouse(bool)` | `true` | Синтезировать мышь из касаний |
+| `.high_pixel_density(bool)` | `false` | Разрешить `SDL_WINDOW_HIGH_PIXEL_DENSITY` |
 | `.build()` | — | Открывает окно, возвращает `Result<Window, Error>` |
 
 `pixel_art(true)` нужен для пиксель-арта: иначе SDL интерполирует соседние

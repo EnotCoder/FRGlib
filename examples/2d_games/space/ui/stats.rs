@@ -32,42 +32,48 @@ impl Ui<'_> {
         .max()
         .unwrap_or(0) as f32;
 
+        let scale = self.scale;
+        let gap = self.px(STATS_GAP);
+        let block_gap = self.px(STATS_BLOCK_GAP);
+        let padding = self.size(STATS_PADDING);
+        let margin = self.size(STATS_MARGIN);
+
         let content_width = fps_key.size().0 as f32
-            + STATS_GAP
+            + gap
             + fps_value.size().0 as f32
-            + STATS_BLOCK_GAP
+            + block_gap
             + zoom_key.size().0 as f32
-            + STATS_GAP
+            + gap
             + zoom_value.size().0 as f32;
 
-        let width = content_width + STATS_PADDING.x * 2.0;
-        let height = row_height + STATS_PADDING.y * 2.0;
-        let x = window.x - STATS_MARGIN.x - width;
-        let y = window.y - STATS_MARGIN.y - height;
-        let text_y = y + STATS_PADDING.y;
+        let width = content_width + padding.x * 2.0;
+        let height = row_height + padding.y * 2.0;
+        let x = window.x - margin.x - width;
+        let y = window.y - margin.y - height;
+        let text_y = y + padding.y;
 
         d.screen_space(|d| {
-            draw_panel(d, x, y, width, height, None)?;
+            draw_panel(d, x, y, width, height, None, scale)?;
 
-            let mut cursor = x + STATS_PADDING.x;
+            let mut cursor = x + padding.x;
 
             Label::new(fps_key)
                 .at(cursor, text_y)
                 .anchored(Anchor::TopLeft)
                 .draw(d)?;
-            cursor += fps_key.size().0 as f32 + STATS_GAP;
+            cursor += fps_key.size().0 as f32 + gap;
 
             Label::new(fps_value)
                 .at(cursor, text_y)
                 .anchored(Anchor::TopLeft)
                 .draw(d)?;
-            cursor += fps_value.size().0 as f32 + STATS_BLOCK_GAP;
+            cursor += fps_value.size().0 as f32 + block_gap;
 
             Label::new(zoom_key)
                 .at(cursor, text_y)
                 .anchored(Anchor::TopLeft)
                 .draw(d)?;
-            cursor += zoom_key.size().0 as f32 + STATS_GAP;
+            cursor += zoom_key.size().0 as f32 + gap;
 
             Label::new(zoom_value)
                 .at(cursor, text_y)

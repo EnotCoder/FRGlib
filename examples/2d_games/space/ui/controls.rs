@@ -47,53 +47,64 @@ impl Ui<'_> {
     }
 
     fn draw_hint(&self, d: &mut Draw, window: Vec2) -> Result<(), frglib::Error> {
+        let scale = self.scale;
         let image = self.dim.get(CONTROLS);
-        let width = image.size().0 as f32 + CONTROLS_PADDING.x * 2.0;
-        let height = image.size().1 as f32 + CONTROLS_PADDING.y * 2.0;
-        let x = CONTROLS_MARGIN.x;
-        let y = window.y - CONTROLS_MARGIN.y - height;
+        let padding = self.size(CONTROLS_PADDING);
+        let margin = self.size(CONTROLS_MARGIN);
+        let width = image.size().0 as f32 + padding.x * 2.0;
+        let height = image.size().1 as f32 + padding.y * 2.0;
+        let x = margin.x;
+        let y = window.y - margin.y - height;
 
         d.screen_space(|d| {
-            draw_panel(d, x, y, width, height, None)?;
+            draw_panel(d, x, y, width, height, None, scale)?;
 
             Label::new(image)
-                .at(x + CONTROLS_PADDING.x, y + CONTROLS_PADDING.y)
+                .at(x + padding.x, y + padding.y)
                 .anchored(Anchor::TopLeft)
                 .draw(d)
         })
     }
 
     fn draw_help(&self, d: &mut Draw, window: Vec2) -> Result<(), frglib::Error> {
-        let title_height = self.accent.get(HELP_TITLE).size().1 as f32;
-        let content_width = HELP_PANEL_WIDTH - HELP_PANEL_PADDING * 2.0;
+        let scale = self.scale;
+        let padding = self.px(HELP_PANEL_PADDING);
+        let panel_width = self.px(HELP_PANEL_WIDTH);
+        let title_gap = self.px(HELP_TITLE_GAP);
+        let section_height = self.px(HELP_SECTION_HEIGHT);
+        let section_gap = self.px(HELP_SECTION_GAP);
+        let row_height = self.px(HELP_ROW_HEIGHT);
 
-        let mut height =
-            HELP_PANEL_PADDING * 2.0 + title_height + HELP_TITLE_GAP + 1.0 + HELP_TITLE_GAP;
+        let title_height = self.accent.get(HELP_TITLE).size().1 as f32;
+        let content_width = panel_width - padding * 2.0;
+
+        let mut height = padding * 2.0 + title_height + title_gap + 1.0 + title_gap;
 
         for &(_, rows) in HELP_SECTIONS {
-            height += HELP_SECTION_HEIGHT + rows.len() as f32 * HELP_ROW_HEIGHT + HELP_SECTION_GAP;
+            height += section_height + rows.len() as f32 * row_height + section_gap;
         }
 
         // Последний отступ снизу уже даёт поле панели.
-        height -= HELP_SECTION_GAP;
+        height -= section_gap;
 
-        let x = CONTROLS_MARGIN.x;
-        let y = window.y - CONTROLS_MARGIN.y - height;
-        let content_x = x + HELP_PANEL_PADDING;
+        let margin = self.size(CONTROLS_MARGIN);
+        let x = margin.x;
+        let y = window.y - margin.y - height;
+        let content_x = x + padding;
 
         d.screen_space(|d| {
-            draw_panel(d, x, y, HELP_PANEL_WIDTH, height, Some(PANEL_ACCENT))?;
+            draw_panel(d, x, y, panel_width, height, Some(PANEL_ACCENT), scale)?;
 
-            let mut cursor = y + HELP_PANEL_PADDING;
+            let mut cursor = y + padding;
 
             Label::new(self.accent.get(HELP_TITLE))
                 .at(content_x, cursor)
                 .anchored(Anchor::TopLeft)
                 .draw(d)?;
 
-            cursor += title_height + HELP_TITLE_GAP;
-            draw_separator(d, content_x, cursor, content_width)?;
-            cursor += 1.0 + HELP_TITLE_GAP;
+            cursor += title_height + title_gap;
+            draw_separator(d, content_x, cursor, content_width, scale)?;
+            cursor += 1.0 + title_gap;
 
             for &(section, rows) in HELP_SECTIONS {
                 Label::new(self.accent.get(section))
@@ -101,23 +112,23 @@ impl Ui<'_> {
                     .anchored(Anchor::TopLeft)
                     .draw(d)?;
 
-                cursor += HELP_SECTION_HEIGHT;
+                cursor += section_height;
 
                 for &(key, description) in rows {
                     Label::new(self.value.get(key))
-                        .at(content_x + HELP_KEY_X, cursor)
+                        .at(content_x + self.px(HELP_KEY_X), cursor)
                         .anchored(Anchor::TopLeft)
                         .draw(d)?;
 
                     Label::new(self.body.get(description))
-                        .at(content_x + HELP_DESC_X, cursor)
+                        .at(content_x + self.px(HELP_DESC_X), cursor)
                         .anchored(Anchor::TopLeft)
                         .draw(d)?;
 
-                    cursor += HELP_ROW_HEIGHT;
+                    cursor += row_height;
                 }
 
-                cursor += HELP_SECTION_GAP;
+                cursor += section_gap;
             }
 
             Ok(())

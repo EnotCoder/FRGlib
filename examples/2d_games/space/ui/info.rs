@@ -124,6 +124,7 @@ impl Ui<'_> {
         info: &BodyInfo,
         following: bool,
     ) -> Result<(), frglib::Error> {
+        let scale = self.scale;
         let rows = info.rows();
         let footer_text = if following {
             FOOTER_FOLLOW
@@ -134,22 +135,29 @@ impl Ui<'_> {
         let title_height = self.title.get(info.name).size().1 as f32;
         let footer_height = self.dim.get(footer_text).size().1 as f32;
 
-        let x = INFO_PANEL_ORIGIN.x;
-        let y = INFO_PANEL_ORIGIN.y;
-        let padding = INFO_PANEL_PADDING;
+        let origin = self.size(INFO_PANEL_ORIGIN);
+        let panel_width = self.px(INFO_PANEL_WIDTH);
+        let x = origin.x;
+        let y = origin.y;
+        let padding = self.px(INFO_PANEL_PADDING);
         let content_x = x + padding;
-        let content_right = x + INFO_PANEL_WIDTH - padding;
+        let content_right = x + panel_width - padding;
+
+        let title_gap = self.px(INFO_TITLE_GAP);
+        let section_gap = self.px(INFO_SECTION_GAP);
+        let row_height = self.px(INFO_ROW_HEIGHT);
+        let footer_gap = self.px(INFO_FOOTER_GAP);
 
         let title_y = y + padding;
-        let separator_1 = title_y + title_height + INFO_TITLE_GAP;
-        let rows_y = separator_1 + 1.0 + INFO_SECTION_GAP;
-        let rows_bottom = rows_y + rows.len() as f32 * INFO_ROW_HEIGHT;
-        let separator_2 = rows_bottom + INFO_FOOTER_GAP;
-        let footer_y = separator_2 + 1.0 + INFO_FOOTER_GAP;
+        let separator_1 = title_y + title_height + title_gap;
+        let rows_y = separator_1 + 1.0 + section_gap;
+        let rows_bottom = rows_y + rows.len() as f32 * row_height;
+        let separator_2 = rows_bottom + footer_gap;
+        let footer_y = separator_2 + 1.0 + footer_gap;
         let height = footer_y + footer_height + padding - y;
 
         d.screen_space(|d| {
-            draw_panel(d, x, y, INFO_PANEL_WIDTH, height, Some(info.accent()))?;
+            draw_panel(d, x, y, panel_width, height, Some(info.accent()), scale)?;
 
             Label::new(self.title.get(info.name))
                 .at(content_x, title_y)
@@ -163,10 +171,10 @@ impl Ui<'_> {
                 .anchored(Anchor::BottomRight)
                 .draw(d)?;
 
-            draw_separator(d, content_x, separator_1, content_right - content_x)?;
+            draw_separator(d, content_x, separator_1, content_right - content_x, scale)?;
 
             for (index, (key, value)) in rows.iter().enumerate() {
-                let row_y = rows_y + index as f32 * INFO_ROW_HEIGHT;
+                let row_y = rows_y + index as f32 * row_height;
 
                 Label::new(self.dim.get(key))
                     .at(content_x, row_y)
@@ -179,7 +187,7 @@ impl Ui<'_> {
                     .draw(d)?;
             }
 
-            draw_separator(d, content_x, separator_2, content_right - content_x)?;
+            draw_separator(d, content_x, separator_2, content_right - content_x, scale)?;
 
             Label::new(self.dim.get(footer_text))
                 .at(content_x, footer_y)

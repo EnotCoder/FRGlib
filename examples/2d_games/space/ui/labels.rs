@@ -27,19 +27,21 @@ pub fn collect_name_labels(
     window: Vec2,
     show_labels: bool,
     show_moons: bool,
+    scale: f32,
 ) -> Vec<ScreenLabel> {
     if !show_labels {
         return Vec::new();
     }
 
+    let spawn_margin = LABEL_SPAWN_MARGIN * scale;
     let mut labels = Vec::new();
     let mut push = |name: &'static str, position: Vec2, radius: f32| {
         let screen = world_to_screen(camera, position, window);
 
-        if screen.x > -LABEL_SPAWN_MARGIN
-            && screen.x < window.x + LABEL_SPAWN_MARGIN
-            && screen.y > -LABEL_SPAWN_MARGIN
-            && screen.y < window.y + LABEL_SPAWN_MARGIN
+        if screen.x > -spawn_margin
+            && screen.x < window.x + spawn_margin
+            && screen.y > -spawn_margin
+            && screen.y < window.y + spawn_margin
         {
             labels.push(ScreenLabel {
                 name,
@@ -80,20 +82,21 @@ impl Ui<'_> {
     ) -> Result<(), frglib::Error> {
         for label in labels {
             let position = world_to_screen(camera, label.position, window);
-            let y = position.y - label.radius * camera.zoom - LABEL_GAP;
+            let y = position.y - label.radius * camera.zoom - self.px(LABEL_GAP);
 
-            if position.x < -LABEL_CULL_X
-                || position.x > window.x + LABEL_CULL_X
-                || y < -LABEL_CULL_Y
-                || y > window.y + LABEL_CULL_Y
+            if position.x < -self.px(LABEL_CULL_X)
+                || position.x > window.x + self.px(LABEL_CULL_X)
+                || y < -self.px(LABEL_CULL_Y)
+                || y > window.y + self.px(LABEL_CULL_Y)
             {
                 continue;
             }
 
             // Тень на пиксель вниз-вправо: подпись не теряется на светлом
             // диске планеты и на ярких кольцах Сатурна.
+            let shadow = self.px(1.0).max(1.0);
             Label::new(self.shadow.get(label.name))
-                .at(position.x + 1.0, y + 1.0)
+                .at(position.x + shadow, y + shadow)
                 .anchored(Anchor::Bottom)
                 .draw(d)?;
 

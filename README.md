@@ -28,6 +28,10 @@ cargo build
 cargo run --example basic-window
 ```
 
+Android-сборка живёт в `android/`: `./android/build.sh --install` собирает
+игру из `android/game.properties` в APK. Подробности —
+[docs/11-android.md](docs/11-android.md).
+
 ## Примеры
 
 ![Пример](img/cube_example.png)
@@ -103,6 +107,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `.resizable(bool)` | Разрешить ресайз. По умолчанию `true` |
 | `.vulkan(bool)` | Флаг `SDL_WINDOW_VULKAN`. По умолчанию `false` |
 | `.background(Color)` | Цвет фона. По умолчанию `Color::GREEN` |
+| `.touch_as_mouse(bool)` | Синтезировать клики мышью из касаний. По умолчанию `true` |
+| `.high_pixel_density(bool)` | Флаг `SDL_WINDOW_HIGH_PIXEL_DENSITY`. По умолчанию `false` |
 | `.build()` | Открывает окно, возвращает `Result<Window, Error>` |
 | `poll() -> Result<Vec<Event>, Error>` | Разбирает очередь событий за кадр |
 | `frame() -> Result<(), Error>` | Заливает окно текущим цветом и показывает кадр |
@@ -110,6 +116,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `set_background(Color)` | Меняет цвет фона на лету |
 | `background() -> Color` | Текущий цвет фона |
 | `size() -> (u32, u32)` | Текущий размер окна |
+| `pixel_density() -> f32` | Физических пикселей на единицу окна; на Android `1.0` |
+| `display_scale() -> f32` | Плотность экрана/масштаб композитора для UI |
 | `relative_mouse() -> Vec2` | Насколько мышь сдвинулась за кадр, в пикселях |
 | `vulkan_instance_extensions() -> Result<Vec<String>, Error>` | Расширения Vulkan, нужные этому окну |
 
@@ -472,7 +480,7 @@ cache.keep("Очки: 120")?;                  // до кадра
 `poll()` возвращает `Vec<Event>`: `Quit`, `CloseRequested`, `Resized`, `Moved`,
 `FocusGained`/`FocusLost`, `Minimized`/`Maximized`/`Restored`, `KeyDown`,
 `KeyUp`, `TextInput`, `MouseMotion`, `MouseButtonDown`, `MouseButtonUp`,
-`MouseWheel`.
+`MouseWheel`, `FingerDown`/`FingerMotion`/`FingerUp`/`FingerCanceled`.
 
 У SDL одна очередь событий на весь процесс, поэтому события фильтруются по
 идентификатору окна: чужое окно не получит твои события мыши и клавиатуры.

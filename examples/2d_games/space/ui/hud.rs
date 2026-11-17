@@ -95,11 +95,16 @@ impl Ui<'_> {
         texts: &HudTexts,
         window: Vec2,
     ) -> Result<(), frglib::Error> {
-        let width = HUD_PANEL_SIZE.x;
-        let height = HUD_PANEL_SIZE.y;
-        let x = window.x - width - HUD_PANEL_MARGIN.x;
-        let y = HUD_PANEL_MARGIN.y;
-        let right = x + width - HUD_TEXT_X;
+        let scale = self.scale;
+        let margin = self.size(HUD_PANEL_MARGIN);
+        let panel = self.size(HUD_PANEL_SIZE);
+        let text_x = self.px(HUD_TEXT_X);
+
+        let width = panel.x;
+        let height = panel.y;
+        let x = window.x - width - margin.x;
+        let y = margin.y;
+        let right = x + width - text_x;
 
         let status = if texts.paused {
             self.warn.get(PAUSED)
@@ -115,47 +120,50 @@ impl Ui<'_> {
         ];
 
         d.screen_space(|d| {
-            draw_panel(d, x, y, width, height, Some(PANEL_ACCENT))?;
+            draw_panel(d, x, y, width, height, Some(PANEL_ACCENT), scale)?;
 
             Label::new(self.accent.get(HEADER))
-                .at(x + HUD_TEXT_X, y + HUD_HEADER_Y)
+                .at(x + text_x, y + self.px(HUD_HEADER_Y))
                 .anchored(Anchor::TopLeft)
                 .draw(d)?;
 
             Label::new(status)
-                .at(right, y + HUD_HEADER_Y)
+                .at(right, y + self.px(HUD_HEADER_Y))
                 .anchored(Anchor::TopRight)
                 .draw(d)?;
 
             draw_separator(
                 d,
-                x + HUD_TEXT_X,
-                y + HUD_SEPARATOR_1_Y,
-                width - HUD_TEXT_X * 2.0,
+                x + text_x,
+                y + self.px(HUD_SEPARATOR_1_Y),
+                width - text_x * 2.0,
+                scale,
             )?;
 
             Label::new(self.dim.get(SPEED_LABEL))
-                .at(x + HUD_TEXT_X, y + HUD_SPEED_Y)
+                .at(x + text_x, y + self.px(HUD_SPEED_Y))
                 .anchored(Anchor::TopLeft)
                 .draw(d)?;
 
             Label::new(self.value.get(&texts.speed))
-                .at(right, y + HUD_SPEED_Y)
+                .at(right, y + self.px(HUD_SPEED_Y))
                 .anchored(Anchor::TopRight)
                 .draw(d)?;
 
             draw_separator(
                 d,
-                x + HUD_TEXT_X,
-                y + HUD_SEPARATOR_2_Y,
-                width - HUD_TEXT_X * 2.0,
+                x + text_x,
+                y + self.px(HUD_SEPARATOR_2_Y),
+                width - text_x * 2.0,
+                scale,
             )?;
 
+            let row_height = self.px(HUD_ROW_HEIGHT);
             for (index, (label, enabled)) in toggles.iter().enumerate() {
-                let row_y = y + HUD_TOGGLES_Y + index as f32 * HUD_ROW_HEIGHT;
+                let row_y = y + self.px(HUD_TOGGLES_Y) + index as f32 * row_height;
 
                 Label::new(self.dim.get(label))
-                    .at(x + HUD_TEXT_X, row_y)
+                    .at(x + text_x, row_y)
                     .anchored(Anchor::TopLeft)
                     .draw(d)?;
 

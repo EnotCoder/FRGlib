@@ -1,0 +1,28 @@
+[package]
+name = "space-android"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Android build of the space example: the same game loop behind an exported SDL_main"
+
+[lib]
+# SDLActivity loads `libmain.so` and looks up `SDL_main` in it. Both the name
+# and the exported symbol are dictated by SDL, not by this crate.
+name = "main"
+crate-type = ["cdylib"]
+
+[dependencies]
+# The game code lives in the desktop example; only the entry point differs.
+frglib = { path = "../../.." }
+
+# Shared SDL3 + SDL3_ttf: Java calls System.loadLibrary("SDL3") before it gets
+# to us, so the libraries have to stay separate .so files inside the APK.
+sdl3 = { version = "0.20", features = ["ttf", "build-from-source"] }
+
+# Pinned to the SDL version whose Java glue is checked in under
+# android/app/src/main/java. SDLActivity refuses to start when the two differ.
+sdl3-sys = "=0.7.3"
+
+[profile.release]
+# A panic must not unwind across the C boundary SDL called us through.
+panic = "abort"
