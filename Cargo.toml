@@ -166,6 +166,10 @@ name = "math-aabb"
 path = "examples/math/aabb.rs"
 
 [[example]]
+name = "math-perlin"
+path = "examples/math/perlin.rs"
+
+[[example]]
 name = "ui-button"
 path = "examples/ui/button.rs"
 

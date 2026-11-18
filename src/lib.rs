@@ -51,6 +51,7 @@ pub mod event;
 pub mod gpu;
 pub mod graphics;
 pub mod math;
+pub mod noise;
 pub mod tilemap;
 pub mod timing;
 pub mod ui;
@@ -70,6 +71,7 @@ pub use gpu::{
 pub use graphics::{Animation, Texture};
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{cos, lerp, sin, Ease, Lerp, Mat3, Rect, Vec2};
+pub use noise::Perlin;
 pub use tilemap::{MapError, TileMap};
 pub use timing::FrameClock;
 pub use ui::{Anchor, Button, ButtonState, Label, Slider, SliderState, TextCache};
