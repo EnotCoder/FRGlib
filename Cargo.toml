@@ -229,6 +229,11 @@ name = "3d_games-fgoty_run"
 path = "examples/3d_games/fgoty_run/main.rs"
 required-features = ["wgpu"]
 
+[[example]]
+name = "3d_games-terrain"
+path = "examples/3d_games/terrain/main.rs"
+required-features = ["wgpu"]
+
 [profile.release]
 lto = true
 codegen-units = 1
