@@ -23,7 +23,7 @@ pub fn draw(
     let width = size.0 as f32;
     let height = size.1 as f32;
 
-    panel(ui, Rect::new(20.0, 20.0, 310.0, 116.0));
+    panel(ui, Rect::new(20.0, 20.0, 360.0, 116.0));
     text(ui, font, "ЛАНДШАФТ ПЕРЛИНА", 38.0, 32.0, 18.0, Color::rgb(255, 216, 142))?;
     text(
         ui,
