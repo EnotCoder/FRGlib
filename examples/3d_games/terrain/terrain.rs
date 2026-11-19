@@ -108,16 +108,50 @@ impl Terrain {
 /// Края квадрата плавно уходят под воду, так что ландшафт выглядит островом,
 /// а не обрезанным краем бесконечной карты.
 fn height(noise: &Perlin, x: f32, z: f32) -> f32 {
-    let continents = noise.fbm_2d(x, z, 5, 0.011, 2.0, 0.5);
-    let ridges = 1.0 - noise
-        .fbm_2d(x + 317.0, z - 211.0, 4, 0.026, 2.0, 0.5)
-        .abs();
-    let detail = noise.fbm_2d(x - 91.0, z + 43.0, 3, 0.09, 2.0, 0.5);
+    // Невысокие плавные холмы.
+    let hills = noise.fbm_2d(
+        x, z,
+        3, 0.011, 2.0, 0.4,
+    );
 
+    // Отдельный шум определяет расположение горных районов.
+    let region = noise.fbm_2d(
+        x + 731.0, z - 419.0,
+        2, 0.018, 2.0, 0.5,
+    );
+
+    // Ниже 0.25 гор нет, от 0.25 до 0.50 они плавно появляются.
+    let mountain_mask = smoothstep(0.25, 0.50, region);
+
+    // Форма горных хребтов.
+    let ridge_noise = noise.fbm_2d(
+        x + 317.0, z - 211.0,
+        4, 0.026, 2.0, 0.5,
+    );
+    let ridges = (1.0 - ridge_noise.abs()).clamp(0.0, 1.0);
+
+    // Мелкие неровности.
+    let detail = noise.fbm_2d(
+        x - 91.0, z + 43.0,
+        3, 0.09, 2.0, 0.5,
+    );
+
+    // Основа острова: небольшой подъём над водой и пологие холмы.
+    let base = 3.0 + hills * 4.0;
+
+    // Горы добавляются только там, где разрешает маска.
+    let mountains = ridges.powi(3) * 24.0 * mountain_mask;
+
+    // На равнинах деталей меньше, в горах — больше.
+    let roughness = detail * (0.25 + mountain_mask * 1.0);
+
+    let land = base + mountains + roughness;
+
+    // Прежнее плавное опускание краёв острова под воду.
     let radius = (x * x + z * z).sqrt() / (SIZE * 0.5);
     let shore = 1.0 - smoothstep(0.55, 1.05, radius);
 
-    (continents * 18.0 + ridges.powi(3) * 17.0 + detail * 1.6) * shore - 9.0 * (1.0 - shore)
+    land * shore - 9.0 * (1.0 - shore)
 }
 
 fn smoothstep(edge0: f32, edge1: f32, value: f32) -> f32 {
