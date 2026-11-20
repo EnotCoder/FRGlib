@@ -3,6 +3,9 @@
 //! Каждая перегенерация создаёт новый `Perlin` из нового seed, поэтому старый
 //! рельеф полностью исчезает. Высоты хранятся рядом с мешем: камера спрашивает
 //! их через [`Terrain::height_at`], чтобы не проваливаться под землю.
+//!
+//! Цвет задаётся на ячейку, а не на вершину: соседние ячейки не смешиваются,
+//! поэтому поверхность выглядит пиксельной, а не размытой.
 
 use frglib::gpu::glam::Vec3;
 use frglib::gpu::{GpuMesh, Mesh, Renderer3D, Vertex};
@@ -39,37 +42,54 @@ impl Terrain {
             }
         }
 
-        let mut vertices = Vec::with_capacity(cols * cols);
+        // Нормалы считаем один раз по сетке высот, чтобы освещение оставалось
+        // гладким даже там, где цвет даётся отдельной ячейке.
+        let mut normals = Vec::with_capacity(cols * cols);
         for j in 0..cols {
-            let z = -half + j as f32 * step;
             for i in 0..cols {
-                let x = -half + i as f32 * step;
-                let index = j * cols + i;
-                let h = heights[index];
-
-                // Нормал из соседних высот: центральная разность по осям.
                 let left = heights[j * cols + i.saturating_sub(1)];
                 let right = heights[j * cols + (i + 1).min(SEGMENTS)];
                 let near = heights[j.saturating_sub(1) * cols + i];
                 let far = heights[(j + 1).min(SEGMENTS) * cols + i];
-                let normal = Vec3::new(left - right, 2.0 * step, near - far).normalize();
-
-                let variation = noise.sample_2d(x * 0.08 + 19.0, z * 0.08 - 7.0);
-                let color = surface_color(h, normal.y, variation);
-                vertices.push(Vertex::with_color([x, h, z], normal.to_array(), color));
+                normals.push(Vec3::new(left - right, 2.0 * step, near - far).normalize());
             }
         }
 
+        // Каждая ячейка получает свои четыре вершины с одинаковым цветом.
+        // Так цвет не интерполируется между соседними ячейками — границы
+        // остаются резкими, как у пиксельной текстуры с точечной фильтрацией.
+        let mut vertices = Vec::with_capacity(SEGMENTS * SEGMENTS * 4);
         let mut indices = Vec::with_capacity(SEGMENTS * SEGMENTS * 6);
         for j in 0..SEGMENTS {
             for i in 0..SEGMENTS {
-                let a = (j * cols + i) as u32;
-                let b = a + 1;
-                let c = a + cols as u32;
-                let d = c + 1;
+                let corners = [
+                    j * cols + i,
+                    j * cols + i + 1,
+                    (j + 1) * cols + i,
+                    (j + 1) * cols + i + 1,
+                ];
+
+                let center_h = corners.iter().map(|&index| heights[index]).sum::<f32>() / 4.0;
+                let center_slope = corners.iter().map(|&index| normals[index].y).sum::<f32>() / 4.0;
+                let cx = -half + (i as f32 + 0.5) * step;
+                let cz = -half + (j as f32 + 0.5) * step;
+                let variation = noise.sample_2d(cx * 0.08 + 19.0, cz * 0.08 - 7.0);
+                let color = surface_color(center_h, center_slope, variation);
+
+                let base = vertices.len() as u32;
+                for &index in &corners {
+                    let x = -half + (index % cols) as f32 * step;
+                    let z = -half + (index / cols) as f32 * step;
+                    vertices.push(Vertex::with_color(
+                        [x, heights[index], z],
+                        normals[index].to_array(),
+                        color,
+                    ));
+                }
+
                 // Обход против часовой стрелки, если смотреть сверху: иначе
                 // back-face culling уберёт всю поверхность.
-                indices.extend_from_slice(&[a, c, b, b, c, d]);
+                indices.extend_from_slice(&[base, base + 2, base + 1, base + 1, base + 2, base + 3]);
             }
         }
 
