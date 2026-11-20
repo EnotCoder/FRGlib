@@ -8,11 +8,13 @@
 //! Escape — выход. Камера не проваливается под поверхность.
 //!
 //! Меш строится из сетки вершин: высота — сумма октав [`frglib::Perlin`],
-//! цвет зависит от высоты и крутизны склона. Небо и вода тоже процедурные,
-//! поэтому примеру не нужны внешние ассеты.
+//! цвет зависит от высоты и крутизны склона. По поверхности случайно
+//! рассеиваются простые ёлки. Небо и вода тоже процедурные, поэтому примеру
+//! не нужны внешние ассеты.
 
 mod camera;
 mod hud;
+mod props;
 mod sky;
 mod terrain;
 
@@ -23,6 +25,7 @@ use frglib::gpu::{Light, Material, Mesh, Renderer2D, Renderer3D, WgpuWindow};
 use frglib::{Button, Color, Event, FrameClock, Keycode, Rect};
 
 use camera::FlyCamera;
+use props::Props;
 use terrain::{Terrain, SIZE};
 
 /// Шрифт HUD из общих ассетов примеров 3D-игр.
@@ -63,6 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut seed = 4242u64;
     let mut regenerations = 0u32;
     let mut terrain = Terrain::generate(&scene, seed);
+    let mut props = Props::generate(&scene, &terrain, seed);
 
     let mut button = Button::new(Rect::new(24.0, 152.0, 250.0, 48.0)).with_colors(
         Color::rgb(46, 64, 94),
@@ -102,6 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             seed = fresh_seed(regenerations);
             regenerations += 1;
             terrain = Terrain::generate(&scene, seed);
+            props = Props::generate(&scene, &terrain, seed);
         }
 
         let dt = clock.dt().min(0.05);
@@ -114,6 +119,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         scene.begin(&view);
         scene.draw_mesh_with(&terrain.mesh, Mat4::IDENTITY, Material::Lit, Color::WHITE);
+        props.draw(&mut scene);
         scene.draw_mesh_with(
             &water,
             water_model,

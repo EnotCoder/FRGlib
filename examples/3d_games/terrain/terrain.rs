@@ -4,8 +4,8 @@
 //! рельеф полностью исчезает. Высоты хранятся рядом с мешем: камера спрашивает
 //! их через [`Terrain::height_at`], чтобы не проваливаться под землю.
 //!
-//! Цвет задаётся на ячейку, а не на вершину: соседние ячейки не смешиваются,
-//! поэтому поверхность выглядит пиксельной, а не размытой.
+//! Цвет задаётся на ячейку, а нормаль — на грань: соседние ячейки не
+//! смешиваются и не сглаживаются. Это аналог `Flat Shading` в Blender.
 
 use frglib::gpu::glam::Vec3;
 use frglib::gpu::{GpuMesh, Mesh, Renderer3D, Vertex};
@@ -42,54 +42,59 @@ impl Terrain {
             }
         }
 
-        // Нормалы считаем один раз по сетке высот, чтобы освещение оставалось
-        // гладким даже там, где цвет даётся отдельной ячейке.
-        let mut normals = Vec::with_capacity(cols * cols);
-        for j in 0..cols {
-            for i in 0..cols {
-                let left = heights[j * cols + i.saturating_sub(1)];
-                let right = heights[j * cols + (i + 1).min(SEGMENTS)];
-                let near = heights[j.saturating_sub(1) * cols + i];
-                let far = heights[(j + 1).min(SEGMENTS) * cols + i];
-                normals.push(Vec3::new(left - right, 2.0 * step, near - far).normalize());
-            }
-        }
-
-        // Каждая ячейка получает свои четыре вершины с одинаковым цветом.
-        // Так цвет не интерполируется между соседними ячейками — границы
-        // остаются резкими, как у пиксельной текстуры с точечной фильтрацией.
-        let mut vertices = Vec::with_capacity(SEGMENTS * SEGMENTS * 4);
+        // Flat shading, как `Flat` в Blender: каждая ячейка даёт два
+        // треугольника, и у каждого своя нормаль по его вершинам. Соседние
+        // грани не сглаживаются, поэтому поверхность выглядит гранёной.
+        let mut vertices = Vec::with_capacity(SEGMENTS * SEGMENTS * 6);
         let mut indices = Vec::with_capacity(SEGMENTS * SEGMENTS * 6);
         for j in 0..SEGMENTS {
             for i in 0..SEGMENTS {
-                let corners = [
-                    j * cols + i,
-                    j * cols + i + 1,
-                    (j + 1) * cols + i,
-                    (j + 1) * cols + i + 1,
-                ];
+                let x0 = -half + i as f32 * step;
+                let x1 = x0 + step;
+                let z0 = -half + j as f32 * step;
+                let z1 = z0 + step;
 
-                let center_h = corners.iter().map(|&index| heights[index]).sum::<f32>() / 4.0;
-                let center_slope = corners.iter().map(|&index| normals[index].y).sum::<f32>() / 4.0;
-                let cx = -half + (i as f32 + 0.5) * step;
-                let cz = -half + (j as f32 + 0.5) * step;
+                let h00 = heights[j * cols + i];
+                let h10 = heights[j * cols + i + 1];
+                let h01 = heights[(j + 1) * cols + i];
+                let h11 = heights[(j + 1) * cols + i + 1];
+
+                let p0 = Vec3::new(x0, h00, z0);
+                let p1 = Vec3::new(x1, h10, z0);
+                let p2 = Vec3::new(x0, h01, z1);
+                let p3 = Vec3::new(x1, h11, z1);
+
+                // Порядок вершин совпадает с индексами ниже: нормали смотрят
+                // вверх, а back-face culling не убирает грани.
+                let n_a = (p2 - p0).cross(p1 - p0).normalize();
+                let n_b = (p2 - p1).cross(p3 - p1).normalize();
+
+                let center_h = (h00 + h10 + h01 + h11) * 0.25;
+                let center_slope = (n_a.y + n_b.y) * 0.5;
+                let cx = (x0 + x1) * 0.5;
+                let cz = (z0 + z1) * 0.5;
                 let variation = noise.sample_2d(cx * 0.08 + 19.0, cz * 0.08 - 7.0);
                 let color = surface_color(center_h, center_slope, variation);
 
                 let base = vertices.len() as u32;
-                for &index in &corners {
-                    let x = -half + (index % cols) as f32 * step;
-                    let z = -half + (index / cols) as f32 * step;
-                    vertices.push(Vertex::with_color(
-                        [x, heights[index], z],
-                        normals[index].to_array(),
-                        color,
-                    ));
+                for (point, normal) in [
+                    (p0, n_a),
+                    (p2, n_a),
+                    (p1, n_a),
+                    (p1, n_b),
+                    (p2, n_b),
+                    (p3, n_b),
+                ] {
+                    vertices.push(Vertex::with_color(point.to_array(), normal.to_array(), color));
                 }
-
-                // Обход против часовой стрелки, если смотреть сверху: иначе
-                // back-face culling уберёт всю поверхность.
-                indices.extend_from_slice(&[base, base + 2, base + 1, base + 1, base + 2, base + 3]);
+                indices.extend_from_slice(&[
+                    base,
+                    base + 1,
+                    base + 2,
+                    base + 3,
+                    base + 4,
+                    base + 5,
+                ]);
             }
         }
 
@@ -121,6 +126,16 @@ impl Terrain {
         let upper = h01 + (h11 - h01) * tx;
         lower + (upper - lower) * tz
     }
+
+    /// Крутизна склона в точке: модуль градиента высоты.
+    ///
+    /// Ноль — ровная площадка, чем больше значение, тем круче подъём.
+    pub fn slope_at(&self, x: f32, z: f32) -> f32 {
+        const D: f32 = 1.5;
+        let dx = self.height_at(x + D, z) - self.height_at(x - D, z);
+        let dz = self.height_at(x, z + D) - self.height_at(x, z - D);
+        dx.hypot(dz) / (2.0 * D)
+    }
 }
 
 /// Высота рельефа в мировой точке: материки + хребты + мелкие детали.
@@ -140,8 +155,9 @@ fn height(noise: &Perlin, x: f32, z: f32) -> f32 {
         2, 0.018, 2.0, 0.5,
     );
 
-    // Ниже 0.25 гор нет, от 0.25 до 0.50 они плавно появляются.
-    let mountain_mask = smoothstep(0.25, 0.50, region);
+    // Горы появляются постепенно: широкий переход не даёт резкой границы
+    // между равниной и хребтом.
+    let mountain_mask = smoothstep(0.18, 0.62, region);
 
     // Форма горных хребтов.
     let ridge_noise = noise.fbm_2d(
@@ -159,11 +175,12 @@ fn height(noise: &Perlin, x: f32, z: f32) -> f32 {
     // Основа острова: небольшой подъём над водой и пологие холмы.
     let base = 3.0 + hills * 4.0;
 
-    // Горы добавляются только там, где разрешает маска.
-    let mountains = ridges.powi(3) * 24.0 * mountain_mask;
+    // Квадрат вместо куба сглаживает гребни: вершины остаются, но пики
+    // становятся округлыми, а не острыми.
+    let mountains = ridges.powi(2) * 17.0 * mountain_mask;
 
-    // На равнинах деталей меньше, в горах — больше.
-    let roughness = detail * (0.25 + mountain_mask * 1.0);
+    // Меньше мелких неровностей — склоны выглядят мягче.
+    let roughness = detail * (0.22 + mountain_mask * 0.55);
 
     let land = base + mountains + roughness;
 
