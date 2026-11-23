@@ -524,6 +524,11 @@ let skybox = Skybox::from_faces(window.gpu(), faces)?;
 | `lights() -> &[Light]` | Текущий набор источников |
 | `set_ambient(Color)` | Устанавливает цвет глобального фонового освещения |
 | `ambient() -> Color` | Текущий цвет фонового освещения |
+| `set_wireframe(bool)` | Рисует треугольники каркасом вместо заливки (отладка); требует `POLYGON_MODE_LINE` у устройства, иначе no-op |
+| `wireframe() -> bool` | Включён ли каркас |
+| `wireframe_supported() -> bool` | Поддерживает ли устройство каркас |
+| `set_show_collision(bool)` | Отладочный флаг «показывать коллизии» (как консольная `show collision`): хранится между кадрами, сцену рисует вызывающий код через `draw_circle`/`draw_sphere`/`draw_box` |
+| `show_collision() -> bool` | Включён ли показ коллизий |
 | `draw_mesh(&GpuMesh, Mat4, Color)` | Ставит lit-меш модельной матрицей |
 | `draw_mesh_textured(&GpuMesh, &Texture, Mat4, Color)` | Рисует меш с текстурой и освещением |
 | `draw_mesh_with(&GpuMesh, Mat4, Material, Color)` | То же с явным материалом |
@@ -541,6 +546,9 @@ let skybox = Skybox::from_faces(window.gpu(), faces)?;
 | `draw_grid(slices, spacing, Color)` | Проволочная сетка; меш кешируется по `(slices, spacing)` |
 | `draw_line(from, to, Color)` | Один отрезок; копится в общий буфер кадра |
 | `draw_lines(&[Vec3], Color) ` | Связная ломаная через точки |
+| `draw_circle(center, radius, Color)` | Проволочная окружность в XZ — контур сферической коллизии на земле |
+| `draw_sphere(center, radius, Color)` | Проволочная сфера из трёх ортогональных колец |
+| `draw_box(center, size, Color)` | 12 рёбер AABB — контур коробчатой коллизии |
 | `finish(&mut Frame)` | Записывает все накопленные draw в один render pass и очищает очередь |
 
 ### Как это устроено внутри
@@ -560,6 +568,10 @@ let skybox = Skybox::from_faces(window.gpu(), faces)?;
 - **Пайплайны.** Lit- и unlit-треугольники (оба с отсечением задних граней),
   их текстурированные варианты, unlit-линии без отсечения и отдельный
   skybox-пайплайн, который пишет только цвет и не трогает глубину.
+- **Каркас.** Если устройство поддерживает `POLYGON_MODE_LINE` (Vulkan,
+  Metal, DX12; запрашивается при создании устройства в `WgpuWindow`),
+  строятся line-варианты всех треугольных пайплайнов без отсечения граней.
+  `set_wireframe(true)` переключает выбор на них; линии и небо не меняются.
 - **Кеш сетки.** `draw_grid` с теми же `slices` и `spacing` переиспользует
   буферы; биты `f32` сравниваются напрямую.
 - **Линии.** `draw_line`/`draw_lines` не создают буфер на каждый вызов: за
@@ -1387,10 +1399,13 @@ Renderer3D::{new, create_mesh, create_gltf, create_skybox, create_material,
              create_preset_material, begin,
              set_skybox, clear_skybox, skybox,
              set_lights, add_light, clear_lights, lights, set_ambient, ambient,
+             set_wireframe, wireframe, wireframe_supported,
+             set_show_collision, show_collision,
              draw_mesh, draw_mesh_with, draw_gltf, draw_gltf_with,
              draw_gltf_animated, draw_gltf_animated_with,
              draw_cube, draw_cube_model, draw_plane,
-             draw_grid, draw_line, draw_lines, finish}
+             draw_grid, draw_line, draw_lines,
+             draw_circle, draw_sphere, draw_box, finish}
 Material::{Lit, Unlit, Transparent, Custom}
 ShaderPreset::{Toon, Comic, Retro, Pixel, Hologram, Neon, Film, Normals, ALL, name, source}
 Light::{directional, point, with_intensity, with_range, direction, position}

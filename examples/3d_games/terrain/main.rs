@@ -7,6 +7,9 @@
 //! зажатая мышь или стрелки — обзор, колесо — скорость, Shift — ускорение,
 //! Escape — выход. Камера не проваливается под поверхность.
 //!
+//! Отладочные опции движка: F1 переключает `set_show_collision` (сфера камеры
+//! над рельефом и границы карты), F2 — `set_wireframe` (каркас моделей).
+//!
 //! Меш строится из сетки вершин: высота — сумма октав [`frglib::Perlin`],
 //! цвет зависит от высоты и крутизны склона. По поверхности случайно
 //! рассеиваются простые ёлки. Небо и вода тоже процедурные, поэтому примеру
@@ -24,7 +27,7 @@ use frglib::gpu::glam::{Mat4, Vec3};
 use frglib::gpu::{Light, Material, Mesh, Renderer2D, Renderer3D, WgpuWindow};
 use frglib::{Button, Color, Event, FrameClock, Keycode, Rect};
 
-use camera::FlyCamera;
+use camera::{FlyCamera, HALF_SIZE, MIN_HEIGHT_ABOVE_GROUND};
 use props::Props;
 use terrain::{Terrain, SIZE};
 
@@ -91,6 +94,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Event::KeyDown {
                     key: Keycode::R, ..
                 } => regenerate = true,
+                // Отладочные опции движка; удержание клавиши не щёлкает ими.
+                Event::KeyDown {
+                    key: Keycode::F1,
+                    repeat: false,
+                    ..
+                } => scene.set_show_collision(!scene.show_collision()),
+                Event::KeyDown {
+                    key: Keycode::F2,
+                    repeat: false,
+                    ..
+                } => scene.set_wireframe(!scene.wireframe()),
                 _ => {}
             }
 
@@ -126,6 +140,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Material::Transparent,
             Color::rgba(48, 128, 184, 145),
         );
+
+        if scene.show_collision() {
+            draw_collision_debug(&mut scene, &camera, &terrain);
+        }
         scene.finish(&mut frame);
 
         ui.begin_overlay(&frame);
@@ -144,6 +162,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         window.present(frame)?;
         clock.tick();
     }
+}
+
+/// Отладочная опция движка `show_collision`: «коллизия» камеры — сфера
+/// минимального зазора над рельефом, точка опоры под ней и границы карты.
+fn draw_collision_debug(scene: &mut Renderer3D, camera: &FlyCamera, terrain: &Terrain) {
+    let pos = camera.position();
+
+    // Камера не проваливается под поверхность: кламп высоты — это сфера
+    // радиуса MIN_HEIGHT_ABOVE_GROUND вокруг позиции камеры.
+    scene.draw_sphere(pos, MIN_HEIGHT_ABOVE_GROUND, Color::rgb(90, 210, 255));
+
+    // Точка рельефа прямо под камерой и отрезок до неё: видно, откуда
+    // берётся ограничение высоты.
+    let ground = Vec3::new(pos.x, terrain.height_at(pos.x, pos.z), pos.z);
+    scene.draw_circle(ground + Vec3::Y * 0.05, 1.0, Color::rgb(255, 214, 116));
+    scene.draw_line(ground, pos, Color::rgb(230, 235, 245));
+
+    // Границы полёта по X/Z, на текущей высоте камеры.
+    let y = pos.y;
+    scene.draw_lines(
+        &[
+            Vec3::new(-HALF_SIZE, y, -HALF_SIZE),
+            Vec3::new(HALF_SIZE, y, -HALF_SIZE),
+            Vec3::new(HALF_SIZE, y, HALF_SIZE),
+            Vec3::new(-HALF_SIZE, y, HALF_SIZE),
+            Vec3::new(-HALF_SIZE, y, -HALF_SIZE),
+        ],
+        Color::rgb(230, 235, 245),
+    );
 }
 
 /// Seed для следующей перегенерации: время плюс счётчик, чтобы два нажатия

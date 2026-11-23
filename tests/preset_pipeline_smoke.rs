@@ -100,9 +100,18 @@ fn all_presets_build_real_pipelines() {
         eprintln!("no adapter; skipping");
         return;
     };
+    // Same request as `WgpuWindow`: wireframe needs the line polygon mode
+    // where the adapter offers it.
+    let mut required_features = wgpu::Features::empty();
+    if adapter
+        .features()
+        .contains(wgpu::Features::POLYGON_MODE_LINE)
+    {
+        required_features |= wgpu::Features::POLYGON_MODE_LINE;
+    }
     let (device, _queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         label: Some("smoke"),
-        required_features: wgpu::Features::empty(),
+        required_features,
         required_limits: wgpu::Limits::default(),
         experimental_features: wgpu::ExperimentalFeatures::disabled(),
         memory_hints: wgpu::MemoryHints::Performance,
@@ -236,6 +245,54 @@ fn all_presets_build_real_pipelines() {
             });
         }
     }
+    // `Renderer3D::set_wireframe` switches to line-mode twins of the triangle
+    // pipelines; validate that combination too when the device supports it.
+    if device
+        .features()
+        .contains(wgpu::Features::POLYGON_MODE_LINE)
+    {
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("wireframe"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../src/gpu/shaders/lit.wgsl").into()),
+        });
+        let _ = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&plain_layout),
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &[Some(vertex_buffer.clone())],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs_unlit"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Line,
+                ..wgpu::PrimitiveState::default()
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+    }
+
     let error = pollster::block_on(scope.pop());
     assert!(error.is_none(), "pipeline validation failed: {error:?}");
 }

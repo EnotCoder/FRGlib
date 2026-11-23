@@ -104,10 +104,21 @@ impl WgpuWindow {
             apply_limit_buckets: false,
         }))?;
 
+        // Wireframe debug rendering needs non-fill polygon modes. Ask for the
+        // feature only when the adapter offers it, so a GLES-only machine
+        // still gets a device; `Renderer3D::set_wireframe` is a no-op there.
+        let mut required_features = wgpu::Features::empty();
+        if adapter
+            .features()
+            .contains(wgpu::Features::POLYGON_MODE_LINE)
+        {
+            required_features |= wgpu::Features::POLYGON_MODE_LINE;
+        }
+
         let (device, queue) =
             pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
                 label: Some("frglib device"),
-                required_features: wgpu::Features::empty(),
+                required_features,
                 required_limits: wgpu::Limits::default(),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,

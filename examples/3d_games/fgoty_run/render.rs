@@ -11,7 +11,7 @@ use frglib::gpu::{Camera3D, Material, Renderer3D};
 use frglib::Color;
 
 use crate::assets::Assets;
-use crate::game::Game;
+use crate::game::{Game, ARENA, COIN_RADIUS, HIT_RADIUS};
 
 const PLAYER_SCALE: f32 = 1.7;
 /// Насколько поднять Ферриса, чтобы лапы стояли на траве.
@@ -86,6 +86,45 @@ pub fn draw_scene(game: &Game, scene: &mut Renderer3D, assets: &Assets, camera: 
 
     draw_particles(game, scene, assets);
     draw_fireflies(game, scene, assets, camera);
+
+    if scene.show_collision() {
+        draw_collisions(game, scene);
+    }
+}
+
+/// Отладочная опция движка `show_collision`: контуры коллизий ровно тех
+/// радиусов, по которым работает физика в `game`. Линии рисуются последними
+/// и видны поверх моделей.
+fn draw_collisions(game: &Game, scene: &mut Renderer3D) {
+    // Игрок и боты сталкиваются сферами одинакового радиуса.
+    scene.draw_sphere(game.player, HIT_RADIUS, Color::rgb(90, 210, 255));
+
+    for enemy in &game.enemies {
+        scene.draw_sphere(enemy.pos, HIT_RADIUS, Color::rgb(255, 80, 70));
+    }
+
+    // Монета собирается по расстоянию на земле, хотя сама модель парит выше.
+    for coin in &game.coins {
+        scene.draw_circle(
+            coin.pos + Vec3::Y * 0.03,
+            COIN_RADIUS,
+            Color::rgb(255, 214, 116),
+        );
+    }
+
+    // Граница арены: кламп игрока. Чуть выше травы, чтобы линия не мерцала.
+    let edge = ARENA - 0.7;
+    let y = 0.04;
+    scene.draw_lines(
+        &[
+            Vec3::new(-edge, y, -edge),
+            Vec3::new(edge, y, -edge),
+            Vec3::new(edge, y, edge),
+            Vec3::new(-edge, y, edge),
+            Vec3::new(-edge, y, -edge),
+        ],
+        Color::rgb(230, 235, 245),
+    );
 }
 
 /// Мягкие тени и световые пятна под игроком, монетами и ботами.

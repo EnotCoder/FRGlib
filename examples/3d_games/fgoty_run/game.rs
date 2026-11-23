@@ -17,9 +17,9 @@ const PLAYER_SPEED: f32 = 6.0;
 /// Сколько столкновений выдерживает игрок.
 const LIVES: u32 = 3;
 /// Радиус, в котором монета считается собранной.
-const COIN_RADIUS: f32 = 0.9;
+pub const COIN_RADIUS: f32 = 0.9;
 /// Радиус столкновения с ботом.
-const HIT_RADIUS: f32 = 0.95;
+pub const HIT_RADIUS: f32 = 0.95;
 /// Секунды неуязвимости после удара.
 const INVULNERABLE: f32 = 1.8;
 

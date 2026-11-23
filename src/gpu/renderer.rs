@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::f32::consts::TAU;
 use std::mem::size_of;
 use std::num::NonZeroU64;
 
@@ -115,6 +116,10 @@ pub struct Renderer3D {
     transparent_lines: wgpu::RenderPipeline,
     transparent_textured: wgpu::RenderPipeline,
 
+    wireframe_pipelines: Option<WireframePipelines>,
+    wireframe: bool,
+    show_collision: bool,
+
     custom_pipelines: Vec<CustomPipeline>,
 
     texture_layout: wgpu::BindGroupLayout,
@@ -135,6 +140,20 @@ pub struct Renderer3D {
 struct CustomPipeline {
     triangles: wgpu::RenderPipeline,
     textured: wgpu::RenderPipeline,
+    /// Line-mode twins, present only when the device supports them.
+    wireframe_triangles: Option<wgpu::RenderPipeline>,
+    wireframe_textured: Option<wgpu::RenderPipeline>,
+}
+
+/// Line-mode twins of the triangle pipelines, built only when the device
+/// supports `POLYGON_MODE_LINE`.
+struct WireframePipelines {
+    lit: wgpu::RenderPipeline,
+    unlit: wgpu::RenderPipeline,
+    lit_textured: wgpu::RenderPipeline,
+    unlit_textured: wgpu::RenderPipeline,
+    transparent: wgpu::RenderPipeline,
+    transparent_textured: wgpu::RenderPipeline,
 }
 
 struct GridCache {
@@ -382,6 +401,7 @@ impl Renderer3D {
             Some(wgpu::Face::Back),
             true,
             "fs_lit",
+            wgpu::PolygonMode::Fill,
         );
         let unlit_triangles = create_pipeline(
             &device,
@@ -392,6 +412,7 @@ impl Renderer3D {
             Some(wgpu::Face::Back),
             true,
             "fs_unlit",
+            wgpu::PolygonMode::Fill,
         );
         let unlit_lines = create_pipeline(
             &device,
@@ -402,6 +423,7 @@ impl Renderer3D {
             None,
             true,
             "fs_unlit",
+            wgpu::PolygonMode::Fill,
         );
         let lit_textured = create_pipeline(
             &device,
@@ -412,6 +434,7 @@ impl Renderer3D {
             Some(wgpu::Face::Back),
             true,
             "fs_lit_textured",
+            wgpu::PolygonMode::Fill,
         );
         let unlit_textured = create_pipeline(
             &device,
@@ -422,6 +445,7 @@ impl Renderer3D {
             Some(wgpu::Face::Back),
             true,
             "fs_unlit_textured",
+            wgpu::PolygonMode::Fill,
         );
 
         // Alpha-blended draws share the unlit shader, but skip depth writes so
@@ -435,6 +459,7 @@ impl Renderer3D {
             Some(wgpu::Face::Back),
             false,
             "fs_unlit",
+            wgpu::PolygonMode::Fill,
         );
         let transparent_lines = create_pipeline(
             &device,
@@ -445,6 +470,7 @@ impl Renderer3D {
             None,
             false,
             "fs_unlit",
+            wgpu::PolygonMode::Fill,
         );
         let transparent_textured = create_pipeline(
             &device,
@@ -455,7 +481,83 @@ impl Renderer3D {
             Some(wgpu::Face::Back),
             false,
             "fs_unlit_textured",
+            wgpu::PolygonMode::Fill,
         );
+
+        // Line-mode twins of the triangle pipelines for `set_wireframe`. They
+        // exist only when the device supports non-fill polygon modes; without
+        // culling both sides of a triangle contribute their edges.
+        let wireframe_pipelines = device
+            .features()
+            .contains(wgpu::Features::POLYGON_MODE_LINE)
+            .then(|| WireframePipelines {
+                lit: create_pipeline(
+                    &device,
+                    &pipeline_layout,
+                    &shader,
+                    format,
+                    wgpu::PrimitiveTopology::TriangleList,
+                    None,
+                    true,
+                    "fs_lit",
+                    wgpu::PolygonMode::Line,
+                ),
+                unlit: create_pipeline(
+                    &device,
+                    &pipeline_layout,
+                    &shader,
+                    format,
+                    wgpu::PrimitiveTopology::TriangleList,
+                    None,
+                    true,
+                    "fs_unlit",
+                    wgpu::PolygonMode::Line,
+                ),
+                lit_textured: create_pipeline(
+                    &device,
+                    &textured_pipeline_layout,
+                    &shader,
+                    format,
+                    wgpu::PrimitiveTopology::TriangleList,
+                    None,
+                    true,
+                    "fs_lit_textured",
+                    wgpu::PolygonMode::Line,
+                ),
+                unlit_textured: create_pipeline(
+                    &device,
+                    &textured_pipeline_layout,
+                    &shader,
+                    format,
+                    wgpu::PrimitiveTopology::TriangleList,
+                    None,
+                    true,
+                    "fs_unlit_textured",
+                    wgpu::PolygonMode::Line,
+                ),
+                transparent: create_pipeline(
+                    &device,
+                    &pipeline_layout,
+                    &shader,
+                    format,
+                    wgpu::PrimitiveTopology::TriangleList,
+                    None,
+                    false,
+                    "fs_unlit",
+                    wgpu::PolygonMode::Line,
+                ),
+                transparent_textured: create_pipeline(
+                    &device,
+                    &textured_pipeline_layout,
+                    &shader,
+                    format,
+                    wgpu::PrimitiveTopology::TriangleList,
+                    None,
+                    false,
+                    "fs_unlit_textured",
+                    wgpu::PolygonMode::Line,
+                ),
+            });
 
         let cube = GpuMesh::upload(&device, &Mesh::cube(1.0));
         let plane = GpuMesh::upload(&device, &Mesh::plane(1.0, 1.0));
@@ -488,6 +590,9 @@ impl Renderer3D {
             transparent_triangles,
             transparent_lines,
             transparent_textured,
+            wireframe_pipelines,
+            wireframe: false,
+            show_collision: false,
             custom_pipelines: Vec::new(),
             texture_layout,
             sampler,
@@ -542,6 +647,7 @@ impl Renderer3D {
             Some(wgpu::Face::Back),
             true,
             "fs_main",
+            wgpu::PolygonMode::Fill,
         );
 
         let textured = create_pipeline(
@@ -553,12 +659,46 @@ impl Renderer3D {
             Some(wgpu::Face::Back),
             true,
             "fs_main_textured",
+            wgpu::PolygonMode::Fill,
         );
+
+        let wireframe = self
+            .device
+            .features()
+            .contains(wgpu::Features::POLYGON_MODE_LINE);
+        let wireframe_triangles = wireframe.then(|| {
+            create_pipeline(
+                &self.device,
+                &self.pipeline_layout,
+                &shader,
+                self.format,
+                wgpu::PrimitiveTopology::TriangleList,
+                None,
+                true,
+                "fs_main",
+                wgpu::PolygonMode::Line,
+            )
+        });
+        let wireframe_textured = wireframe.then(|| {
+            create_pipeline(
+                &self.device,
+                &self.textured_pipeline_layout,
+                &shader,
+                self.format,
+                wgpu::PrimitiveTopology::TriangleList,
+                None,
+                true,
+                "fs_main_textured",
+                wgpu::PolygonMode::Line,
+            )
+        });
 
         let id = self.custom_pipelines.len() as u32;
         self.custom_pipelines.push(CustomPipeline {
             triangles,
             textured,
+            wireframe_triangles,
+            wireframe_textured,
         });
 
         Material::Custom(id)
@@ -724,6 +864,52 @@ impl Renderer3D {
     /// The current global ambient light colour.
     pub fn ambient(&self) -> Color {
         self.ambient
+    }
+
+    /// Draws triangle geometry as a wireframe instead of filled surfaces.
+    ///
+    /// A debug view: every triangle of every mesh — including glTF models —
+    /// shows only its edges, in the colour the draw already uses. Lines and
+    /// the skybox are unaffected. The toggle persists across frames until
+    /// changed again.
+    ///
+    /// Needs the `POLYGON_MODE_LINE` device feature (Vulkan, Metal, DX12).
+    /// Where the adapter does not offer it — GLES, for instance — this is a
+    /// no-op and [`wireframe`](Self::wireframe) stays `false`; check
+    /// [`wireframe_supported`](Self::wireframe_supported) to tell the cases
+    /// apart.
+    pub fn set_wireframe(&mut self, enabled: bool) {
+        self.wireframe = enabled && self.wireframe_pipelines.is_some();
+    }
+
+    /// Whether triangle geometry is currently drawn as a wireframe.
+    pub fn wireframe(&self) -> bool {
+        self.wireframe
+    }
+
+    /// Whether this device can draw wireframes at all.
+    pub fn wireframe_supported(&self) -> bool {
+        self.wireframe_pipelines.is_some()
+    }
+
+    /// Engine debug toggle: whether collision outlines should be drawn.
+    ///
+    /// Works like a console `show collision` command: the renderer keeps the
+    /// flag across frames, and the scene code acts on it — while it is on,
+    /// queue a [`draw_circle`](Self::draw_circle),
+    /// [`draw_sphere`](Self::draw_sphere) or [`draw_box`](Self::draw_box)
+    /// for every collider. The engine does not know the game's colliders,
+    /// so what to outline is up to the caller.
+    ///
+    /// Toggle it from anywhere in code or bind it to a key; it is off by
+    /// default and survives frame boundaries.
+    pub fn set_show_collision(&mut self, enabled: bool) {
+        self.show_collision = enabled;
+    }
+
+    /// Whether the collision debug layer is currently enabled.
+    pub fn show_collision(&self) -> bool {
+        self.show_collision
     }
 
     /// Sets the background cube map drawn behind the scene.
@@ -1043,6 +1229,67 @@ impl Renderer3D {
         }
     }
 
+    /// Queues a wireframe circle in the XZ plane.
+    ///
+    /// A debug ring on the ground: draw it at a sphere collider's centre with
+    /// the collider's radius to see exactly where a hit registers. Like
+    /// [`draw_line`](Self::draw_line), it joins the frame's shared line buffer.
+    pub fn draw_circle(&mut self, center: Vec3, radius: f32, color: Color) {
+        self.draw_ring(center, radius, Vec3::X, Vec3::Z, color);
+    }
+
+    /// Queues a wireframe sphere: three orthogonal rings through `center`.
+    ///
+    /// The outline of a sphere collider, readable from any camera angle.
+    pub fn draw_sphere(&mut self, center: Vec3, radius: f32, color: Color) {
+        self.draw_ring(center, radius, Vec3::X, Vec3::Z, color);
+        self.draw_ring(center, radius, Vec3::X, Vec3::Y, color);
+        self.draw_ring(center, radius, Vec3::Y, Vec3::Z, color);
+    }
+
+    /// Queues the twelve edges of an axis-aligned box.
+    ///
+    /// The outline of an AABB collider: `center` is the middle of the box and
+    /// `size` its full extent along each axis.
+    pub fn draw_box(&mut self, center: Vec3, size: Vec3, color: Color) {
+        let half = size * 0.5;
+        let corners = [
+            center + Vec3::new(-half.x, -half.y, -half.z),
+            center + Vec3::new(half.x, -half.y, -half.z),
+            center + Vec3::new(half.x, -half.y, half.z),
+            center + Vec3::new(-half.x, -half.y, half.z),
+            center + Vec3::new(-half.x, half.y, -half.z),
+            center + Vec3::new(half.x, half.y, -half.z),
+            center + Vec3::new(half.x, half.y, half.z),
+            center + Vec3::new(-half.x, half.y, half.z),
+        ];
+
+        // Bottom ring, top ring, then the four vertical edges.
+        self.draw_lines(
+            &[corners[0], corners[1], corners[2], corners[3], corners[0]],
+            color,
+        );
+        self.draw_lines(
+            &[corners[4], corners[5], corners[6], corners[7], corners[4]],
+            color,
+        );
+        for i in 0..4 {
+            self.draw_line(corners[i], corners[i + 4], color);
+        }
+    }
+
+    /// One closed ring of 48 segments spanned by two unit axes.
+    fn draw_ring(&mut self, center: Vec3, radius: f32, u: Vec3, v: Vec3, color: Color) {
+        const SEGMENTS: u32 = 48;
+
+        let mut points = Vec::with_capacity(SEGMENTS as usize + 1);
+        for i in 0..=SEGMENTS {
+            let angle = TAU * i as f32 / SEGMENTS as f32;
+            points.push(center + (u * angle.cos() + v * angle.sin()) * radius);
+        }
+        self.draw_lines(&points, color);
+    }
+
     /// Records the queued draws into `frame` and clears the queue.
     pub fn finish(&mut self, frame: &mut Frame) {
         if !self.line_vertices.is_empty() {
@@ -1173,35 +1420,7 @@ impl Renderer3D {
             let textured = command.texture.is_some()
                 && command.mesh.topology == wgpu::PrimitiveTopology::TriangleList;
 
-            let pipeline = match (command.material, command.mesh.topology, textured) {
-                (Material::Lit, wgpu::PrimitiveTopology::TriangleList, true) => &self.lit_textured,
-                (Material::Lit, wgpu::PrimitiveTopology::TriangleList, false) => {
-                    &self.lit_triangles
-                }
-                (Material::Unlit, wgpu::PrimitiveTopology::TriangleList, true) => {
-                    &self.unlit_textured
-                }
-                (Material::Unlit, wgpu::PrimitiveTopology::TriangleList, false) => {
-                    &self.unlit_triangles
-                }
-                (Material::Transparent, wgpu::PrimitiveTopology::TriangleList, true) => {
-                    &self.transparent_textured
-                }
-                (Material::Transparent, wgpu::PrimitiveTopology::TriangleList, false) => {
-                    &self.transparent_triangles
-                }
-                (Material::Transparent, wgpu::PrimitiveTopology::LineList, _) => {
-                    &self.transparent_lines
-                }
-                (Material::Custom(id), wgpu::PrimitiveTopology::TriangleList, true) => {
-                    &self.custom_pipelines[id as usize].textured
-                }
-                (Material::Custom(id), wgpu::PrimitiveTopology::TriangleList, false) => {
-                    &self.custom_pipelines[id as usize].triangles
-                }
-                (_, wgpu::PrimitiveTopology::LineList, _) => &self.unlit_lines,
-                _ => &self.unlit_triangles,
-            };
+            let pipeline = self.pipeline_for(command.material, command.mesh.topology, textured);
 
             pass.set_pipeline(pipeline);
             // Slot 0 is the identity matrices shared by unskinned draws; a
@@ -1271,6 +1490,64 @@ impl Renderer3D {
         });
 
         order
+    }
+
+    /// The pipeline one queued draw renders with.
+    ///
+    /// Lines keep their own pipelines; triangles go through
+    /// [`triangle_pipeline`](Self::triangle_pipeline), which honours the
+    /// wireframe toggle.
+    fn pipeline_for(
+        &self,
+        material: Material,
+        topology: wgpu::PrimitiveTopology,
+        textured: bool,
+    ) -> &wgpu::RenderPipeline {
+        match (material, topology, textured) {
+            (Material::Transparent, wgpu::PrimitiveTopology::LineList, _) => {
+                &self.transparent_lines
+            }
+            (_, wgpu::PrimitiveTopology::LineList, _) => &self.unlit_lines,
+            (_, wgpu::PrimitiveTopology::TriangleList, _) => {
+                self.triangle_pipeline(material, textured)
+            }
+            _ => &self.unlit_triangles,
+        }
+    }
+
+    /// The triangle pipeline for a material, in fill or line mode.
+    fn triangle_pipeline(&self, material: Material, textured: bool) -> &wgpu::RenderPipeline {
+        if self.wireframe {
+            if let Some(wire) = &self.wireframe_pipelines {
+                return match (material, textured) {
+                    (Material::Lit, true) => &wire.lit_textured,
+                    (Material::Lit, false) => &wire.lit,
+                    (Material::Unlit, true) => &wire.unlit_textured,
+                    (Material::Unlit, false) => &wire.unlit,
+                    (Material::Transparent, true) => &wire.transparent_textured,
+                    (Material::Transparent, false) => &wire.transparent,
+                    (Material::Custom(id), true) => self.custom_pipelines[id as usize]
+                        .wireframe_textured
+                        .as_ref()
+                        .unwrap_or(&self.unlit_textured),
+                    (Material::Custom(id), false) => self.custom_pipelines[id as usize]
+                        .wireframe_triangles
+                        .as_ref()
+                        .unwrap_or(&self.unlit_triangles),
+                };
+            }
+        }
+
+        match (material, textured) {
+            (Material::Lit, true) => &self.lit_textured,
+            (Material::Lit, false) => &self.lit_triangles,
+            (Material::Unlit, true) => &self.unlit_textured,
+            (Material::Unlit, false) => &self.unlit_triangles,
+            (Material::Transparent, true) => &self.transparent_textured,
+            (Material::Transparent, false) => &self.transparent_triangles,
+            (Material::Custom(id), true) => &self.custom_pipelines[id as usize].textured,
+            (Material::Custom(id), false) => &self.custom_pipelines[id as usize].triangles,
+        }
     }
 
     fn queue_mesh(
@@ -1379,6 +1656,7 @@ impl Renderer3D {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_pipeline(
     device: &wgpu::Device,
     layout: &wgpu::PipelineLayout,
@@ -1388,6 +1666,7 @@ fn create_pipeline(
     cull: Option<wgpu::Face>,
     depth_write: bool,
     fragment_entry: &str,
+    polygon_mode: wgpu::PolygonMode,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("frglib 3d pipeline"),
@@ -1414,7 +1693,7 @@ fn create_pipeline(
             front_face: wgpu::FrontFace::Ccw,
             cull_mode: cull,
             unclipped_depth: false,
-            polygon_mode: wgpu::PolygonMode::Fill,
+            polygon_mode,
             conservative: false,
         },
         depth_stencil: Some(wgpu::DepthStencilState {

@@ -11,8 +11,10 @@ use frglib::{Event, Keycode, MouseButton, MouseWheelDirection, Rect, Vec2};
 
 use crate::terrain::{Terrain, SIZE};
 
-const MIN_HEIGHT_ABOVE_GROUND: f32 = 2.5;
-const HALF_SIZE: f32 = SIZE * 0.5 + 20.0;
+/// Минимальный зазор камеры над рельефом: радиус её «коллизии» для отладки.
+pub const MIN_HEIGHT_ABOVE_GROUND: f32 = 2.5;
+/// Граница полёта по X/Z: половина карты плюс запас.
+pub const HALF_SIZE: f32 = SIZE * 0.5 + 20.0;
 
 pub struct FlyCamera {
     position: Vec3,

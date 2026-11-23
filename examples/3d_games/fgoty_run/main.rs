@@ -7,6 +7,10 @@
 //! кончаются, начинается следующая волна с более быстрыми ботами. Три
 //! столкновения — и игра окончена.
 //!
+//! Отладочные опции движка: F1 переключает `set_show_collision`, F2 —
+//! `set_wireframe`. Те же опции можно включать прямо из кода; при рестарте
+//! партии они не сбрасываются.
+//!
 //! Модели лежат в `examples/3d_games/assets/fgoty_run`: `player.glb` — краб,
 //! `bot.glb` — враг, `coin.glb` — монета, `map.glb` — трава. Сцена и интерфейс
 //! делят один кадр: `Renderer3D` рисует мир, `Renderer2D` — HUD поверх него.
@@ -57,13 +61,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     key: Keycode::Escape,
                     ..
                 } => return Ok(()),
-                Event::KeyDown { key, .. } => {
-                    if matches!(key, Keycode::R) || (game.over && matches!(key, Keycode::Space)) {
-                        game = Game::new(seed());
-                        keys = Keys::default();
-                        camera = CameraRig::new();
-                    } else {
-                        keys.press(*key, true);
+                Event::KeyDown { key, repeat, .. } => {
+                    // Отладочные опции движка, как консольные show collision /
+                    // viewmode wireframe. Удержание клавиши не щёлкает ими.
+                    match key {
+                        Keycode::F1 if !repeat => {
+                            scene.set_show_collision(!scene.show_collision());
+                        }
+                        Keycode::F2 if !repeat => {
+                            scene.set_wireframe(!scene.wireframe());
+                        }
+                        _ => {
+                            if matches!(key, Keycode::R)
+                                || (game.over && matches!(key, Keycode::Space))
+                            {
+                                game = Game::new(seed());
+                                keys = Keys::default();
+                                camera = CameraRig::new();
+                            } else {
+                                keys.press(*key, true);
+                            }
+                        }
                     }
                 }
                 Event::KeyUp { key, .. } => keys.press(*key, false),
