@@ -50,6 +50,7 @@
 //! # }
 //! ```
 
+mod animation;
 mod builder;
 mod camera;
 mod error;
@@ -65,13 +66,15 @@ mod skybox;
 mod texture;
 mod window;
 
+pub use animation::GltfAnimationPlayer;
 pub use builder::WgpuWindowBuilder;
 pub use camera::Camera3D;
 pub use error::Error;
 pub use font::{FontId, TextAlign};
 pub use gltf::{
-    GltfError, GltfImage, GltfInstance, GltfMaterial, GltfModel, GltfPrimitive, GpuGltfModel,
-    GpuGltfPrimitive,
+    GltfAnimation, GltfAnimationChannel, GltfAnimationProperty, GltfError, GltfImage, GltfInstance,
+    GltfInterpolation, GltfMaterial, GltfModel, GltfNode, GltfPrimitive, GltfSkin, GpuGltfModel,
+    GpuGltfPrimitive, MAX_JOINTS,
 };
 pub use light::{Light, LightKind, MAX_LIGHTS};
 pub use mesh::{GpuMesh, Mesh, Vertex};

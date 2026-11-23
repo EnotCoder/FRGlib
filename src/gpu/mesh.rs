@@ -4,11 +4,14 @@ use wgpu::util::DeviceExt;
 
 use crate::graphics::Color;
 
-/// One vertex: position, normal, colour multiplier and texture coordinates.
+/// One vertex: position, normal, colour multiplier, texture coordinates and
+/// optional skinning data.
 ///
 /// The built-in primitives are white, so the colour passed to a draw call
 /// decides their shade; a custom mesh can bake per-vertex colours in instead.
 /// The UV pair is read only by textured draws; untextured ones ignore it.
+/// `joints` and `weights` carry up to four influences for glTF skinning. A
+/// zero weight sum means "no skinning", which is what every ordinary mesh uses.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
 pub struct Vertex {
@@ -17,6 +20,10 @@ pub struct Vertex {
     pub color: [f32; 4],
     /// Texture coordinates, with `(0, 0)` at the top-left of the image.
     pub uv: [f32; 2],
+    /// Indices into the active skin's joint matrix array.
+    pub joints: [u16; 4],
+    /// Influence of each joint. A zero sum leaves the vertex unskinned.
+    pub weights: [f32; 4],
 }
 
 impl Vertex {
@@ -27,6 +34,8 @@ impl Vertex {
             normal,
             color: [1.0, 1.0, 1.0, 1.0],
             uv: [0.0, 0.0],
+            joints: [0; 4],
+            weights: [0.0; 4],
         }
     }
 
@@ -37,6 +46,8 @@ impl Vertex {
             normal,
             color,
             uv: [0.0, 0.0],
+            joints: [0; 4],
+            weights: [0.0; 4],
         }
     }
 
@@ -47,6 +58,8 @@ impl Vertex {
             normal,
             color: [1.0, 1.0, 1.0, 1.0],
             uv,
+            joints: [0; 4],
+            weights: [0.0; 4],
         }
     }
 
@@ -62,12 +75,26 @@ impl Vertex {
             normal,
             color,
             uv,
+            joints: [0; 4],
+            weights: [0.0; 4],
         }
+    }
+
+    /// Adds up to four joint influences, for hand-built skinned meshes.
+    ///
+    /// Indices refer to the joint matrices supplied by a
+    /// [`GltfAnimationPlayer`](super::GltfAnimationPlayer) or the model's bind
+    /// pose. Weights do not have to be normalised: the shader divides by their
+    /// sum.
+    pub const fn with_skin(mut self, joints: [u16; 4], weights: [f32; 4]) -> Self {
+        self.joints = joints;
+        self.weights = weights;
+        self
     }
 
     /// How `wgpu` should read [`Vertex`] out of the vertex buffer.
     pub(crate) fn layout() -> wgpu::VertexBufferLayout<'static> {
-        const ATTRIBUTES: [wgpu::VertexAttribute; 4] = [
+        const ATTRIBUTES: [wgpu::VertexAttribute; 6] = [
             wgpu::VertexAttribute {
                 format: wgpu::VertexFormat::Float32x3,
                 offset: 0,
@@ -87,6 +114,16 @@ impl Vertex {
                 format: wgpu::VertexFormat::Float32x2,
                 offset: 40,
                 shader_location: 3,
+            },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Uint16x4,
+                offset: 48,
+                shader_location: 4,
+            },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x4,
+                offset: 56,
+                shader_location: 5,
             },
         ];
 
@@ -368,9 +405,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_vertex_is_forty_eight_bytes() {
-        // position (12) + normal (12) + colour (16) + uv (8).
-        assert_eq!(std::mem::size_of::<Vertex>(), 48);
+    fn a_vertex_is_seventy_two_bytes() {
+        // position (12) + normal (12) + colour (16) + uv (8)
+        // + joints (8) + weights (16).
+        assert_eq!(std::mem::size_of::<Vertex>(), 72);
     }
 
     #[test]
@@ -382,9 +420,17 @@ mod tests {
             .map(|attribute| attribute.offset)
             .collect();
 
-        assert_eq!(layout.array_stride, 48);
-        assert_eq!(offsets, vec![0, 12, 24, 40]);
-        assert_eq!(layout.attributes[3].shader_location, 3);
+        assert_eq!(layout.array_stride, 72);
+        assert_eq!(offsets, vec![0, 12, 24, 40, 48, 56]);
+        assert_eq!(layout.attributes[4].format, wgpu::VertexFormat::Uint16x4);
+        assert_eq!(layout.attributes[5].format, wgpu::VertexFormat::Float32x4);
+    }
+
+    #[test]
+    fn an_ordinary_vertex_is_not_skinned() {
+        let vertex = Vertex::new([0.0; 3], [0.0, 1.0, 0.0]);
+        assert_eq!(vertex.joints, [0; 4]);
+        assert_eq!(vertex.weights, [0.0; 4]);
     }
 
     #[test]

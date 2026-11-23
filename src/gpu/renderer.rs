@@ -7,12 +7,13 @@ use glam::{Mat4, Vec2, Vec3};
 
 use crate::gpu::camera::Camera3D;
 use crate::gpu::error::Error;
-use crate::gpu::gltf::{GltfModel, GpuGltfModel, GpuGltfPrimitive};
+use crate::gpu::gltf::{GltfModel, GpuGltfModel, GpuGltfPrimitive, MAX_JOINTS};
 use crate::gpu::light::{Light, LightKind, MAX_LIGHTS};
 use crate::gpu::mesh::{GpuMesh, Mesh, Vertex};
 use crate::gpu::skybox::Skybox;
 use crate::gpu::texture::Texture;
 use crate::gpu::window::{Frame, Gpu};
+use crate::gpu::GltfAnimationPlayer;
 use crate::graphics::{Color, Image};
 
 use super::color_to_linear;
@@ -43,6 +44,11 @@ impl Material {
         matches!(self, Material::Transparent)
     }
 }
+
+/// Bytes reserved for one skin in the shared joint-matrix storage buffer.
+/// Each slot has room for every joint the shader can address, so a bind group
+/// offset is simply `slot * SKIN_STRIDE`.
+const SKIN_STRIDE: u64 = MAX_JOINTS as u64 * 64;
 
 /// Draws meshes with the built-in camera, light and sky setup.
 ///
@@ -87,6 +93,9 @@ pub struct Renderer3D {
     draw_bind_group: wgpu::BindGroup,
     draw_capacity: u32,
     draw_stride: u64,
+
+    skin_buffer: wgpu::Buffer,
+    skin_capacity: u32,
 
     pipeline_layout: wgpu::PipelineLayout,
     textured_pipeline_layout: wgpu::PipelineLayout,
@@ -141,6 +150,8 @@ struct DrawCommand {
     material: Material,
     /// Resolved texture binding, when the draw samples a texture.
     texture: Option<wgpu::BindGroup>,
+    /// Joint matrices for a skinned draw, stored in one slot of the skin buffer.
+    joints: Option<Vec<Mat4>>,
 }
 
 #[repr(C)]
@@ -216,27 +227,47 @@ impl Renderer3D {
 
         let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("frglib draw layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: NonZeroU64::new(size_of::<DrawUniform>() as u64),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: NonZeroU64::new(size_of::<DrawUniform>() as u64),
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                // Joint matrices share the draw group so the whole renderer
+                // stays within the default limit of four bind groups.
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: true,
+                        min_binding_size: NonZeroU64::new(SKIN_STRIDE),
+                    },
+                    count: None,
+                },
+            ],
         });
 
         let alignment = device.limits().min_uniform_buffer_offset_alignment as u64;
         let draw_stride = align_up(size_of::<DrawUniform>() as u64, alignment);
         let draw_capacity = 256;
+        // Slot zero always holds identity matrices and is reused by every
+        // unskinned draw; skinned draws get a slot indexed by queue position.
+        let skin_capacity = 16;
+        let skin_buffer = create_skin_buffer(&device, skin_capacity);
+        write_skin_slot(&queue, &skin_buffer, 0, None);
         let (draw_buffer, draw_bind_group) = create_draw_bindings(
             &device,
             &draw_layout,
             draw_stride,
             draw_capacity,
             size_of::<DrawUniform>() as u64,
+            &skin_buffer,
         );
 
         let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -440,6 +471,8 @@ impl Renderer3D {
             draw_bind_group,
             draw_capacity,
             draw_stride,
+            skin_buffer,
+            skin_capacity,
             pipeline_layout,
             textured_pipeline_layout,
             skybox_layout,
@@ -478,8 +511,9 @@ impl Renderer3D {
     /// Creates a custom material from a WGSL shader.
     ///
     /// The shader must provide the same entry points as the built-in one:
-    /// `vs_main`, `fs_main` and `fs_main_textured`. It can use the same
-    /// bind groups (0 for camera, 1 for draw, 2 for texture).
+    /// `vs_main`, `fs_main` and `fs_main_textured`. It can use the same bind
+    /// groups (0 for camera, 1 for draw and joint matrices, 2 for texture) and
+    /// the same six vertex attributes as [`Vertex`].
     ///
     /// The returned `Material` can be passed to `draw_mesh_with`.
     pub fn create_material(&mut self, source: &str) -> Material {
@@ -626,11 +660,19 @@ impl Renderer3D {
             .map(|image| self.create_texture_rgba8(image.width, image.height, &image.rgba8))
             .collect::<Result<_, _>>()?;
 
+        let bind_pose = model
+            .skins
+            .iter()
+            .enumerate()
+            .map(|(index, _)| model.bind_pose(index).unwrap_or_default())
+            .collect();
+
         Ok(GpuGltfModel {
             primitives,
             instances: model.instances.clone(),
             materials: model.materials.clone(),
             textures,
+            bind_pose,
         })
     }
 
@@ -789,9 +831,55 @@ impl Renderer3D {
         self.queue_gltf(model, transform, Some(material));
     }
 
+    /// Queues a glTF model posed by `player`.
+    ///
+    /// Call [`GltfAnimationPlayer::update`](super::GltfAnimationPlayer::update)
+    /// once per frame before this. Skinned primitives use the player's joint
+    /// matrices and ignore their node transform; unskinned ones follow the
+    /// animated node transform. `transform` still places the whole model.
+    pub fn draw_gltf_animated(
+        &mut self,
+        model: &GpuGltfModel,
+        player: &GltfAnimationPlayer,
+        transform: Mat4,
+    ) {
+        self.queue_gltf_animated(model, player, transform, None);
+    }
+
+    /// Like [`draw_gltf_animated`](Self::draw_gltf_animated), with a material override.
+    pub fn draw_gltf_animated_with(
+        &mut self,
+        model: &GpuGltfModel,
+        player: &GltfAnimationPlayer,
+        transform: Mat4,
+        material: Material,
+    ) {
+        self.queue_gltf_animated(model, player, transform, Some(material));
+    }
+
     fn queue_gltf(
         &mut self,
         model: &GpuGltfModel,
+        transform: Mat4,
+        material_override: Option<Material>,
+    ) {
+        self.queue_gltf_inner(model, None, transform, material_override);
+    }
+
+    fn queue_gltf_animated(
+        &mut self,
+        model: &GpuGltfModel,
+        player: &GltfAnimationPlayer,
+        transform: Mat4,
+        material_override: Option<Material>,
+    ) {
+        self.queue_gltf_inner(model, Some(player), transform, material_override);
+    }
+
+    fn queue_gltf_inner(
+        &mut self,
+        model: &GpuGltfModel,
+        player: Option<&GltfAnimationPlayer>,
         transform: Mat4,
         material_override: Option<Material>,
     ) {
@@ -800,7 +888,23 @@ impl Renderer3D {
                 continue;
             };
 
-            let placement = transform * instance.transform;
+            // glTF skinned meshes are positioned entirely by their joints; the
+            // transform on the mesh node is not part of the skinning equation.
+            let skin = instance.skin;
+            let node_transform = player
+                .and_then(|player| player.node_transform(instance.node))
+                .unwrap_or(instance.transform);
+            let placement = if skin.is_some() {
+                transform
+            } else {
+                transform * node_transform
+            };
+            let joints = skin.and_then(|skin| {
+                player
+                    .and_then(|player| player.joint_matrices(skin))
+                    .or_else(|| model.bind_pose.get(skin).map(Vec::as_slice))
+                    .map(|matrices| matrices.to_vec())
+            });
 
             let (color, material, texture) = match primitive
                 .material
@@ -824,15 +928,23 @@ impl Renderer3D {
             match texture {
                 Some(texture) => {
                     let bind_group = self.texture_bind_group(texture);
-                    self.queue_mesh(
+                    self.queue_mesh_skinned(
                         &primitive.mesh,
                         placement,
                         color,
                         material,
                         Some(bind_group),
+                        joints,
                     );
                 }
-                None => self.queue_mesh(&primitive.mesh, placement, color, material, None),
+                None => self.queue_mesh_skinned(
+                    &primitive.mesh,
+                    placement,
+                    color,
+                    material,
+                    None,
+                    joints,
+                ),
             }
         }
     }
@@ -907,6 +1019,7 @@ impl Renderer3D {
             color: color_to_linear(color),
             material: Material::Unlit,
             texture: None,
+            joints: None,
         });
     }
 
@@ -941,6 +1054,7 @@ impl Renderer3D {
                 color: [1.0; 4],
                 material: Material::Unlit,
                 texture: None,
+                joints: None,
             });
         }
 
@@ -1010,6 +1124,9 @@ impl Renderer3D {
                 index as u64 * self.draw_stride,
                 bytemuck::bytes_of(&uniform),
             );
+            if let Some(joints) = &command.joints {
+                write_skin_slot(&self.queue, &self.skin_buffer, index + 1, Some(joints));
+            }
         }
 
         // Opaque geometry first, then alpha-blended draws from far to near.
@@ -1087,10 +1204,20 @@ impl Renderer3D {
             };
 
             pass.set_pipeline(pipeline);
+            // Slot 0 is the identity matrices shared by unskinned draws; a
+            // skinned draw was uploaded to the slot matching its queue index.
+            let skin_slot = if command.joints.is_some() {
+                index + 1
+            } else {
+                0
+            };
             pass.set_bind_group(
                 1,
                 &self.draw_bind_group,
-                &[(index as u64 * self.draw_stride) as u32],
+                &[
+                    (index as u64 * self.draw_stride) as u32,
+                    (skin_slot as u64 * SKIN_STRIDE) as u32,
+                ],
             );
 
             if textured {
@@ -1128,23 +1255,19 @@ impl Renderer3D {
             let first_transparent = first.material.is_transparent();
             let second_transparent = second.material.is_transparent();
 
-            first_transparent
-                .cmp(&second_transparent)
-                .then_with(|| {
-                    if first_transparent {
-                        let first_distance =
-                            first.model.w_axis.truncate().distance_squared(camera);
-                        let second_distance =
-                            second.model.w_axis.truncate().distance_squared(camera);
+            first_transparent.cmp(&second_transparent).then_with(|| {
+                if first_transparent {
+                    let first_distance = first.model.w_axis.truncate().distance_squared(camera);
+                    let second_distance = second.model.w_axis.truncate().distance_squared(camera);
 
-                        // Far to near: the farther draw comes first.
-                        second_distance
-                            .partial_cmp(&first_distance)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    } else {
-                        std::cmp::Ordering::Equal
-                    }
-                })
+                    // Far to near: the farther draw comes first.
+                    second_distance
+                        .partial_cmp(&first_distance)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
         });
 
         order
@@ -1158,6 +1281,18 @@ impl Renderer3D {
         material: Material,
         texture: Option<wgpu::BindGroup>,
     ) {
+        self.queue_mesh_skinned(mesh, model, color, material, texture, None);
+    }
+
+    fn queue_mesh_skinned(
+        &mut self,
+        mesh: &GpuMesh,
+        model: Mat4,
+        color: [f32; 4],
+        material: Material,
+        texture: Option<wgpu::BindGroup>,
+        joints: Option<Vec<Mat4>>,
+    ) {
         if mesh.vertex_count == 0 {
             return;
         }
@@ -1168,6 +1303,7 @@ impl Renderer3D {
             color,
             material,
             texture,
+            joints,
         });
     }
 
@@ -1212,17 +1348,34 @@ impl Renderer3D {
         // Grow geometrically so a scene that slowly gains instances does not
         // rebuild the buffer every frame.
         let capacity = needed.max(self.draw_capacity.saturating_mul(2));
+
+        // One identity slot plus one slot per possible skinned draw. The draw
+        // bind group references both buffers, so it has to be rebuilt when
+        // either one grows.
+        let skin_needed = needed.saturating_add(1);
+        let (skin_buffer, skin_capacity) = if skin_needed > self.skin_capacity {
+            let skin_capacity = skin_needed.max(self.skin_capacity.saturating_mul(2));
+            let buffer = create_skin_buffer(&self.device, skin_capacity);
+            write_skin_slot(&self.queue, &buffer, 0, None);
+            (buffer, skin_capacity)
+        } else {
+            (self.skin_buffer.clone(), self.skin_capacity)
+        };
+
         let (buffer, bind_group) = create_draw_bindings(
             &self.device,
             &self.draw_layout,
             self.draw_stride,
             capacity,
             size_of::<DrawUniform>() as u64,
+            &skin_buffer,
         );
 
         self.draw_buffer = buffer;
         self.draw_bind_group = bind_group;
         self.draw_capacity = capacity;
+        self.skin_buffer = skin_buffer;
+        self.skin_capacity = skin_capacity;
     }
 }
 
@@ -1383,6 +1536,7 @@ fn create_draw_bindings(
     stride: u64,
     capacity: u32,
     binding_size: u64,
+    skin_buffer: &wgpu::Buffer,
 ) -> (wgpu::Buffer, wgpu::BindGroup) {
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("frglib draw uniforms"),
@@ -1394,17 +1548,62 @@ fn create_draw_bindings(
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("frglib draw uniforms"),
         layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                buffer: &buffer,
-                offset: 0,
-                size: NonZeroU64::new(binding_size),
-            }),
-        }],
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &buffer,
+                    offset: 0,
+                    size: NonZeroU64::new(binding_size),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: skin_buffer,
+                    offset: 0,
+                    size: NonZeroU64::new(SKIN_STRIDE),
+                }),
+            },
+        ],
     });
 
     (buffer, bind_group)
+}
+
+fn create_skin_buffer(device: &wgpu::Device, capacity: u32) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("frglib skin matrices"),
+        size: SKIN_STRIDE * capacity as u64,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
+/// Builds one fixed-size slot: the joint matrices followed by identity for the
+/// unused entries. Writing one slot per draw keeps the shader indexing simple.
+fn skin_slot(matrices: Option<&[Mat4]>) -> Vec<[[f32; 4]; 4]> {
+    let mut slot = vec![Mat4::IDENTITY.to_cols_array_2d(); MAX_JOINTS];
+    if let Some(matrices) = matrices {
+        for (target, matrix) in slot.iter_mut().zip(matrices.iter().take(MAX_JOINTS)) {
+            *target = matrix.to_cols_array_2d();
+        }
+    }
+    slot
+}
+
+fn write_skin_slot(
+    queue: &wgpu::Queue,
+    buffer: &wgpu::Buffer,
+    slot: usize,
+    matrices: Option<&[Mat4]>,
+) {
+    let data = skin_slot(matrices);
+    queue.write_buffer(
+        buffer,
+        slot as u64 * SKIN_STRIDE,
+        bytemuck::cast_slice(&data),
+    );
 }
 
 fn align_up(value: u64, alignment: u64) -> u64 {
@@ -1439,5 +1638,19 @@ mod tests {
         // view_proj (64) + inv_view_proj (64) + camera vec4 (16) + ambient
         // vec4 (16) + count vec4 (16) + three light arrays of MAX_LIGHTS vec4s.
         assert_eq!(size_of::<CameraUniform>(), 176 + MAX_LIGHTS * 3 * 16);
+    }
+
+    #[test]
+    fn a_skin_slot_has_one_matrix_per_shader_joint() {
+        assert_eq!(SKIN_STRIDE, MAX_JOINTS as u64 * 64);
+
+        let empty = skin_slot(None);
+        assert_eq!(empty.len(), MAX_JOINTS);
+        assert_eq!(empty[0], Mat4::IDENTITY.to_cols_array_2d());
+
+        let expected = Mat4::from_translation(glam::Vec3::X).to_cols_array_2d();
+        let filled = skin_slot(Some(&[Mat4::from_translation(glam::Vec3::X)]));
+        assert_eq!(filled[0], expected);
+        assert_eq!(filled[1], Mat4::IDENTITY.to_cols_array_2d());
     }
 }

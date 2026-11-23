@@ -62,10 +62,12 @@ pub use event::{Event, Keycode, Mod, MouseButton, MouseWheelDirection};
 pub use gpu::Error as GpuError;
 #[cfg(feature = "wgpu")]
 pub use gpu::{
-    Camera3D, FontId, Frame, GltfError, GltfImage, GltfInstance, GltfMaterial, GltfModel,
-    GltfPrimitive, Gpu, GpuGltfModel, GpuGltfPrimitive, GpuMesh, GpuTexture, Light, LightKind,
-    Material, Mesh, ObjError, Renderer2D, Renderer3D, Skybox, TextAlign, Texture, Vertex,
-    WgpuWindow, WgpuWindowBuilder, MAX_LIGHTS, SKYBOX_FACES,
+    Camera3D, FontId, Frame, GltfAnimation, GltfAnimationChannel, GltfAnimationPlayer,
+    GltfAnimationProperty, GltfError, GltfImage, GltfInstance, GltfInterpolation, GltfMaterial,
+    GltfModel, GltfNode, GltfPrimitive, GltfSkin, Gpu, GpuGltfModel, GpuGltfPrimitive, GpuMesh,
+    GpuTexture, Light, LightKind, Material, Mesh, ObjError, Renderer2D, Renderer3D, Skybox,
+    TextAlign, Texture, Vertex, WgpuWindow, WgpuWindowBuilder, MAX_JOINTS, MAX_LIGHTS,
+    SKYBOX_FACES,
 };
 #[cfg(feature = "cached-textures")]
 pub use graphics::{Animation, Texture};

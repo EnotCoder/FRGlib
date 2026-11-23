@@ -5,15 +5,18 @@
 // followed by the preset itself. Keeping the plumbing here means a preset only
 // has to describe its look in `fs_main` / `fs_main_textured`.
 
+// `skin_vertex` and the skin bind group come from the `lit.wgsl` header that
+// `create_material` prepends, so skinned glTF models work with every style.
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
-    let world = draw.model * vec4<f32>(input.position, 1.0);
+    let skinned = skin_vertex(input.position, input.normal, input.joints, input.weights);
+    let world = draw.model * vec4<f32>(skinned.position, 1.0);
 
     var out: VertexOutput;
     out.clip_position = camera.view_proj * world;
     out.world_position = world.xyz;
     // Same assumption as the built-in shader: uniform scale only.
-    out.normal = normalize((draw.model * vec4<f32>(input.normal, 0.0)).xyz);
+    out.normal = normalize((draw.model * vec4<f32>(skinned.normal, 0.0)).xyz);
     out.color = input.color * draw.color;
     out.uv = input.uv;
     return out;

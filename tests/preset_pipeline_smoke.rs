@@ -7,7 +7,13 @@ use std::mem::size_of;
 
 use frglib::gpu::ShaderPreset;
 
-fn layouts(device: &wgpu::Device) -> (wgpu::PipelineLayout, wgpu::PipelineLayout) {
+fn layouts(
+    device: &wgpu::Device,
+) -> (
+    wgpu::PipelineLayout,
+    wgpu::PipelineLayout,
+    wgpu::BindGroupLayout,
+) {
     let camera = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
         entries: &[wgpu::BindGroupLayoutEntry {
@@ -23,16 +29,29 @@ fn layouts(device: &wgpu::Device) -> (wgpu::PipelineLayout, wgpu::PipelineLayout
     });
     let draw = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: true,
-                min_binding_size: None,
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: None,
+                },
+                count: None,
             },
-            count: None,
-        }],
+            // Joint matrices share the draw group in the renderer too.
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: true,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
     });
     let texture = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -65,7 +84,7 @@ fn layouts(device: &wgpu::Device) -> (wgpu::PipelineLayout, wgpu::PipelineLayout
         bind_group_layouts: &[Some(&camera), Some(&draw), Some(&texture)],
         immediate_size: 0,
     });
-    (plain, textured)
+    (plain, textured, draw)
 }
 
 #[test]
@@ -92,7 +111,7 @@ fn all_presets_build_real_pipelines() {
     .unwrap();
 
     let format = wgpu::TextureFormat::Rgba8UnormSrgb;
-    let (plain_layout, textured_layout) = layouts(&device);
+    let (plain_layout, textured_layout, draw_layout) = layouts(&device);
     let header = include_str!("../src/gpu/shaders/lit.wgsl")
         .split("@vertex")
         .next()
@@ -115,8 +134,18 @@ fn all_presets_build_real_pipelines() {
         },
         wgpu::VertexAttribute {
             format: wgpu::VertexFormat::Float32x2,
-            offset: 36,
+            offset: 40,
             shader_location: 3,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Uint16x4,
+            offset: 48,
+            shader_location: 4,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: 56,
+            shader_location: 5,
         },
     ];
     let vertex_buffer = wgpu::VertexBufferLayout {
@@ -126,6 +155,44 @@ fn all_presets_build_real_pipelines() {
     };
 
     let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
+
+    // The renderer binds the per-draw uniform and its joint matrices in one
+    // group with two dynamic offsets; check that combination as well.
+    let uniform = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: 256,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let joints = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: 64 * 64,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let _draw_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout: &draw_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &uniform,
+                    offset: 0,
+                    size: std::num::NonZeroU64::new(80),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &joints,
+                    offset: 0,
+                    size: std::num::NonZeroU64::new(64 * 64),
+                }),
+            },
+        ],
+    });
+
     for preset in ShaderPreset::ALL {
         let source = format!("{}\n{}", header, preset.source());
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {

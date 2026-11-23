@@ -78,7 +78,8 @@ src/gpu/
 ├── light.rs          Light, LightKind, MAX_LIGHTS
 ├── skybox.rs         Skybox, SKYBOX_FACES
 ├── obj.rs            загрузка Wavefront OBJ
-├── gltf.rs           загрузка glTF 2.0 (.gltf/.glb)
+├── gltf.rs           загрузка glTF 2.0 (.gltf/.glb), скины и клипы
+├── animation.rs      GltfAnimationPlayer: воспроизведение клипов
 ├── renderer.rs       Renderer3D, Material
 ├── renderer2d.rs     Renderer2D, GpuTexture
 ├── font.rs           FontId, TextAlign, атлас глифов, раскладка текста
@@ -106,7 +107,8 @@ src/gpu/
 | `Renderer2D` | Батчевый 2D-рендерер | `Renderer2D`, `GpuTexture` |
 | `texture.rs` | Текстуры для 3D и общие GPU-изображения | `Texture` |
 | `obj.rs` | Загрузка моделей Wavefront OBJ | `ObjError` |
-| `gltf.rs` | Загрузка сцен glTF 2.0 (`.gltf`/`.glb`), материалы и текстуры | `GltfModel`, `GltfPrimitive`, `GltfInstance`, `GltfMaterial`, `GltfImage`, `GpuGltfModel`, `GpuGltfPrimitive`, `GltfError` |
+| `gltf.rs` | Загрузка сцен glTF 2.0 (`.gltf`/`.glb`), скины, клипы, материалы и текстуры | `GltfModel`, `GltfPrimitive`, `GltfInstance`, `GltfNode`, `GltfSkin`, `GltfAnimation`, `GltfAnimationChannel`, `GltfAnimationProperty`, `GltfInterpolation`, `GltfMaterial`, `GltfImage`, `GpuGltfModel`, `GpuGltfPrimitive`, `GltfError`, `MAX_JOINTS` |
+| `animation.rs` | Проигрыватель анимаций: вычисление каналов и матриц костей | `GltfAnimationPlayer` |
 | `font.rs` | Шрифты, глифы и раскладка строк | `FontId`, `TextAlign` |
 | `error.rs` | Ошибки окна, GPU и рисования | `Error` |
 | `shaders/lit.wgsl` | WGSL для 3D (lit, unlit, textured) | — |
@@ -299,7 +301,8 @@ let camera = Camera3D::perspective(60.0, 0.1, 500.0)
 
 ### `Vertex`
 
-Одна вершина: позиция, нормаль и цветовой множитель.
+Одна вершина: позиция, нормаль, цветовой множитель, UV и до четырёх влияний
+костей для glTF-скиннинга.
 
 ```rust
 #[repr(C)]
@@ -307,12 +310,21 @@ pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub color: [f32; 4],
+    pub uv: [f32; 2],
+    pub joints: [u16; 4],
+    pub weights: [f32; 4],
 }
 ```
 
-Размер — 40 байт. `Vertex::new` делает белую вершину, `Vertex::with_color` —
-цветную. Встроенные примитивы белые, поэтому цвет draw-вызова их и
-окрашивает; своя геометрия может запечь цвет в вершинах.
+Размер — 72 байта: шесть атрибутов с локациями 0…5. `Vertex::new` делает белую
+вершину, `Vertex::with_color`, `Vertex::with_uv` и `Vertex::with_color_uv` —
+варианты с цветом и/или UV. Встроенные примитивы белые, поэтому цвет
+draw-вызова их и окрашивает; своя геометрия может запечь цвет в вершинах.
+
+`Vertex::with_skin` добавляет индексы костей и веса. Сумма нулевых весов
+означает «не скиннировать», поэтому все обычные меши, кубы и линии работают как
+раньше: они получают те же нулевые `joints`/`weights`, что и загрузчик glTF для
+нескинных примитивов.
 
 ### `Mesh`
 
@@ -498,7 +510,7 @@ let skybox = Skybox::from_faces(window.gpu(), faces)?;
 | Метод | Что делает |
 |---|---|
 | `new(&Gpu)` | Создаёт пайплайны, буферы юниформ и встроенные куб с плоскостью |
-| `create_material(source) -> Material` | Компилирует WGSL-код в новый материал. Автоматически подставляет структуры `Camera`, `Draw`, `VertexInput` и `VertexOutput` |
+| `create_material(source) -> Material` | Компилирует WGSL-код в новый материал. Автоматически подставляет структуры `Camera`, `Draw`, `VertexInput` и `VertexOutput`, а также `skin_vertex` и storage-буфер костей |
 | `create_mesh(&Mesh) -> GpuMesh` | Загружает свою геометрию; handle можно хранить между кадрами |
 | `create_texture(&Image) -> Texture` | Загружает изображение на GPU для использования в 3D |
 | `create_skybox(&Image) -> Skybox` | Собирает кубическое небо из панорамы 2:1 |
@@ -516,8 +528,10 @@ let skybox = Skybox::from_faces(window.gpu(), faces)?;
 | `draw_mesh_textured(&GpuMesh, &Texture, Mat4, Color)` | Рисует меш с текстурой и освещением |
 | `draw_mesh_with(&GpuMesh, Mat4, Material, Color)` | То же с явным материалом |
 | `draw_mesh_textured_with(...)` | Текстурированный меш с кастомным материалом |
-| `draw_gltf(&GpuGltfModel, Mat4)` | Все инстансы glTF; lit/unlit берётся из материалов модели |
+| `draw_gltf(&GpuGltfModel, Mat4)` | Все инстансы glTF; lit/unlit берётся из материалов модели. Скинные меши рисуются в bind pose |
 | `draw_gltf_with(&GpuGltfModel, Mat4, Material)` | Все инстансы glTF с принудительным материалом |
+| `draw_gltf_animated(&GpuGltfModel, &GltfAnimationPlayer, Mat4)` | glTF в текущей позе игрока; скинные меши деформируются матрицами костей |
+| `draw_gltf_animated_with(...)` | То же с принудительным материалом |
 | `draw_cube(center, size, Color)` | Куб, сдвинутый и растянутый; внутри `translation * scale` |
 | `draw_cube_with(center, size, Material, Color)` | Куб с явным материалом |
 | `draw_cube_textured(center, size, &Texture, Color)` | Текстурированный куб |
@@ -533,12 +547,16 @@ let skybox = Skybox::from_faces(window.gpu(), faces)?;
 
 - **Bind group-ы.** Group 0 — камера: `view_proj`, обратная матрица для неба,
   позиция камеры и массивы источников света (до `MAX_LIGHTS`). Group 1 —
-  конкретный draw: модельная матрица и цвет. Group 2 — альбедо-текстура, а
-  group 3 — кубическая текстура неба (её использует только skybox-пайплайн).
-- **Динамические offset-ы.** Все per-draw юниформы лежат в одном буфере;
-  между draw-ами меняется только offset. Шаг выравнивается по
-  `min_uniform_buffer_offset_alignment` устройства. Буфер стартует с 256
-  записей и растёт вдвое, когда их не хватает.
+  конкретный draw: модельная матрица, цвет и read-only storage-буфер с матрицами
+  костей. Group 2 — альбедо-текстура, а group 3 — кубическая текстура неба (её
+  использует только skybox-пайплайн).
+- **Динамические offset-ы.** В group 1 два offset-а: один на per-draw юниформ,
+  второй на слот скелета. Все юниформы лежат в одном буфере, шаг выравнивается
+  по `min_uniform_buffer_offset_alignment` устройства. Слот 0 storage-буфера
+  всегда содержит единичные матрицы и используется обычными draw-вызовами;
+  скинный draw получает слот `index + 1`. Один слот занимает
+  `MAX_JOINTS * 64 = 4096` байт (`MAX_JOINTS = 64`). Буферы стартуют с 256
+  записей и 16 слотов соответственно и растут вдвое, когда их не хватает.
 - **Пайплайны.** Lit- и unlit-треугольники (оба с отсечением задних граней),
   их текстурированные варианты, unlit-линии без отсечения и отдельный
   skybox-пайплайн, который пишет только цвет и не трогает глубину.
@@ -1117,7 +1135,7 @@ renderer.draw_mesh_textured_with(&mesh, &texture, transform, retro, Color::WHITE
 
 ### Кастомные шейдеры (Renderer3D)
 
-`create_material` позволяет вставить свою логику отрисовки. В код автоматически добавляется «хедер» с определениями `Camera`, `Draw`, `VertexInput` и `VertexOutput`.
+`create_material` позволяет вставить свою логику отрисовки. В код автоматически добавляется «хедер» с определениями `Camera`, `Draw`, `VertexInput`, `VertexOutput`, `SkinnedVertex`, функцией `skin_vertex` и storage-буфером `joint_matrices`. Кастомный шейдер должен использовать те же шесть атрибутов вершины и тот же layout group 1, что и встроенный `lit.wgsl`; готовые пресеты уже делают это через общий `vs_main`.
 
 Вам нужно реализовать как минимум:
 - `fs_main(input: VertexOutput) -> @location(0) vec4<f32>` (для обычных мешей)
@@ -1158,10 +1176,15 @@ renderer.draw_mesh_textured(&gpu_mesh, &texture, transform, Color::WHITE);
 
 ### glTF-модели
 
-`GltfModel` читает `.gltf` и `.glb` целиком: буферы, иерархию узлов,
-материалы и встроенные или внешние изображения. Сцена «сплющивается» в список
-уникальных примитивов и экземпляров с мировыми матрицами, поэтому один меш,
-использованный в нескольких узлах, загружается на GPU один раз.
+`GltfModel` читает `.gltf` и `.glb` целиком: буферы, иерархию узлов, скины,
+анимационные клипы, материалы и встроенные или внешние изображения. Сцена
+«сплющивается» в список уникальных примитивов и экземпляров с мировыми
+матрицами, поэтому один меш, использованный в нескольких узлах, загружается на
+GPU один раз. При этом узлы, скины и клипы сохраняются в модели, чтобы можно
+было вычислить позу в любой момент времени.
+
+Обычная отрисовка не отличалась от прежней: скинные меши при этом показываются
+в bind pose, которую `create_gltf` сохраняет в `GpuGltfModel`.
 
 ```rust
 use frglib::gpu::glam::Mat4;
@@ -1176,10 +1199,42 @@ renderer.draw_gltf(&gpu_model, Mat4::IDENTITY);
 renderer.finish(&mut frame);
 ```
 
-- Читаются `POSITION`, `NORMAL`, `TEXCOORD_0`…`TEXCOORD_n`, `COLOR_0`, индексы,
-  режимы `TRIANGLES`/`TRIANGLE_STRIP`/`TRIANGLE_FAN`/`LINES`/`LINE_STRIP`/
-  `LINE_LOOP`, base color factor и base color texture, а также
-  `KHR_materials_unlit` и `KHR_texture_transform`.
+Для анимации создайте `GltfAnimationPlayer` из той же `GltfModel` и передавайте
+его в `draw_gltf_animated`. Плеер сам выбирает первый клип, зацикливает его и
+пересчитывает матрицы костей:
+
+```rust
+use frglib::gpu::glam::Mat4;
+use frglib::gpu::{GltfAnimationPlayer, GltfModel};
+
+let model = GltfModel::from_file("model.glb")?;
+let gpu_model = renderer.create_gltf(&model)?;
+let mut player = GltfAnimationPlayer::new(&model);
+
+// В цикле кадра, до finish:
+player.update(clock.dt().min(0.05)); // шаг ограничивают, чтобы не было рывков
+renderer.begin(&camera);
+renderer.draw_gltf_animated(&gpu_model, &player, Mat4::IDENTITY);
+renderer.finish(&mut frame);
+```
+
+- Читаются `POSITION`, `NORMAL`, `TEXCOORD_0`…`TEXCOORD_n`, `COLOR_0`,
+  `JOINTS_0`, `WEIGHTS_0`, индексы, режимы `TRIANGLES`/`TRIANGLE_STRIP`/
+  `TRIANGLE_FAN`/`LINES`/`LINE_STRIP`/`LINE_LOOP`, base color factor и base color
+  texture, а также `KHR_materials_unlit` и `KHR_texture_transform`.
+- Матрица кости считается как `world(joint) * inverseBindMatrix`. Вершинный
+  шейдер смешивает до четырёх влияний и делит результат на сумму весов, поэтому
+  веса не обязаны быть нормализованными. Один скелет может содержать не более
+  `MAX_JOINTS = 64` костей; иначе загрузка вернёт `GltfError::TooManyJoints`.
+- Поддерживаются каналы `translation`, `rotation` и `scale` с интерполяцией
+  `LINEAR` и `STEP`; вращения интерполируются через slerp. Для `CUBICSPLINE`
+  берётся среднее значение каждой тройки, а тангенсы игнорируются. Клип
+  зацикливается; `set_clip`, `with_clip`, `set_speed` и `set_time` управляют
+  воспроизведением.
+- `draw_gltf_animated` использует текущие матрицы костей и игнорирует
+  transform у mesh-узла, потому что в glTF скинным мешем управляют только кости.
+  Обычные узлы следуют анимированной мировой матрице. Внешний `transform`
+  по-прежнему размещает всю модель.
 - Текстуры декодируются из GLB, из `data:`-URI и из внешних PNG/JPEG рядом с
   моделью. Набор UV выбирается по `baseColorTexture.texCoord`; если такого
   набора в меше нет, используется `TEXCOORD_0`.
@@ -1187,9 +1242,9 @@ renderer.finish(&mut frame);
   получают `(0, 0)`.
 - UV в glTF уже отсчитываются от верхнего левого угла, поэтому V не
   переворачивается, в отличие от OBJ.
-- Скины, морф-таргеты, анимации, камеры, источники света и остальные
-  PBR-каналы пока не загружаются. Сэмплеры текстур игнорируются: рендерер
-  использует свой обычный sampler.
+- Морф-таргеты, камеры, источники света и остальные PBR-каналы пока не
+  загружаются. Сэмплеры текстур игнорируются: рендерер использует свой обычный
+  sampler.
 - `GltfModel::from_slice` принимает GLB или JSON из памяти, включая
   встроенные изображения; для JSON внешние файлы ищутся относительно текущего
   каталога.
@@ -1198,6 +1253,9 @@ renderer.finish(&mut frame);
 
 ```text
 window.poll()
+      │
+      ▼
+player.update(dt)             готовит матрицы костей
       │
       ▼
 window.begin_frame() ── None ──► continue
@@ -1253,6 +1311,9 @@ scene.finish(&mut frame)      ui.finish(&mut frame)
   `measure_text`.
 - **Нормали 3D.** `lit.wgsl` поворачивает нормаль модельной матрицей, что
   верно для равномерного масштаба. При растяжении освещение будет неточным.
+- **Скелетная анимация.** На скелет отводится `MAX_JOINTS = 64` кости;
+  тангенсы `CUBICSPLINE` не используются. Морф-таргеты пока не загружаются,
+  а transform скинного mesh-узла в glTF намеренно игнорируется.
 - **Skybox не вращается сам.** Небо следует за поворотом камеры, но не за её
   позицией, и не имеет отдельного угла поворота. Один skybox на рендерер.
 - **Грани skybox.** Все шесть граней должны быть одинакового квадратного
@@ -1287,13 +1348,16 @@ cargo test --doc --features wgpu
 cargo run --features wgpu --example wgpu-cube
 cargo run --features wgpu --example wgpu-hud
 cargo run --features wgpu --example wgpu-gltf
+cargo run --features wgpu --example wgpu-skinned
 cargo run --features wgpu --example wgpu-skybox
 ```
 
 Юнит-тесты GPU-слоя не требуют видеокарты: они проверяют раскладку текста,
 аллокатор атласа, размеры вершин и юниформ, математику камеры, конвертацию
-цвета, а также направления граней skybox и разворот панорамы. Всё, что реально
-трогает `Device` или `Queue`, живёт в примерах.
+цвета, загрузку glTF и скинов, а также направления граней skybox и разворот
+панорамы. Исключение — `tests/preset_pipeline_smoke.rs`: он компилирует все
+пресеты в настоящие пайплайны `wgpu`, если адаптер доступен, и молча
+пропускается без него.
 
 ## Шпаргалка по API
 
@@ -1312,13 +1376,20 @@ Frame::{encoder, color, depth, size, background} + Frame::aspect
 ```rust
 Camera3D::{perspective, position, target, up, fov_y, clip, orbit, view, projection, view_projection}
 Mesh::{cube, plane, grid, from_vertices, from_line_list, line, from_obj_str, from_obj_file}
-Vertex::{new, with_color}
-GltfModel::{from_file, from_slice}
+Vertex::{new, with_color, with_uv, with_color_uv, with_skin}
+GltfModel::{from_file, from_slice, bind_pose}
+GltfNode::local_matrix
+GltfSkin, GltfAnimation, GltfAnimationChannel, GltfAnimationProperty, GltfInterpolation
+GltfAnimationPlayer::{new, with_clip, clip, clip_count, set_clip,
+                      duration, time, speed, set_speed, set_time, update,
+                      node_transform, joint_matrices}
 Renderer3D::{new, create_mesh, create_gltf, create_skybox, create_material,
              create_preset_material, begin,
              set_skybox, clear_skybox, skybox,
              set_lights, add_light, clear_lights, lights, set_ambient, ambient,
-             draw_mesh, draw_mesh_with, draw_gltf, draw_cube, draw_cube_model, draw_plane,
+             draw_mesh, draw_mesh_with, draw_gltf, draw_gltf_with,
+             draw_gltf_animated, draw_gltf_animated_with,
+             draw_cube, draw_cube_model, draw_plane,
              draw_grid, draw_line, draw_lines, finish}
 Material::{Lit, Unlit, Transparent, Custom}
 ShaderPreset::{Toon, Comic, Retro, Pixel, Hologram, Neon, Film, Normals, ALL, name, source}
@@ -1326,6 +1397,7 @@ Light::{directional, point, with_intensity, with_range, direction, position}
 LightKind::{Directional, Point}
 Skybox::{from_equirectangular, from_equirectangular_rgba8, from_faces, from_rgba8_faces,
          face_size, texture, view}
+MAX_JOINTS
 MAX_LIGHTS
 SKYBOX_FACES
 ```
