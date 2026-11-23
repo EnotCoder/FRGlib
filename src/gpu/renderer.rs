@@ -16,6 +16,7 @@ use crate::gpu::window::{Frame, Gpu};
 use crate::graphics::{Color, Image};
 
 use super::color_to_linear;
+use super::shaders::ShaderPreset;
 
 /// How a draw call is lit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -527,6 +528,28 @@ impl Renderer3D {
         });
 
         Material::Custom(id)
+    }
+
+    /// Compiles one of the ready-made [`ShaderPreset`] styles into a material.
+    ///
+    /// This is a thin wrapper around [`create_material`](Self::create_material):
+    /// the preset already contains `vs_main`, `fs_main` and `fs_main_textured`.
+    /// Compile a preset once, then reuse the returned material every frame.
+    ///
+    /// ```no_run
+    /// # use frglib::gpu::{Renderer3D, ShaderPreset};
+    /// # let mut renderer: Renderer3D = unimplemented!();
+    /// let toon = renderer.create_preset_material(ShaderPreset::Toon);
+    /// renderer.draw_cube_with(
+    ///     frglib::gpu::glam::Vec3::ZERO,
+    ///     frglib::gpu::glam::Vec3::ONE,
+    ///     toon,
+    ///     frglib::Color::RED,
+    /// );
+    /// ```
+    pub fn create_preset_material(&mut self, preset: ShaderPreset) -> Material {
+        let source = preset.source();
+        self.create_material(&source)
     }
 
     /// Uploads caller geometry to the GPU.

@@ -225,6 +225,11 @@ path = "examples/wgpu/skybox.rs"
 required-features = ["wgpu"]
 
 [[example]]
+name = "wgpu-shader-presets"
+path = "examples/wgpu/shader_presets.rs"
+required-features = ["wgpu"]
+
+[[example]]
 name = "3d_games-fgoty_run"
 path = "examples/3d_games/fgoty_run/main.rs"
 required-features = ["wgpu"]
@@ -232,6 +237,11 @@ required-features = ["wgpu"]
 [[example]]
 name = "3d_games-terrain"
 path = "examples/3d_games/terrain/main.rs"
+required-features = ["wgpu"]
+
+[[test]]
+name = "preset_pipeline_smoke"
+path = "tests/preset_pipeline_smoke.rs"
 required-features = ["wgpu"]
 
 [profile.release]

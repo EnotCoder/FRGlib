@@ -85,7 +85,11 @@ src/gpu/
 ├── error.rs          Error
 └── shaders/
     ├── lit.wgsl      3D: освещённый и unlit-фрагмент
-    └── sprite.wgsl   2D: фигуры, спрайты и текст
+    ├── sprite.wgsl   2D: фигуры, спрайты и текст
+    ├── presets/
+    │   ├── common.wgsl   общий vs_main и хелперы для пресетов
+    │   └── *.wgsl        готовые стили: toon, comic, retro, ...
+    └── mod.rs        ShaderPreset: список и исходники пресетов
 ```
 
 | Файл | Роль | Публичные имена |
@@ -98,6 +102,7 @@ src/gpu/
 | `light.rs` | Направленные и точечные источники света | `Light`, `LightKind`, `MAX_LIGHTS` |
 | `skybox.rs` | Кубическое небо из шести граней или панорамы | `Skybox`, `SKYBOX_FACES` |
 | `Renderer3D` | 3D-рендерер с освещением, небом и кастомными шейдерами | `Renderer3D`, `Material` |
+| `shaders/mod.rs` | Готовые стили шейдеров | `ShaderPreset` |
 | `Renderer2D` | Батчевый 2D-рендерер | `Renderer2D`, `GpuTexture` |
 | `texture.rs` | Текстуры для 3D и общие GPU-изображения | `Texture` |
 | `obj.rs` | Загрузка моделей Wavefront OBJ | `ObjError` |
@@ -106,6 +111,7 @@ src/gpu/
 | `error.rs` | Ошибки окна, GPU и рисования | `Error` |
 | `shaders/lit.wgsl` | WGSL для 3D (lit, unlit, textured) | — |
 | `shaders/sprite.wgsl` | WGSL для 2D | — |
+| `shaders/presets/*.wgsl` | Готовые стили (мультфильм, комикс, ретро и др.) | — |
 
 Дальше — каждый файл по порядку.
 
@@ -1065,6 +1071,50 @@ window.present(frame)?;
 - `render_size()` отстаёт от `size()` на один кадр: между событием ресайза и
   следующим `begin_frame` они могут отличаться.
 
+### Готовые шейдеры (ShaderPreset)
+
+`ShaderPreset` — набор готовых стилей, которые компилируются через тот же
+`create_material`, что и пользовательские шейдеры. Их можно передавать в любые
+`*_with`-методы, они работают с текстурами и используют свет сцены.
+
+| Пресет | Эффект |
+|---|---|
+| `ShaderPreset::Toon` | Мультяшный: жёсткие ступени света, резкий блик и тёмный контур по краю |
+| `ShaderPreset::Comic` | Комикс: постерованные цвета, растровые точки и обводка по излому нормалей |
+| `ShaderPreset::Retro` | Ретро: палитра из 8 уровней, крупные пиксели текстуры, скан-линии и цветовые ореолы |
+| `ShaderPreset::Pixel` | Пиксель-арт: упорядоченный дизеринг и маленькая палитра, текстура привязывается к сетке |
+| `ShaderPreset::Hologram` | Голограмма: свечение по Френелю, мерцающие полосы и частичная прозрачность |
+| `ShaderPreset::Neon` | Неон: тёмная сердцевина, насыщенный ореол и светящиеся кольца |
+| `ShaderPreset::Film` | Старое кино: сепия, зерно, царапина и затемнение углов |
+| `ShaderPreset::Normals` | Отладка: нормали в мировом пространстве в виде RGB |
+
+```rust
+use frglib::gpu::{Material, Renderer3D, ShaderPreset};
+
+let toon = renderer.create_preset_material(ShaderPreset::Toon);
+let retro = renderer.create_preset_material(ShaderPreset::Retro);
+renderer.draw_cube_with(center, size, toon, Color::RED);
+renderer.draw_mesh_textured_with(&mesh, &texture, transform, retro, Color::WHITE);
+
+// Список для меню: ShaderPreset::ALL / preset.name().
+```
+
+Компиляция WGSL стоит денег, поэтому материалы создают один раз до цикла
+кадров и переиспользуют. `ShaderPreset::source()` возвращает тело шейдера
+(общий `vs_main` и два фрагментных входа) для `create_material`, если нужно
+доработать эффект вручную.
+
+Ограничения: пресет берёт только первый источник света; движение ретро- и
+голографических эффектов привязано к координатам, потому что в юниформе камеры
+нет времени. `Hologram` возвращает альфу, но рисуется в очереди непрозрачных
+материалов с записью глубины — для настоящего свечения поверх сцены используйте
+`Material::Transparent` со своим шейдером.
+
+Все пресеты проверяются тестом: `cargo test --features wgpu gpu::shaders`
+парсит и валидирует их WGSL (включая `fs_main` и `fs_main_textured`), а
+`cargo test --features wgpu --test preset_pipeline_smoke` собирает из них
+настоящие пайплайны `wgpu` (если есть адаптер).
+
 ### Кастомные шейдеры (Renderer3D)
 
 `create_material` позволяет вставить свою логику отрисовки. В код автоматически добавляется «хедер» с определениями `Camera`, `Draw`, `VertexInput` и `VertexOutput`.
@@ -1264,12 +1314,14 @@ Camera3D::{perspective, position, target, up, fov_y, clip, orbit, view, projecti
 Mesh::{cube, plane, grid, from_vertices, from_line_list, line, from_obj_str, from_obj_file}
 Vertex::{new, with_color}
 GltfModel::{from_file, from_slice}
-Renderer3D::{new, create_mesh, create_gltf, create_skybox, begin,
+Renderer3D::{new, create_mesh, create_gltf, create_skybox, create_material,
+             create_preset_material, begin,
              set_skybox, clear_skybox, skybox,
              set_lights, add_light, clear_lights, lights, set_ambient, ambient,
              draw_mesh, draw_mesh_with, draw_gltf, draw_cube, draw_cube_model, draw_plane,
              draw_grid, draw_line, draw_lines, finish}
-Material::{Lit, Unlit}
+Material::{Lit, Unlit, Transparent, Custom}
+ShaderPreset::{Toon, Comic, Retro, Pixel, Hologram, Neon, Film, Normals, ALL, name, source}
 Light::{directional, point, with_intensity, with_range, direction, position}
 LightKind::{Directional, Point}
 Skybox::{from_equirectangular, from_equirectangular_rgba8, from_faces, from_rgba8_faces,
