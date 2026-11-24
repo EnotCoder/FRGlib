@@ -161,9 +161,10 @@ impl<'a> Draw<'a> {
         Ok(())
     }
 
-    /// Private because an indexed triangle list is what every `*_object` fill
-    /// reduces to once rotation is in play.
-    fn fill_polygon(
+    /// The indexed-triangle primitive behind every `*_object` fill. Crate-visible
+    /// so other drawing helpers, such as round particles, can queue their own
+    /// polygons through the same camera and blend settings.
+    pub(crate) fn fill_polygon(
         &mut self,
         points: &[(f32, f32)],
         indices: &[i32],

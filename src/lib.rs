@@ -1,7 +1,8 @@
 //! Rust bindings to SDL3.
 //!
-//! A window with a renderer, window and input events, and a [`TileMap`] for
-//! laying tiles out over a world.
+//! A window with a renderer, window and input events, a [`TileMap`] for laying
+//! tiles out over a world, and a [`ParticleSystem`] for sparks, smoke and
+//! bursts that can be drawn through either renderer.
 //!
 //! With the `wgpu` feature the crate also grows a second window flavour,
 //! [`gpu::WgpuWindow`], where SDL3 still owns the window and input but `wgpu`
@@ -52,6 +53,7 @@ pub mod gpu;
 pub mod graphics;
 pub mod math;
 pub mod noise;
+pub mod particles;
 pub mod tilemap;
 pub mod timing;
 pub mod ui;
@@ -74,6 +76,7 @@ pub use graphics::{Animation, Texture};
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{cos, lerp, sin, Ease, Lerp, Mat3, Rect, Vec2};
 pub use noise::Perlin;
+pub use particles::{Emitter, Particle, ParticleShape, ParticleSystem};
 pub use tilemap::{MapError, TileMap};
 pub use timing::FrameClock;
 pub use ui::{Anchor, Button, ButtonState, Label, Slider, SliderState, TextCache};

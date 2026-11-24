@@ -38,6 +38,7 @@ required-features = ["cached-textures"]
 | `basic-object` | `examples/basic/object.rs` | — | Три объекта с поворотом: цвет, текстура, многоугольник |
 | `basic-mouse` | `examples/basic/mouse.rs` | — | Состояние кнопок мыши между кадрами, `FocusLost` |
 | `basic-camera` | `examples/basic/camera.rs` | — | Движение камеры, зум к курсору, `to_world` |
+| `basic-particles` | `examples/basic/particles.rs` | — | `ParticleSystem`: фонтан за курсором, вспышка по клику, две формы частиц |
 | `basic-cached` | `examples/basic/cached.rs` | `cached-textures` | Одинаковая жаба: заливка каждый кадр против одной загрузки |
 | `basic-animation` | `examples/basic/animation.rs` | `cached-textures` | 8 кадров, `Animation::advance`, пауза, скорость, цикл |
 
@@ -89,6 +90,7 @@ cargo run --example basic-polygon
 cargo run --example basic-object
 cargo run --example basic-mouse
 cargo run --example basic-camera
+cargo run --example basic-particles
 cargo run --example input-relative
 cargo run --example math-lerp
 cargo run --example math-sin-cos
@@ -205,6 +207,7 @@ fn asset(name: &str) -> PathBuf {
 | Полигоны | `basic-polygon` |
 | Поворот | `basic-object` |
 | Камера и мышь | `basic-camera`, `input-relative` |
+| Частицы | `basic-particles` |
 | Кеш текстур | `basic-cached`, `basic-animation` |
 | Тайлмап | `2d_games-fgoty`, `2d_games-fgoty-dash` |
 | UI | `ui-button`, `ui-slider`, `ui-text` |

@@ -341,6 +341,40 @@ let halfway = from.lerp(to, 0.5, Ease::Linear);
 Когда-нибудь здесь появятся `Ease::In`, `Ease::Out` и остальные — сигнатура
 не изменится, добавится только новый вариант enum.
 
+### Частицы
+
+`ParticleSystem` — пул частиц с настройкой рождения через `Emitter`. Система
+не зависит от окна: один и тот же набор частиц рисуется и в SDL-окне, и на GPU.
+
+```rust
+use frglib::{Color, Emitter, ParticleShape, ParticleSystem, Vec2};
+
+let mut sparks = ParticleSystem::with_emitter(512, Emitter::new()
+    .rate(40.0)                                    // частиц в секунду
+    .at(Vec2::new(400.0, 300.0))                   // точка рождения
+    .direction(-std::f32::consts::FRAC_PI_2)       // вверх по экрану
+    .spread(0.7)                                   // ширина конуса, радианы
+    .speed(80.0, 200.0)
+    .lifetime(0.4, 0.9)
+    .colors(Color::WHITE, Color::rgba(255, 80, 40, 0))
+    .shape(ParticleShape::Circle));
+
+// В цикле кадра:
+sparks.update(dt);
+window.frame_with(|d| { sparks.draw(d)?; Ok(()) })?;
+// В GPU-окне вместо этого: sparks.draw_gpu(&mut ui);
+```
+
+`gravity`, `drag`, `size` и `end_scale` задают движение и затухание. `emit(n)`
+выдаёт пачку сразу в точке эмиттера, `emit_at(n, pos)` — в своей точке, а
+`clear()` опустошает пул. Когда пул полон, новые частицы вытесняют самые старые,
+поэтому долго работающий эмиттер не растёт бесконечно. Позиции — в единицах
+мира: если у окна стоит камера, частицы рисуются через неё вместе со всем
+остальным.
+
+Примеры: `cargo run --example basic-particles` и
+`cargo run --features wgpu --example wgpu-particles`.
+
 ### Кнопки
 
 ```rust

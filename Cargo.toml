@@ -128,6 +128,10 @@ name = "basic-window"
 path = "examples/basic/window.rs"
 
 [[example]]
+name = "basic-particles"
+path = "examples/basic/particles.rs"
+
+[[example]]
 name = "basic-camera"
 path = "examples/basic/camera.rs"
 
@@ -232,6 +236,11 @@ required-features = ["wgpu"]
 [[example]]
 name = "wgpu-shader-presets"
 path = "examples/wgpu/shader_presets.rs"
+required-features = ["wgpu"]
+
+[[example]]
+name = "wgpu-particles"
+path = "examples/wgpu/particles.rs"
 required-features = ["wgpu"]
 
 [[example]]

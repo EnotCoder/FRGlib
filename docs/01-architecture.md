@@ -30,9 +30,11 @@
 - `gpu` (wgpu) стоит особняком: он использует SDL3 только для создания окна,
   но заменяет собой весь слой отрисовки. Внутри два независимых рендерера:
   `Renderer3D` для сцен и `Renderer2D` для примитивов, текстур и текста.
-- `ui` и `tilemap` построены поверх `window::Draw`, `graphics` и `math`. Под
-  фичей `wgpu` у тех же типов есть методы `draw_gpu`, которые рисуют их через
-  `gpu::Renderer2D`; SDL-API при этом не меняется.
+- `ui`, `tilemap` и `particles` построены поверх `window::Draw`, `graphics` и
+  `math`. Под фичей `wgpu` у тех же типов есть методы `draw_gpu`, которые
+  рисуют их через `gpu::Renderer2D`; SDL-API при этом не меняется. Частицы
+  сами по себе не зависят ни от SDL, ни от `wgpu`: только методы отрисовки
+  обращаются к рендерерам.
 
 ## Точка входа и реэкспорты
 
@@ -44,6 +46,7 @@ pub mod event;
 pub mod gpu;
 pub mod graphics;
 pub mod math;
+pub mod particles;
 pub mod timing;
 pub mod tilemap;
 pub mod ui;
@@ -66,6 +69,7 @@ pub use gpu::{
 };
 pub use graphics::{Camera, Color, Image, Object};
 pub use math::{cos, lerp, sin, Ease, Lerp, Mat3, Rect, Vec2};
+pub use particles::{Emitter, Particle, ParticleShape, ParticleSystem};
 pub use timing::FrameClock;
 pub use tilemap::{MapError, TileMap};
 pub use ui::{Anchor, Button, ButtonState, Label, Slider, SliderState, TextCache};

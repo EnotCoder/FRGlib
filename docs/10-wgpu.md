@@ -14,11 +14,13 @@
 ```bash
 cargo run --features wgpu --example wgpu-cube
 cargo run --features wgpu --example wgpu-hud
+cargo run --features wgpu --example wgpu-particles
 ```
 
 `wgpu-cube` — только 3D: куб, сетка, орбитальная камера. `wgpu-hud` — оба
 рендерера в одном кадре: 3D-сцена, а поверх неё панель, текст, кнопка,
-слайдер и текстурированный тайлмап.
+слайдер и текстурированный тайлмап. `wgpu-particles` — общий `ParticleSystem`,
+который здесь рисуется через `Renderer2D` методом `draw_gpu`.
 
 ## Что важно понять сразу
 
@@ -669,6 +671,20 @@ renderer.draw_rect(Rect::new(10.0, 10.0, 120.0, 40.0), 2.0, Color::WHITE);
 renderer.draw_line(Vec2::new(10.0, 80.0), Vec2::new(130.0, 80.0), 3.0, Color::WHITE);
 renderer.fill_circle(Vec2::new(80.0, 160.0), 24.0, Color::BLUE);
 ```
+
+### Частицы
+
+Симуляция частиц живёт вне GPU-модуля: `frglib::ParticleSystem` работает и с
+обычным окном, и с GPU-окном. В GPU-кадре её достаточно обновить и отрисовать через
+`draw_gpu`, который сам вызовет нужные примитивы:
+
+```rust
+sparks.update(dt);
+sparks.draw_gpu(&mut renderer);
+```
+
+Метод использует текущее пространство рендерера — экранные пиксели или камеру,
+установленную через `set_camera`.
 
 ### Текстуры
 
